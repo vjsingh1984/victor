@@ -24,6 +24,7 @@ import logging
 import os
 import shutil
 import sqlite3
+import tempfile
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -32,6 +33,20 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+def _current_correlation_id() -> Optional[str]:
+    """Best-effort current trace/turn id, used as the change-group ``message_id``.
+
+    Reads the ambient ``TraceContext`` contextvar (cheap, None if no active
+    trace); groups edits made within one turn under the same id. Never raises.
+    """
+    try:
+        from victor.runtime.trace_context import get_correlation_id
+
+        return get_correlation_id()
+    except Exception:  # pragma: no cover - defensive, tracing is optional
+        return None
 
 
 class ChangeType(Enum):
@@ -109,6 +124,8 @@ class ChangeGroup:
     description: str = ""
     tool_name: str = ""
     undone: bool = False
+    session_id: Optional[str] = None
+    message_id: Optional[str] = None  # Links the group to a conversation message
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -119,6 +136,8 @@ class ChangeGroup:
             "description": self.description,
             "tool_name": self.tool_name,
             "undone": self.undone,
+            "session_id": self.session_id,
+            "message_id": self.message_id,
         }
 
     @classmethod
@@ -131,6 +150,8 @@ class ChangeGroup:
             description=data.get("description", ""),
             tool_name=data.get("tool_name", ""),
             undone=data.get("undone", False),
+            session_id=data.get("session_id"),
+            message_id=data.get("message_id"),
         )
 
 
@@ -157,7 +178,7 @@ class FileChangeHistory:
             project_path: Path to project root for database access.
         """
         from victor.config.settings import get_project_paths
-        from victor.core.database import get_project_database
+        from victor.core.undo_database import get_undo_database
 
         self.storage_dir = storage_dir or get_project_paths().changes_dir
         self.storage_dir.mkdir(parents=True, exist_ok=True)
@@ -171,8 +192,9 @@ class FileChangeHistory:
         # Current change group being built
         self._current_group: Optional[ChangeGroup] = None
 
-        # Use consolidated project.db via ProjectDatabaseManager
-        self._db = get_project_database(project_path)
+        # Dedicated undo.db (own write-lock; never contends with the graph indexer
+        # on project.db). Schema owned by UndoDatabaseManager.
+        self._db = get_undo_database(project_path)
         self._db_path = self._db.db_path
         self._init_database()
 
@@ -186,101 +208,13 @@ class FileChangeHistory:
         return f"session_{int(time.time() * 1000)}"
 
     def _init_database(self) -> None:
-        """Initialize database tables with correct schema."""
-        conn = self._db.get_connection()
+        """Ensure the undo schema exists.
 
-        # Check if tables need recreation (wrong schema)
-        if self._needs_schema_rebuild(conn):
-            conn.execute("DROP TABLE IF EXISTS file_changes")
-            conn.execute("DROP TABLE IF EXISTS change_groups")
-            conn.commit()
-
-        # Create tables with correct schema
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS change_groups (
-                id TEXT PRIMARY KEY,
-                session_id TEXT,
-                timestamp REAL,
-                description TEXT,
-                tool_name TEXT,
-                undone INTEGER DEFAULT 0,
-                data TEXT
-            )
-        """)
-
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS file_changes (
-                id TEXT PRIMARY KEY,
-                group_id TEXT,
-                change_type TEXT,
-                file_path TEXT,
-                timestamp REAL,
-                tool_name TEXT,
-                original_content TEXT,
-                new_content TEXT,
-                original_path TEXT,
-                checksum_before TEXT,
-                checksum_after TEXT,
-                FOREIGN KEY (group_id) REFERENCES change_groups(id)
-            )
-        """)
-
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_groups_session
-            ON change_groups(session_id)
-        """)
-
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_groups_timestamp
-            ON change_groups(timestamp DESC)
-        """)
-
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_changes_path
-            ON file_changes(file_path)
-        """)
-
-        conn.commit()
-
-    def _needs_schema_rebuild(self, conn: sqlite3.Connection) -> bool:
-        """Check if tables exist with wrong schema and need rebuild."""
-        try:
-            # Check change_groups columns
-            cursor = conn.execute("PRAGMA table_info(change_groups)")
-            group_cols = {row[1] for row in cursor.fetchall()}
-            required_group = {
-                "id",
-                "session_id",
-                "timestamp",
-                "description",
-                "tool_name",
-                "undone",
-                "data",
-            }
-            if group_cols and not required_group.issubset(group_cols):
-                return True
-
-            # Check file_changes columns AND types (id must be TEXT, not INTEGER)
-            cursor = conn.execute("PRAGMA table_info(file_changes)")
-            change_cols = {row[1]: row[2] for row in cursor.fetchall()}
-            if change_cols:
-                # Check required columns exist
-                required_change = {
-                    "id",
-                    "group_id",
-                    "change_type",
-                    "file_path",
-                    "timestamp",
-                }
-                if not required_change.issubset(change_cols.keys()):
-                    return True
-                # Check id column type is TEXT (not INTEGER)
-                if change_cols.get("id", "").upper() != "TEXT":
-                    return True
-
-            return False
-        except sqlite3.OperationalError:
-            return False
+        The dedicated ``undo.db`` is a fresh, self-contained file whose schema is
+        owned and versioned by :class:`UndoDatabaseManager`; there is no legacy
+        table to destructively rebuild (that lived in the shared ``project.db``).
+        """
+        self._db.ensure_schema()
 
     def _load_recent_history(self) -> None:
         """Load recent change history from database."""
@@ -314,22 +248,31 @@ class FileChangeHistory:
         """Compute MD5 checksum of content."""
         return hashlib.md5(content.encode("utf-8")).hexdigest()
 
-    def begin_change_group(self, tool_name: str, description: str = "") -> str:
+    def begin_change_group(
+        self, tool_name: str, description: str = "", message_id: Optional[str] = None
+    ) -> str:
         """Begin a new change group.
 
         Args:
             tool_name: Name of the tool making changes
             description: Human-readable description
+            message_id: Optional conversation message id this group belongs to
 
         Returns:
             Group ID
         """
         group_id = f"grp_{int(time.time() * 1000)}_{tool_name}"
+        # Auto-resolve the turn/message id when the caller didn't supply one, so
+        # edit/write/patch groups are attributed without touching each writer.
+        if message_id is None:
+            message_id = _current_correlation_id()
         self._current_group = ChangeGroup(
             id=group_id,
             tool_name=tool_name,
             description=description,
             timestamp=time.time(),
+            session_id=self.session_id,
+            message_id=message_id,
         )
         logger.debug(f"Started change group: {group_id}")
         return group_id
@@ -343,6 +286,7 @@ class FileChangeHistory:
         tool_name: str = "",
         tool_args: Optional[Dict[str, Any]] = None,
         original_path: Optional[str] = None,
+        message_id: Optional[str] = None,
     ) -> FileChange:
         """Record a file change.
 
@@ -354,12 +298,14 @@ class FileChangeHistory:
             tool_name: Name of tool making the change
             tool_args: Arguments passed to the tool
             original_path: Original path (for renames)
+            message_id: Optional conversation message id (defaults to the group's)
 
         Returns:
             The recorded FileChange
         """
         change_id = f"chg_{int(time.time() * 1000)}_{os.path.basename(file_path)}"
 
+        group_message_id = self._current_group.message_id if self._current_group else None
         change = FileChange(
             id=change_id,
             change_type=change_type,
@@ -373,6 +319,7 @@ class FileChangeHistory:
             checksum_before=(self.compute_checksum(original_content) if original_content else None),
             checksum_after=self.compute_checksum(new_content) if new_content else None,
             session_id=self.session_id,
+            message_id=message_id if message_id is not None else group_message_id,
         )
 
         if self._current_group:
@@ -441,53 +388,70 @@ class FileChangeHistory:
                 time.sleep(self._SAVE_LOCK_RETRY_DELAY_S)
 
     def _save_group_once(self, group: ChangeGroup) -> None:
-        """Single attempt at persisting a change group to the database."""
+        """Single attempt at persisting a change group to the database.
+
+        Group row + all file rows are written in one implicit transaction and a
+        single ``commit`` so the group is DB-atomic (all-or-nothing); the
+        write-lock is held only for that short commit, minimizing contention
+        across concurrent sessions.
+        """
         conn = self._db.get_connection()
         cursor = conn.cursor()
 
-        cursor.execute(
-            """
-            INSERT OR REPLACE INTO change_groups
-            (id, session_id, timestamp, description, tool_name, undone, data)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                group.id,
-                self.session_id,
-                group.timestamp,
-                group.description,
-                group.tool_name,
-                1 if group.undone else 0,
-                json_dumps(group.to_dict()),
-            ),
-        )
-
-        # Also save individual changes for querying
-        for change in group.changes:
+        try:
             cursor.execute(
                 """
-                INSERT OR REPLACE INTO file_changes
-                (id, group_id, change_type, file_path, timestamp, tool_name,
-                 original_content, new_content, original_path, checksum_before, checksum_after)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO change_groups
+                (id, session_id, message_id, timestamp, description, tool_name, undone, data)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
-                    change.id,
                     group.id,
-                    change.change_type.value,
-                    change.file_path,
-                    change.timestamp,
-                    change.tool_name,
-                    change.original_content,
-                    change.new_content,
-                    change.original_path,
-                    change.checksum_before,
-                    change.checksum_after,
+                    self.session_id,
+                    group.message_id,
+                    group.timestamp,
+                    group.description,
+                    group.tool_name,
+                    1 if group.undone else 0,
+                    json_dumps(group.to_dict()),
                 ),
             )
 
-        conn.commit()
-        # Connection managed by ProjectDatabaseManager
+            # Replace child rows so seq stays consistent on re-save (undo/redo).
+            cursor.execute("DELETE FROM file_changes WHERE group_id = ?", (group.id,))
+
+            # Also save individual changes for querying (seq = deterministic order).
+            for seq, change in enumerate(group.changes):
+                cursor.execute(
+                    """
+                    INSERT INTO file_changes
+                    (id, group_id, seq, change_type, file_path, timestamp, tool_name,
+                     original_content, new_content, original_path, checksum_before,
+                     checksum_after, session_id, message_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        change.id,
+                        group.id,
+                        seq,
+                        change.change_type.value,
+                        change.file_path,
+                        change.timestamp,
+                        change.tool_name,
+                        change.original_content,
+                        change.new_content,
+                        change.original_path,
+                        change.checksum_before,
+                        change.checksum_after,
+                        change.session_id,
+                        change.message_id,
+                    ),
+                )
+
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
     def _trim_history(self) -> None:
         """Trim history to max_history size."""
@@ -513,8 +477,14 @@ class FileChangeHistory:
         """Check if redo is available."""
         return len(self._redo_stack) > 0
 
-    def undo(self) -> Tuple[bool, str, List[str]]:
-        """Undo the last change group.
+    def undo(self, force: bool = False) -> Tuple[bool, str, List[str]]:
+        """Undo the last change group for this session (group-atomic).
+
+        Reverts every file in the most recent non-undone group. Writes are
+        crash-safe (temp file + ``os.replace``); if any file fails mid-replay the
+        already-reverted files are restored (all-or-nothing). A file another
+        session changed since (checksum mismatch) is skipped with a warning
+        unless ``force`` is set.
 
         Returns:
             Tuple of (success, message, list of affected files)
@@ -522,44 +492,34 @@ class FileChangeHistory:
         if not self._undo_stack:
             return False, "Nothing to undo", []
 
-        group = self._undo_stack.pop()
-        affected_files = []
-        errors = []
+        group = self._undo_stack[-1]
+        applied, skipped, error = self._replay_group(group, phase="undo", force=force)
 
-        # Reverse changes in reverse order
-        for change in reversed(group.changes):
-            try:
-                self._reverse_change(change)
-                affected_files.append(change.file_path)
-            except Exception as e:
-                errors.append(f"{change.file_path}: {e}")
-                logger.error(f"Failed to undo change on {change.file_path}: {e}")
+        if error is not None:
+            return False, f"Undo failed: {error} (changes rolled back)", []
+        if not applied and skipped:
+            return (
+                False,
+                f"Skipped {len(skipped)} file(s) changed by another session since; "
+                "nothing undone. Re-run with force to override.",
+                [],
+            )
 
-        # Mark as undone and move to redo stack
+        # Commit the state transition only after a successful replay.
+        self._undo_stack.pop()
         group.undone = True
         self._redo_stack.append(group)
         self._save_group(group)
 
-        if errors:
-            return (
-                False,
-                f"Partial undo with errors: {'; '.join(errors)}",
-                affected_files,
-            )
-
-        # Generate summary
-        tool_name = group.tool_name
-        file_count = len(affected_files)
         timestamp = datetime.fromtimestamp(group.timestamp).strftime("%H:%M:%S")
+        plural = "s" if len(applied) != 1 else ""
+        msg = f"Undid '{group.tool_name}' ({len(applied)} file{plural}) from {timestamp}"
+        if skipped:
+            msg += f"; skipped {len(skipped)} changed externally"
+        return True, msg, applied
 
-        return (
-            True,
-            f"Undid '{tool_name}' ({file_count} file{'s' if file_count > 1 else ''}) from {timestamp}",
-            affected_files,
-        )
-
-    def redo(self) -> Tuple[bool, str, List[str]]:
-        """Redo the last undone change group.
+    def redo(self, force: bool = False) -> Tuple[bool, str, List[str]]:
+        """Redo the last undone change group (group-atomic, crash-safe).
 
         Returns:
             Tuple of (success, message, list of affected files)
@@ -567,98 +527,206 @@ class FileChangeHistory:
         if not self._redo_stack:
             return False, "Nothing to redo", []
 
-        group = self._redo_stack.pop()
-        affected_files = []
-        errors = []
+        group = self._redo_stack[-1]
+        applied, skipped, error = self._replay_group(group, phase="redo", force=force)
 
-        # Apply changes in original order
-        for change in group.changes:
-            try:
-                self._apply_change(change)
-                affected_files.append(change.file_path)
-            except Exception as e:
-                errors.append(f"{change.file_path}: {e}")
-                logger.error(f"Failed to redo change on {change.file_path}: {e}")
+        if error is not None:
+            return False, f"Redo failed: {error} (changes rolled back)", []
+        if not applied and skipped:
+            return (
+                False,
+                f"Skipped {len(skipped)} file(s) changed by another session since; "
+                "nothing redone. Re-run with force to override.",
+                [],
+            )
 
-        # Mark as not undone and move back to undo stack
+        self._redo_stack.pop()
         group.undone = False
         self._undo_stack.append(group)
         self._save_group(group)
 
-        if errors:
-            return (
-                False,
-                f"Partial redo with errors: {'; '.join(errors)}",
-                affected_files,
-            )
+        plural = "s" if len(applied) != 1 else ""
+        msg = f"Redid '{group.tool_name}' ({len(applied)} file{plural})"
+        if skipped:
+            msg += f"; skipped {len(skipped)} changed externally"
+        return True, msg, applied
 
-        tool_name = group.tool_name
-        file_count = len(affected_files)
+    def _replay_group(
+        self, group: ChangeGroup, *, phase: str, force: bool = False
+    ) -> Tuple[List[str], List[str], Optional[str]]:
+        """Replay a group's changes atomically (``undo`` reverses, ``redo`` applies).
 
-        return (
-            True,
-            f"Redid '{tool_name}' ({file_count} file{'s' if file_count > 1 else ''})",
-            affected_files,
-        )
+        Returns ``(applied_files, skipped_files, error)``. On error, every file
+        mutated in this call is restored to its pre-replay content and ``error``
+        is set (``applied`` empty) — the group is all-or-nothing on the filesystem.
+        Conflict-guarded files are skipped (recorded in ``skipped_files``).
+        """
+        changes = list(reversed(group.changes)) if phase == "undo" else list(group.changes)
+        applied: List[str] = []
+        skipped: List[str] = []
+        journal: List[Dict[str, Tuple[bool, Optional[str]]]] = []
+
+        for change in changes:
+            if not force and self._has_conflict(change, phase):
+                skipped.append(change.file_path)
+                logger.warning(
+                    "%s conflict guard skipped %s (changed by another session)",
+                    phase,
+                    change.file_path,
+                )
+                continue
+
+            snap = self._snapshot_paths(self._paths_touched(change))
+            try:
+                if phase == "undo":
+                    self._reverse_change(change)
+                else:
+                    self._apply_change(change)
+            except Exception as e:
+                # Roll back this change and everything applied earlier in the group.
+                self._restore_snapshot(snap)
+                for prev in reversed(journal):
+                    self._restore_snapshot(prev)
+                logger.error("Failed to %s %s: %s", phase, change.file_path, e)
+                return [], skipped, f"{change.file_path}: {e}"
+            journal.append(snap)
+            applied.append(change.file_path)
+
+        return applied, skipped, None
+
+    @staticmethod
+    def _paths_touched(change: FileChange) -> List[str]:
+        """Filesystem paths a change may mutate (target + rename source)."""
+        paths = [change.file_path]
+        if change.original_path:
+            paths.append(change.original_path)
+        return paths
+
+    @staticmethod
+    def _snapshot_paths(paths: List[str]) -> Dict[str, Tuple[bool, Optional[str]]]:
+        """Snapshot (exists, content) for each path, for partial-failure rollback."""
+        snap: Dict[str, Tuple[bool, Optional[str]]] = {}
+        for pth in paths:
+            p = Path(pth)
+            if p.exists() and p.is_file():
+                try:
+                    snap[pth] = (True, p.read_text())
+                except (OSError, UnicodeDecodeError):
+                    snap[pth] = (True, None)  # unreadable/binary: existence-only
+            else:
+                snap[pth] = (False, None)
+        return snap
+
+    def _restore_snapshot(self, snap: Dict[str, Tuple[bool, Optional[str]]]) -> None:
+        """Restore files to a snapshot captured by :meth:`_snapshot_paths`."""
+        for pth, (existed, content) in snap.items():
+            p = Path(pth)
+            if existed:
+                if content is not None:
+                    self._atomic_write(p, content)
+            elif p.exists():
+                try:
+                    p.unlink()
+                except OSError:
+                    logger.error("rollback: could not remove %s", p)
+
+    @staticmethod
+    def _atomic_write(path: Path, content: str) -> None:
+        """Crash-safe write: temp file in the same dir + fsync + ``os.replace``."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".undo_tmp_")
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, path)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+
+    def _current_checksum(self, file_path: str) -> Optional[str]:
+        """MD5 of the file's current on-disk content, or None if absent/unreadable."""
+        p = Path(file_path)
+        if not p.exists() or not p.is_file():
+            return None
+        try:
+            return self.compute_checksum(p.read_text())
+        except (OSError, UnicodeDecodeError):
+            return None
+
+    def _has_conflict(self, change: FileChange, phase: str) -> bool:
+        """True if the file is not in the state this replay step expects.
+
+        ``undo`` expects the change's *after* state on disk; ``redo`` expects the
+        *before* state. A mismatch means another session/tool touched the file
+        since, so we skip rather than clobber it.
+        """
+        ct = change.change_type
+        cur = self._current_checksum(change.file_path)
+        if phase == "undo":
+            if ct in (ChangeType.CREATE, ChangeType.MODIFY):
+                return cur != change.checksum_after
+            if ct == ChangeType.DELETE:
+                return cur is not None  # expected absent (it was deleted)
+            if ct == ChangeType.RENAME:
+                return not Path(change.file_path).exists()  # expected at new path
+        else:  # redo → expect the 'before' state
+            if ct == ChangeType.CREATE:
+                return cur is not None  # expected absent (not yet created)
+            if ct == ChangeType.MODIFY:
+                return cur != change.checksum_before
+            if ct == ChangeType.DELETE:
+                return cur != change.checksum_before  # expected original present
+            if ct == ChangeType.RENAME and change.original_path:
+                return not Path(change.original_path).exists()
+        return False
 
     def _reverse_change(self, change: FileChange) -> None:
-        """Reverse a single file change."""
+        """Reverse a single file change (crash-safe writes)."""
         path = Path(change.file_path)
 
         if change.change_type == ChangeType.CREATE:
             # Reverse create = delete
             if path.exists():
                 path.unlink()
-                logger.debug(f"Deleted {path} (reverse of create)")
-
         elif change.change_type == ChangeType.DELETE:
-            # Reverse delete = restore
+            # Reverse delete = restore original content
             if change.original_content is not None:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(change.original_content)
-                logger.debug(f"Restored {path} (reverse of delete)")
-
+                self._atomic_write(path, change.original_content)
         elif change.change_type == ChangeType.MODIFY:
             # Reverse modify = restore original content
             if change.original_content is not None:
-                path.write_text(change.original_content)
-                logger.debug(f"Restored original content of {path}")
-
+                self._atomic_write(path, change.original_content)
         elif change.change_type == ChangeType.RENAME:
             # Reverse rename = rename back
             if change.original_path and path.exists():
                 original = Path(change.original_path)
                 original.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(path), str(original))
-                logger.debug(f"Renamed {path} back to {original}")
 
     def _apply_change(self, change: FileChange) -> None:
-        """Apply a single file change (for redo)."""
+        """Apply a single file change for redo (crash-safe writes)."""
         path = Path(change.file_path)
 
         if change.change_type == ChangeType.CREATE:
             if change.new_content is not None:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(change.new_content)
-                logger.debug(f"Created {path} (redo)")
-
+                self._atomic_write(path, change.new_content)
         elif change.change_type == ChangeType.DELETE:
             if path.exists():
                 path.unlink()
-                logger.debug(f"Deleted {path} (redo)")
-
         elif change.change_type == ChangeType.MODIFY:
             if change.new_content is not None:
-                path.write_text(change.new_content)
-                logger.debug(f"Modified {path} (redo)")
-
+                self._atomic_write(path, change.new_content)
         elif change.change_type == ChangeType.RENAME:
             if change.original_path:
                 original = Path(change.original_path)
                 if original.exists():
                     path.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(original), str(path))
-                    logger.debug(f"Renamed {original} to {path} (redo)")
 
     def get_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent change history.
