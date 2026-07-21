@@ -38,8 +38,32 @@ from victor.tools.decorators import tool
 from victor.storage.cache.generic_result_cache import GenericResultCache, ResultType
 
 # Constants
-_USER_AGENT = "Mozilla/5.0 (compatible; Victor/1.0; +https://github.com/vijaykumar/victor)"
+# Rotating User-Agent pool. A single static UA is trivially fingerprinted and
+# blocked by search endpoints / anti-bot layers. Requests pick one at random.
+_USER_AGENTS = (
+    "Mozilla/5.0 (compatible; Victor/1.0; +https://github.com/vijaykumar/victor)",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0",
+)
+_USER_AGENT = _USER_AGENTS[0]  # Backwards-compat alias for static imports.
 _DEFAULT_MAX_CONTENT_LENGTH = 5000
+
+# DuckDuckGo endpoints tried in order. The HTML endpoint is the primary path
+# but rate-limits aggressively and blocks headless UAs; `lite` is a lighter
+# fallback; the rendered main site is the last resort (browser-based).
+_DDG_HTML_URL = "https://html.duckduckgo.com/html/"
+_DDG_LITE_URL = "https://lite.duckduckgo.com/lite/"
+_DDG_RENDER_URL_TMPL = "https://duckduckgo.com/?q={query}"
+
+
+def _pick_user_agent() -> str:
+    """Return a random User-Agent from the rotating pool."""
+    import random
+
+    return random.choice(_USER_AGENTS)
 
 _GENERIC_WEB_CACHE: Optional[GenericResultCache] = None
 _GENERIC_WEB_CACHE_LOCK = RLock()
@@ -513,6 +537,182 @@ def _parse_ddg_results(html: str, max_results: int) -> List[Dict[str, str]]:
     return results
 
 
+def _parse_ddg_lite_results(html: str, max_results: int) -> List[Dict[str, str]]:
+    """Parse DuckDuckGo Lite results (fallback endpoint).
+
+    The lite endpoint uses table rows (``<tr class="result-link">`` for the
+    link and the following row for the snippet) rather than divs.
+
+    Args:
+        html: HTML response from lite.duckduckgo.com
+        max_results: Maximum number of results
+
+    Returns:
+        List of result dictionaries
+    """
+    soup = BeautifulSoup(html, "lxml")
+    results: List[Dict[str, str]] = []
+
+    for link_row in soup.find_all("tr", class_=re.compile(r"result-link"), limit=max_results):
+        try:
+            a = link_row.find("a", class_="result-link")
+            if not a:
+                a = link_row.find("a")
+            if not a:
+                continue
+            title = a.get_text(strip=True)
+            url = a.get("href", "")
+            # Snippet sits in the sibling result-snippet row.
+            snippet = ""
+            sib = link_row.find_next_sibling("tr", class_=re.compile(r"result-snippet"))
+            if sib:
+                snippet = sib.get_text(strip=True)
+            if title and url:
+                results.append({"title": title, "url": url, "snippet": snippet})
+        except Exception:
+            continue
+
+    return results
+
+
+async def _ddg_render_results(
+    query: str,
+    region: str,
+    max_results: int,
+    *,
+    timeout_seconds: float = 30.0,
+) -> List[Dict[str, str]]:
+    """Last-resort: render the JS-backed DuckDuckGo main site via Playwright.
+
+    Only invoked when both HTTP endpoints (html + lite) return nothing. Uses
+    the same Playwright backend as ``_render_page_text``.
+
+    Args:
+        query: Search query
+        region: DDG region code
+        max_results: Maximum number of results
+        timeout_seconds: Per-page navigation timeout
+
+    Returns:
+        List of result dictionaries (may be empty)
+    """
+    try:
+        from playwright.async_api import async_playwright
+    except Exception:
+        return []
+
+    from urllib.parse import quote_plus
+
+    url = _DDG_RENDER_URL_TMPL.format(query=quote_plus(query))
+    if region and region != "wt-wt":
+        url += f"&kl={region}"
+    browser = None
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page(user_agent=_pick_user_agent())
+            await page.goto(url, wait_until="networkidle", timeout=int(timeout_seconds * 1000))
+            # DDG result links are anchors with data-testid="result-title-a" or
+            # class ``result__a`` once rendered.
+            anchors = await page.query_selector_all('a[data-testid="result-title-a"], a.result__a')
+            results: List[Dict[str, str]] = []
+            for a in anchors[:max_results]:
+                title = (await a.inner_text()).strip()
+                href = await a.get_attribute("href")
+                if title and href:
+                    results.append({"title": title, "url": href, "snippet": ""})
+            return results
+    except Exception:
+        return []
+    finally:
+        if browser is not None:
+            try:
+                await browser.close()
+            except Exception:
+                pass
+
+
+async def _ddg_search(
+    query: str,
+    region: str,
+    max_results: int,
+    safe_value: str,
+    *,
+    web_config: Dict[str, Any],
+    timeout_seconds: float = 30.0,
+) -> List[Dict[str, str]]:
+    """Run a DuckDuckGo search across multiple endpoints with a browser fallback.
+
+    Strategy (returns the first non-empty result set):
+      1. POST html.duckduckgo.com/html/ (primary; parsed via _parse_ddg_results)
+      2. POST lite.duckduckgo.com/lite/ (lighter fallback)
+      3. Render duckduckgo.com via Playwright (only if 1 and 2 yield nothing)
+
+    This keeps the common path fast (plain HTTP) and only spins up a browser on
+    the hard cases where the HTML endpoint is rate-limited or blocked.
+
+    Args:
+        query: Search query
+        region: DDG region code (e.g. "wt-wt")
+        max_results: Maximum number of results
+        safe_value: Safe-search value ("-1", "1", or "p")
+        web_config: Web tool configuration from _get_web_config
+        timeout_seconds: Per-request timeout
+
+    Returns:
+        List of result dictionaries (may be empty)
+    """
+    logger = logging.getLogger(__name__)
+    data = {"q": query, "kl": region, "p": safe_value}
+    headers = {"User-Agent": _pick_user_agent()}
+
+    # 1. Primary HTML endpoint.
+    try:
+        status, payload = await _request_text(
+            "POST",
+            _DDG_HTML_URL,
+            data=data,
+            headers=headers,
+            follow_redirects=True,
+            timeout_seconds=timeout_seconds,
+            web_config=web_config,
+        )
+        if status == 200:
+            results = _parse_ddg_results(payload, max_results)
+            if results:
+                return results
+    except Exception as exc:
+        logger.debug("DDG html endpoint failed: %s", exc)
+
+    # 2. Lite fallback endpoint.
+    try:
+        status, payload = await _request_text(
+            "POST",
+            _DDG_LITE_URL,
+            data=data,
+            headers={"User-Agent": _pick_user_agent()},
+            follow_redirects=True,
+            timeout_seconds=timeout_seconds,
+            web_config=web_config,
+        )
+        if status == 200:
+            results = _parse_ddg_lite_results(payload, max_results)
+            if results:
+                return results
+    except Exception as exc:
+        logger.debug("DDG lite endpoint failed: %s", exc)
+
+    # 3. Browser-rendered fallback (Playwright optional; empty if unavailable).
+    try:
+        results = await _ddg_render_results(query, region, max_results, timeout_seconds=timeout_seconds)
+        if results:
+            return results
+    except Exception as exc:
+        logger.debug("DDG browser fallback failed: %s", exc)
+
+    return []
+
+
 def _format_results(query: str, results: List[Dict[str, str]]) -> str:
     """Format search results as text.
 
@@ -540,6 +740,10 @@ def _format_results(query: str, results: List[Dict[str, str]]) -> str:
 def _extract_content(html: str, max_length: int = 5000) -> str:
     """Extract main content from HTML.
 
+    Prefers `trafilatura` when available — it strips boilerplate/navigation/ads
+    far better than hand-rolled heuristics and handles JS-heavy markup. Falls
+    back to a BeautifulSoup heuristic when the optional dependency is absent.
+
     Args:
         html: HTML content
         max_length: Maximum content length
@@ -547,6 +751,18 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
     Returns:
         Extracted text content
     """
+    # Try trafilatura first (optional dependency; graceful fallback).
+    try:
+        from trafilatura import extract as traf_extract
+
+        text = traf_extract(html, include_comments=False, include_tables=False, favor_recall=True)
+        if text and len(text.strip()) > 100:
+            text = re.sub(r"\n\s*\n", "\n\n", text)
+            text = re.sub(r" +", " ", text).strip()
+            return text[:max_length]
+    except Exception:
+        pass  # Fall through to BeautifulSoup heuristic.
+
     soup = BeautifulSoup(html, "lxml")
 
     # Remove script and style elements
@@ -736,28 +952,15 @@ async def web_search(
             return payload
 
     try:
-        # DuckDuckGo HTML search
-        search_url = "https://html.duckduckgo.com/html/"
-        data = {"q": query, "kl": region, "p": safe_value}
-
-        status_code, payload = await _request_text(
-            "POST",
-            search_url,
-            data=data,
-            headers={"User-Agent": _USER_AGENT},
-            follow_redirects=True,
-            timeout_seconds=30.0,  # Increased from 15.0 for better reliability
+        # DuckDuckGo search across multiple endpoints with a browser fallback.
+        results = await _ddg_search(
+            query,
+            region,
+            max_results,
+            safe_value,
             web_config=config,
+            timeout_seconds=30.0,  # Increased from 15.0 for better reliability
         )
-
-        if status_code != 200:
-            return {
-                "success": False,
-                "error": f"Search failed with status {status_code}",
-            }
-
-        # Parse results
-        results = _parse_ddg_results(payload, max_results)
         logger.info(
             f"[web_search] query='{query}', max_results={max_results}, parsed_results={len(results)}"
         )
@@ -1004,27 +1207,17 @@ async def _summarize_search(
     max_content_length = max(500, min(max_content_length, 20000))
 
     try:
-        # First, perform search
-        search_url = "https://html.duckduckgo.com/html/"
-        data = {"q": query, "kl": region, "p": safe_value}
-
-        status_code, payload = await _request_text(
-            "POST",
-            search_url,
-            data=data,
-            headers={"User-Agent": _USER_AGENT},
-            follow_redirects=True,
-            timeout_seconds=30.0,  # Increased from 15.0 for better reliability
+        # First, perform search across multiple DDG endpoints with a browser
+        # fallback. Keeps the common path fast (plain HTTP) and only spins up
+        # a browser when the HTTP endpoints yield nothing.
+        results = await _ddg_search(
+            query,
+            region,
+            fetch_pool,
+            safe_value,
             web_config=config,
+            timeout_seconds=30.0,  # Increased from 15.0 for better reliability
         )
-        if status_code != 200:
-            return {
-                "success": False,
-                "error": f"Search failed with status {status_code}",
-            }
-
-        # Parse results
-        results = _parse_ddg_results(payload, fetch_pool)
         logger.info(f"[web_summarize] search query='{query}', parsed_results={len(results)}")
         if results:
             logger.info(f"[web_summarize] top URLs: {[r.get('url','') for r in results[:5]]}")
