@@ -1212,6 +1212,28 @@ models:
       recommended_tool_budget: 20
       argument_format: json
 
+  "kimi-k3*":
+    # Kimi K3 flagship: 2.8T MoE, 1M-token context, always-on thinking,
+    # native vision. Served from the international .ai platform endpoint;
+    # routed automatically by MoonshotProvider.resolve_base_url_for_model.
+    training:
+      tool_calling: true
+      reasoning: true
+      thinking_mode: true
+      code_generation: true
+
+    providers:
+      moonshot:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+        requires_strict_prompting: false
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 30
+      argument_format: json
+
   # ---------------------------------------------------------------------------
   # DEEPSEEK API MODELS
   # ---------------------------------------------------------------------------

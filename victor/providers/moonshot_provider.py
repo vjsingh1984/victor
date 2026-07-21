@@ -12,15 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Moonshot AI provider for Kimi K2 models.
+"""Moonshot AI provider for Kimi K2 and K3 models.
 
-Moonshot AI provides OpenAI-compatible API with special support for:
-- Kimi K2 Thinking models with reasoning traces
-- 256k context window
+Moonshot AI provides an OpenAI-compatible API with special support for:
+- Kimi K3 flagship (2.8T MoE, 1M context, always-on thinking, native vision)
+- Kimi K2 Thinking models with reasoning traces (256k context)
 - Native tool calling support
 - Streaming with reasoning_content field
 
+Endpoint routing:
+- kimi-k3*  -> https://api.moonshot.ai/v1  (international platform)
+- kimi-k2*  -> https://api.moonshot.cn/v1  (default; .cn platform)
+An explicit base_url passed at construction pins ALL models to that endpoint.
+
 References:
+- https://platform.kimi.ai/docs/guide/kimi-k3-quickstart
 - https://platform.moonshot.ai/docs/guide/use-kimi-k2-thinking-model
 - https://github.com/MoonshotAI/Kimi-K2
 """
