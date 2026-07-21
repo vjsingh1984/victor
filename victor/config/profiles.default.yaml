@@ -31,7 +31,7 @@ profiles:
     max_tokens: 4096
     description: Local Ollama profile
 
-  # --- Cloud examples (uncomment and adjust; keys come from env vars) -------
+  # --- Cloud profiles (commented examples; uncomment + set env key to use) ---
   #
   # claude:
   #   provider: anthropic
@@ -47,12 +47,15 @@ profiles:
   #   max_tokens: 8192
   #   description: OpenAI GPT (OPENAI_API_KEY)
   #
-  # kimi:
-  #   provider: moonshot
-  #   model: kimi-k3
-  #   temperature: 0.6
-  #   max_tokens: 8192
-  #   description: Moonshot Kimi K3 — 1M context (MOONSHOT_API_KEY)
+  # Kimi K3 is active out of the box for discovery. It requires a top-up to
+  # unlock (see https://platform.kimi.ai) and the MOONSHOT_API_KEY env var.
+  # Set the key, then:  victor chat -p kimi
+  kimi:
+    provider: moonshot
+    model: kimi-k3
+    temperature: 0.6
+    max_tokens: 8192
+    description: Moonshot Kimi K3 — 1M context, always-on thinking (MOONSHOT_API_KEY)
   #
   # zai-coding:
   #   provider: zai
