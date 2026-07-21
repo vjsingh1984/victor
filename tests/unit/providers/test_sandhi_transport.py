@@ -328,3 +328,27 @@ class TestMixinStreamPath:
                 received.append(c)
         assert "".join(c.content for c in received) == "he", "content before failure is kept"
         assert provider._sandhi_demoted is True, "future calls go native"
+
+
+class TestSettingsBridge:
+    def test_configure_from_settings_enables_resolver(self, monkeypatch):
+        monkeypatch.setattr(st, "_sg", SimpleNamespace())
+        st.configure_from_settings(SimpleNamespace(sandhi_transport_providers=["deepseek"]))
+        assert (
+            st.resolve_transport_class("deepseek", DeepSeekProvider, {})
+            is st.SandhiDeepSeekProvider
+        )
+
+    def test_configure_from_settings_empty_falls_back_to_env(self, monkeypatch):
+        monkeypatch.setattr(st, "_sg", SimpleNamespace())
+        monkeypatch.setenv("VICTOR_SANDHI_TRANSPORT_PROVIDERS", "deepseek")
+        st.configure_from_settings(SimpleNamespace(sandhi_transport_providers=[]))
+        # empty settings list means "not configured" -> env var still wins
+        assert (
+            st.resolve_transport_class("deepseek", DeepSeekProvider, {})
+            is st.SandhiDeepSeekProvider
+        )
+
+    def test_configure_from_settings_never_raises(self):
+        st.configure_from_settings(None)
+        st.configure_from_settings(SimpleNamespace())  # missing attribute

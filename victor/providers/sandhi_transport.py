@@ -72,6 +72,20 @@ def set_sandhi_transport_providers(names: Optional[Iterable[str]]) -> None:
     )
 
 
+def configure_from_settings(settings: Any) -> None:
+    """Bridge ``Settings.sandhi_transport_providers`` into the resolver (bootstrap seam).
+
+    Called by the agent factory so YAML/profile-configured values reach provider creation
+    (the resolver otherwise only sees the env var). An empty list means "not configured" —
+    the env fallback stays active. Never raises.
+    """
+    try:
+        names = getattr(settings, "sandhi_transport_providers", None) if settings else None
+        set_sandhi_transport_providers(names or None)
+    except Exception as exc:  # never let the pilot break bootstrap
+        logger.debug("sandhi transport settings bridge failed (ignored): %s", exc)
+
+
 def _enabled_providers() -> FrozenSet[str]:
     if _enabled_override is not None:
         return _enabled_override
@@ -388,6 +402,7 @@ __all__ = [
     "SandhiXAIProvider",
     "SandhiZAIProvider",
     "map_sandhi_error",
+    "configure_from_settings",
     "resolve_transport_class",
     "sandhi_transport_available",
     "set_sandhi_transport_providers",

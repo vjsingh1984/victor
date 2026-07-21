@@ -169,6 +169,12 @@ class AgentFactory:
 
         self._apply_profile_overrides()
 
+        # FEP-0020 Phase 4b: bridge the sandhi transport pilot setting into the provider
+        # registry resolver before any provider is created. Exception-free no-op by default.
+        from victor.providers.sandhi_transport import configure_from_settings
+
+        configure_from_settings(self._settings)
+
         # Step 1: Pre-flight validation
         issues = self.validate()
         errors = [i for i in issues if i.get("severity") == EventSeverity.ERROR.value]
