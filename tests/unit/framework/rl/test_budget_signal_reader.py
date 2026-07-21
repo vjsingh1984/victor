@@ -38,14 +38,20 @@ from victor.framework.rl.budget_signal_reader import BudgetSignalReader
 class FakeDB:
     """Minimal DB handle with cursor()."""
 
-    def __init__(self, tool_rows: List[Dict[str, Any]], outcome_rows: List[Dict[str, Any]]):
+    def __init__(
+        self,
+        tool_rows: List[Dict[str, Any]],
+        outcome_rows: List[Dict[str, Any]],
+        unified_rows: List[Dict[str, Any]] | None = None,
+    ):
         self._tool_rows = tool_rows
         self._outcome_rows = outcome_rows
+        self._unified_rows = unified_rows or []
 
     def cursor(self) -> FakeCursor:
         # Hand back a fresh cursor seeded by the *next* execute's intent.
         # We disambiguate via the query string the reader emits.
-        c = _RoutingCursor(self._tool_rows, self._outcome_rows)
+        c = _RoutingCursor(self._tool_rows, self._outcome_rows, self._unified_rows)
         return c  # type: ignore[return-value]
 
 
@@ -68,12 +74,18 @@ class _Row:
 class _RoutingCursor:
     """Returns tool rows for rl_tool_q queries, outcome rows otherwise."""
 
-    def __init__(self, tool_rows, outcome_rows):
+    def __init__(self, tool_rows, outcome_rows, unified_rows=None):
         self._tool = tool_rows
         self._outcome = outcome_rows
+        self._unified = unified_rows or []
 
     def execute(self, query: str, params: Any = ()):
-        self._current = self._tool if "rl_tool_q" in query else self._outcome
+        if "rl_q_value" in query:
+            self._current = self._unified
+        elif "rl_tool_q" in query:
+            self._current = self._tool
+        else:
+            self._current = self._outcome
         return self
 
     def fetchall(self):
@@ -98,6 +110,42 @@ TOOL_ROWS = [
         "success_count": 120,
     },
 ]
+
+
+UNIFIED_ROWS = [
+    {
+        "tool_name": "code",
+        "q_value": 0.42,
+        "selection_count": 6330,
+        "success_count": 3100,
+    },
+    {
+        "tool_name": "git",
+        "q_value": 0.61,
+        "selection_count": 489,
+        "success_count": 290,
+    },
+]
+
+
+class TestLoadToolSignalsUnified:
+    """P7: the reader must consume the LIVE unified tables (rl_q_value +
+    rl_task_stat), not the legacy rl_tool_q frozen at the v0.7.0 migration."""
+
+    def test_load_tool_signals_reads_unified_tables(self):
+        db = FakeDB(tool_rows=TOOL_ROWS, outcome_rows=[], unified_rows=UNIFIED_ROWS)
+        signals = BudgetSignalReader().load_tool_signals(db=db)
+        by_name = {s.tool_name: s for s in signals}
+        assert "code" in by_name, "unified rows must win over legacy"
+        assert by_name["code"].selection_count == 6330
+        assert abs(by_name["code"].success_rate - 3100 / 6330) < 1e-9
+        assert "read" not in by_name, "legacy rows must not be mixed in when unified has data"
+
+    def test_load_tool_signals_falls_back_to_legacy_when_unified_empty(self):
+        db = FakeDB(tool_rows=TOOL_ROWS, outcome_rows=[], unified_rows=[])
+        signals = BudgetSignalReader().load_tool_signals(db=db)
+        names = {s.tool_name for s in signals}
+        assert names == {"read", "shell"}
 
 
 class TestLoadToolSignals:

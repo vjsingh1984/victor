@@ -953,7 +953,7 @@ class ToolExecutor:
                         break
 
         # Emit RL event for tool execution (for learner activation)
-        self._emit_rl_tool_event(tool_name, success, execution_time, exec_context)
+        self._emit_rl_tool_event(tool_name, success, execution_time, exec_context, result=result)
 
         # Complete tool call in tracer
         self._complete_tool_call(call_id, success, result=result, error=error)
@@ -1063,6 +1063,7 @@ class ToolExecutor:
         success: bool,
         execution_time: float,
         context: Dict[str, Any],
+        result: Any = None,
     ) -> None:
         """Emit RL event for tool execution to activate tool_selector learner.
 
@@ -1081,6 +1082,15 @@ class ToolExecutor:
                 return
 
             from victor.framework.rl.hooks import RLEvent, RLEventType
+
+            # Truthful RL signal (P7): unified tools report failures as
+            # '### ❌' markdown strings with invocation-level success=True —
+            # recording those as successes hid the real error rate from
+            # the Q-values.
+            from victor.tools.unified.parser import classify_result_marker
+
+            if success and classify_result_marker(result) == "tool_error":
+                success = False
 
             # Calculate quality score based on success and execution time
             # Fast successful executions get higher scores
