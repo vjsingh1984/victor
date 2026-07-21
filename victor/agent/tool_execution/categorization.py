@@ -29,6 +29,7 @@ from victor.agent.action_authorizer import (
     build_write_tool_set,
     normalize_tool_name_for_policy,
 )
+from victor.tools.base import AccessMode
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +147,15 @@ def categorize_tool_call(tool_name: str, arguments: Dict[str, Any]) -> ToolCateg
         ToolCategory for the tool call
     """
     canonical_tool_name = normalize_tool_name_for_policy(tool_name)
+
+    # Per-invocation narrowing: multi-command tools (shell readonly=True,
+    # code grep/search) are statically write-capable but this specific call
+    # may be provably read-only — which skips pre-tool checkpoints and
+    # allows parallelization. Resolvers can only narrow, never widen.
+    from victor.tools.effective_access import resolve_effective_access
+
+    if resolve_effective_access(canonical_tool_name, arguments) is AccessMode.READONLY:
+        return ToolCategory.READ_ONLY
 
     # Check metadata first
     if canonical_tool_name in TOOL_METADATA:

@@ -340,8 +340,10 @@ class LiveDisplayRenderer:
         color = "success" if success else "error"
         duration_str = format_duration(elapsed)
 
-        # Get tool metadata from unified registry (Phase 1)
-        metadata = get_tool_metadata_for_display(name)
+        # Get tool metadata from unified registry, narrowed to this
+        # invocation's effective access (a code grep shows READ ONLY, not the
+        # tool's static MIXED envelope).
+        metadata = get_tool_metadata_for_display(name, arguments)
         metadata_badges = format_tool_metadata_badges(
             category=metadata.get("category", ""),
             access_mode=metadata.get("access_mode", ""),
