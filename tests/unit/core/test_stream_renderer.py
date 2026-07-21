@@ -334,7 +334,6 @@ class TestLiveDisplayRenderer:
         assert mock_live_class.call_count == 2
         assert mock_live.start.call_count == 2
 
-
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_success_prints_checkmark(self, mock_live_class, renderer, mock_console):
         """Test on_tool_result() prints a success indicator for success.
@@ -675,11 +674,6 @@ class TestLiveDisplayRenderer:
         output = "\n".join([f"line{i}" for i in range(20)])
         lines = renderer._calculate_adaptive_preview_lines(output, None, 3, tool_settings)
         assert lines == 5  # Within bounds
-
-
-
-
-
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_tool_result_skips_group_header_when_disabled(
