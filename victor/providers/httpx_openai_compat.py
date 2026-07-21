@@ -70,40 +70,9 @@ from victor.providers.openai_compat import (
     parse_openai_tool_calls,
 )
 from victor.providers.logging import ProviderLogger
+from victor.providers.usage_parsing import parse_usage_dict
 
 logger = logging.getLogger(__name__)
-
-# Single-sourced cache-split parsing (AnvaiOps ADR-0047 D10a step 2 / Sandhi ADR-0003). The
-# OpenAI-compat usage dict drops the prompt-cache split; when the optional `sandhi-gateway`
-# binding is present we populate it from sandhi's fixture-proven parser — the metering-critical
-# extraction that varies per provider. **Scoped adoption:** `prompt_tokens` is left as the full
-# count (victor's context-window / budget logic depends on it); only the cache split is added.
-try:  # optional dependency (victor[sandhi])
-    import json as _json
-    import sandhi_gateway as _sg  # type: ignore[import-untyped]
-except Exception:  # pragma: no cover — absent without the extra
-    _sg = None
-
-
-def _augment_cache_split(usage: dict, usage_data: dict) -> None:
-    """Populate ``usage`` with the prompt-cache split from sandhi's single-sourced parser.
-
-    ``usage_data`` is the provider's raw ``usage`` block. No-op when ``sandhi-gateway`` is absent
-    or the response carries no cache split. Best-effort; never raises. Does **not** touch
-    ``prompt_tokens`` (ADR-0047 D10a step 2, safe scope).
-    """
-    if _sg is None:
-        return
-    try:
-        d = _sg.parse_usage("openai", _json.dumps({"usage": usage_data or {}}))
-    except Exception:  # pragma: no cover — defensive; never fail a call on metering
-        return
-    creation = int(d.get("cache_creation_tokens", 0) or 0)
-    read = int(d.get("cache_read_tokens", 0) or 0)
-    if creation:
-        usage["cache_creation_input_tokens"] = creation
-    if read:
-        usage["cache_read_input_tokens"] = read
 
 
 class HttpxOpenAICompatProvider(BaseProvider):
@@ -265,6 +234,34 @@ class HttpxOpenAICompatProvider(BaseProvider):
             raise
         return stream_context, response
 
+    async def _complete_raw(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """WIRE SEAM (FEP-0020 Phase 4b): one non-streaming call → parsed body dict.
+
+        Everything above this seam (payload build, response parsing, tool translation,
+        usage parsing, error classification) is transport-independent; an alternate
+        transport (e.g. the sandhi binding) overrides only this method.
+        """
+        response = await self._execute_with_circuit_breaker(
+            self._send_chat_completion_request, payload
+        )
+        return response.json()  # type: ignore[no-any-return]
+
+    async def _open_stream_lines(self, payload: Dict[str, Any]) -> "tuple[Any, AsyncIterator[str]]":
+        """WIRE SEAM (FEP-0020 Phase 4b): open a stream → ``(closer, line_iterator)``.
+
+        ``closer`` is an async callable the consumer must await exactly once when done
+        (lexically paired in the driving task — see ``_open_chat_completion_stream``).
+        The iterator yields decoded SSE lines; all chunk parsing stays in ``stream()``.
+        """
+        stream_context, response = await self._execute_with_circuit_breaker(
+            self._open_chat_completion_stream, payload
+        )
+
+        async def _closer() -> None:
+            await stream_context.__aexit__(None, None, None)
+
+        return _closer, response.aiter_lines()
+
     def _build_request_payload(
         self,
         messages: List[Message],
@@ -396,15 +393,16 @@ class HttpxOpenAICompatProvider(BaseProvider):
         content = message.get("content", "") or ""
         tool_calls = parse_openai_tool_calls(message.get("tool_calls"))
 
+        # Routed through sandhi's single-sourced parser (recovers the prompt-cache
+        # split; prompt_tokens stays the FULL count); native dict is the fallback.
         usage = None
         usage_data = result.get("usage")
         if usage_data:
-            usage = {
+            usage = parse_usage_dict("openai", usage_data) or {
                 "prompt_tokens": usage_data.get("prompt_tokens", 0),
                 "completion_tokens": usage_data.get("completion_tokens", 0),
                 "total_tokens": usage_data.get("total_tokens", 0),
             }
-            _augment_cache_split(usage, usage_data)
 
         metadata = self._extract_response_metadata(message)
 
@@ -460,16 +458,16 @@ class HttpxOpenAICompatProvider(BaseProvider):
                         }
                     )
 
-        # Parse usage from final chunk (when finish_reason is set)
+        # Parse usage from final chunk (when finish_reason is set) — routed through
+        # sandhi's single-sourced parser; native dict is the fallback.
         usage = None
         if finish_reason and "usage" in chunk_data:
             usage_data = chunk_data.get("usage") or {}
-            usage = {
+            usage = parse_usage_dict("openai", usage_data) or {
                 "prompt_tokens": usage_data.get("prompt_tokens", 0),
                 "completion_tokens": usage_data.get("completion_tokens", 0),
                 "total_tokens": usage_data.get("total_tokens", 0),
             }
-            _augment_cache_split(usage, usage_data)
 
         return StreamChunk(
             content=content,
@@ -504,10 +502,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
                 payload = self._build_request_payload(
                     messages, model, temperature, max_tokens, tools, False, **kwargs
                 )
-                response = await self._execute_with_circuit_breaker(
-                    self._send_chat_completion_request, payload
-                )
-                result = response.json()
+                result = await self._complete_raw(payload)
                 parsed = self._parse_response(result, model)
                 tokens = parsed.usage.get("total_tokens") if parsed.usage else None
                 log_success(tokens=tokens)
@@ -540,14 +535,12 @@ class HttpxOpenAICompatProvider(BaseProvider):
             payload = self._build_request_payload(
                 messages, model, temperature, max_tokens, tools, True, **kwargs
             )
-            stream_context, response = await self._execute_with_circuit_breaker(
-                self._open_chat_completion_stream, payload
-            )
+            closer, lines = await self._open_stream_lines(payload)
             try:
                 accumulated_tool_calls: List[Dict[str, Any]] = []
                 has_sent_final = False
 
-                async for line in response.aiter_lines():
+                async for line in lines:
                     if not line.strip():
                         continue
                     if not line.startswith("data: "):
@@ -578,9 +571,9 @@ class HttpxOpenAICompatProvider(BaseProvider):
                             line[:100],
                         )
             finally:
-                # Close the stream context here — lexically paired with the __aenter__ in
-                # _open_chat_completion_stream, in whatever task drives this generator.
-                await stream_context.__aexit__(None, None, None)
+                # Close the wire seam here — lexically paired with the open in
+                # _open_stream_lines, in whatever task drives this generator.
+                await closer()
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(

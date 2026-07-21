@@ -70,11 +70,34 @@ def test_not_complete_does_not_prompt():
     log_dec.assert_not_called()
 
 
-def test_setting_disabled_does_not_prompt():
-    agent, _orch = _make_agent(True, prev_completed=False)
-    with patch("victor.agent.decisions.chain.log_decision") as log_dec:
+def test_passive_mode_logs_spine_without_prompting():
+    """Default (passive): the task_completion spine is logged, no blocking
+    prompt fires, and no explicit outcome is recorded — the reward loop and
+    /rate own outcome recording now."""
+    agent, orch = _make_agent(True, prev_completed=False)
+    orch._rate_hint_shown = False
+    with (
+        patch("victor.agent.decisions.chain.log_decision") as log_dec,
+        patch("victor.agent.decisions.outcome.record_session_outcome") as rec,
+        patch("rich.prompt.Prompt.ask") as ask,
+    ):
         _run(agent, SimpleNamespace(enable_rl_feedback_prompt=False))
-    log_dec.assert_not_called()
+    log_dec.assert_called_once()
+    assert log_dec.call_args.args[0] == "task_completion"
+    ask.assert_not_called()
+    rec.assert_not_called()
+    assert orch._rate_hint_shown is True
+
+
+def test_rate_hint_shown_once_per_session():
+    agent, orch = _make_agent(True, prev_completed=False)
+    orch._rate_hint_shown = True
+    console = MagicMock()
+    with patch("victor.agent.decisions.chain.log_decision"):
+        from victor.ui.commands.chat import _maybe_prompt_outcome
+
+        _maybe_prompt_outcome(agent, SimpleNamespace(enable_rl_feedback_prompt=False), console)
+    console.print.assert_not_called()
 
 
 def test_skip_answer_logs_spine_but_records_nothing():

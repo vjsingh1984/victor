@@ -61,6 +61,7 @@ from victor.providers.base import (
     ToolDefinition,
 )
 from victor.providers.logging import ProviderLogger
+from victor.providers.usage_parsing import parse_usage_dict
 from victor.providers.openai_compat import (
     extract_thinking_content as _extract_thinking_content,
     extract_tool_calls_from_content as _extract_tool_calls_from_content,
@@ -691,9 +692,10 @@ class VLLMProvider(BaseProvider):
                     f"vLLM: Extracted {len(tool_calls)} tool call(s) from content using fallback parser"
                 )
 
-        # Get usage info
+        # Get usage info — routed through sandhi's single-sourced parser (also recovers
+        # prompt_tokens_details.cached_tokens); native dict is the fallback.
         usage_data = result.get("usage", {})
-        usage = {
+        usage = (parse_usage_dict("openai", usage_data) if usage_data else None) or {
             "prompt_tokens": usage_data.get("prompt_tokens", 0),
             "completion_tokens": usage_data.get("completion_tokens", 0),
             "total_tokens": usage_data.get("total_tokens", 0),

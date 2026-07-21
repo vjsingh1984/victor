@@ -50,6 +50,7 @@ from victor.providers.resolution import (
     APIKeyNotFoundError,
 )
 from victor.providers.logging import ProviderLogger
+from victor.providers.usage_parsing import parse_usage_dict
 from victor.providers.oauth_manager import OAuthTokenManager
 
 # Qwen API endpoints
@@ -281,9 +282,11 @@ class QwenProvider(BaseProvider):
                     for tc in choice.message.tool_calls
                 ]
 
+            # Parse usage — routed through sandhi's single-sourced parser (also
+            # recovers prompt_tokens_details.cached_tokens); native dict fallback.
             usage = None
             if response.usage:
-                usage = {
+                usage = parse_usage_dict("openai", response.usage) or {
                     "prompt_tokens": response.usage.prompt_tokens,
                     "completion_tokens": response.usage.completion_tokens,
                     "total_tokens": response.usage.total_tokens,
