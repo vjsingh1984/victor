@@ -65,6 +65,7 @@ def _pick_user_agent() -> str:
 
     return random.choice(_USER_AGENTS)
 
+
 _GENERIC_WEB_CACHE: Optional[GenericResultCache] = None
 _GENERIC_WEB_CACHE_LOCK = RLock()
 
@@ -704,7 +705,9 @@ async def _ddg_search(
 
     # 3. Browser-rendered fallback (Playwright optional; empty if unavailable).
     try:
-        results = await _ddg_render_results(query, region, max_results, timeout_seconds=timeout_seconds)
+        results = await _ddg_render_results(
+            query, region, max_results, timeout_seconds=timeout_seconds
+        )
         if results:
             return results
     except Exception as exc:
