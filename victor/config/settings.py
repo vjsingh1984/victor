@@ -1463,13 +1463,12 @@ class Settings(BaseSettings):
     # Tracks success rates and adjusts limits automatically
     enable_continuation_rl_learning: bool = True
 
-    # FEP-0012 RL feedback: after the agent declares task completion in an
-    # interactive `victor chat` session, prompt "Did this resolve your task?"
-    # The yes/no answer is the reward label that flows (via
-    # record_session_outcome → decision_outcome) into classifier training.
-    # Skippable (enter=skip); /rate works regardless of this flag. Interactive
-    # REPL only — never fires for oneshot/API/headless.
-    enable_rl_feedback_prompt: bool = True
+    # DEPRECATED (default False): the blocking "Did this resolve your task?"
+    # prompt after each completed turn. Feedback is now passive — the reward
+    # loop records outcomes automatically and explicit feedback lives in
+    # /rate. Setting this to True restores the legacy per-turn prompt; the
+    # task_completion decision is logged either way.
+    enable_rl_feedback_prompt: bool = False
 
     # Session idle timeout: Maximum seconds of inactivity before forcing completion
     # Timer resets on each provider response or tool execution
