@@ -298,8 +298,18 @@ class TestSettings:
                 assert config_dir == mock_dir
                 mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
-    def test_load_profiles_no_file(self):
-        """Test loading profiles when file doesn't exist."""
+    def test_load_profiles_no_file_seeds_bundled_defaults(self, tmp_path):
+        """A missing user file is seeded from the bundled defaults."""
+        with patch.object(Settings, "get_config_dir", classmethod(lambda cls: tmp_path)):
+            profiles = Settings.load_profiles()
+
+        assert (tmp_path / "profiles.yaml").exists()
+        assert "default" in profiles
+        assert profiles["default"].provider == "ollama"
+
+    def test_load_profiles_no_file_legacy_lmstudio_fallback(self):
+        """Without the bundled resource (unusual install), the legacy
+        LM Studio probe still provides a default profile."""
         with patch.object(Settings, "get_config_dir") as mock_get_config_dir:
             mock_dir = MagicMock()
             mock_profiles_file = MagicMock()
@@ -307,11 +317,13 @@ class TestSettings:
             mock_dir.__truediv__.return_value = mock_profiles_file
             mock_get_config_dir.return_value = mock_dir
 
-            # Mock the model selection to return a predictable value
-            with patch.object(
-                Settings,
-                "_choose_default_lmstudio_model",
-                return_value="qwen2.5-coder:7b",
+            with (
+                patch.object(Settings, "_bundled_default_profiles_text", return_value=None),
+                patch.object(
+                    Settings,
+                    "_choose_default_lmstudio_model",
+                    return_value="qwen2.5-coder:7b",
+                ),
             ):
                 profiles = Settings.load_profiles()
 
@@ -339,17 +351,17 @@ profiles:
             mock_dir = MagicMock()
             mock_profiles_file = MagicMock()
             mock_profiles_file.exists.return_value = True
+            mock_profiles_file.read_text.return_value = yaml_content
             mock_dir.__truediv__.return_value = mock_profiles_file
             mock_get_config_dir.return_value = mock_dir
 
-            with patch("builtins.open", mock_open(read_data=yaml_content)):
-                profiles = Settings.load_profiles()
+            profiles = Settings.load_profiles()
 
-                assert "dev" in profiles
-                assert "prod" in profiles
-                assert profiles["dev"].provider == "ollama"
-                assert profiles["prod"].provider == "anthropic"
-                assert profiles["prod"].temperature == 0.5
+            assert "dev" in profiles
+            assert "prod" in profiles
+            assert profiles["dev"].provider == "ollama"
+            assert profiles["prod"].provider == "anthropic"
+            assert profiles["prod"].temperature == 0.5
 
     def test_load_profiles_error_handling(self):
         """Test error handling when loading profiles fails."""
@@ -360,11 +372,11 @@ profiles:
             mock_dir.__truediv__.return_value = mock_profiles_file
             mock_get_config_dir.return_value = mock_dir
 
-            with patch("builtins.open", side_effect=IOError("Read error")):
-                profiles = Settings.load_profiles()
+            mock_profiles_file.read_text.side_effect = IOError("Read error")
+            profiles = Settings.load_profiles()
 
-                # Should return empty dict on error
-                assert profiles == {}
+            # Should return empty dict on error
+            assert profiles == {}
 
     def test_load_provider_config_no_file(self):
         """Test loading provider config when file doesn't exist."""

@@ -2289,46 +2289,91 @@ class Settings(BaseSettings):
         return config_dir
 
     @classmethod
+    def _bundled_default_profiles_text(cls) -> Optional[str]:
+        """Return the packaged ``profiles.default.yaml`` contents, if present."""
+        try:
+            from importlib import resources
+
+            ref = resources.files("victor.config").joinpath("profiles.default.yaml")
+            return ref.read_text(encoding="utf-8")
+        except Exception:
+            return None
+
+    @staticmethod
+    def _parse_profiles_yaml(text: str) -> Dict[str, Dict[str, Any]]:
+        """Parse a profiles YAML document into raw per-profile dicts."""
+        data = yaml.safe_load(text) or {}
+        raw = data.get("profiles", {}) or {}
+        return {str(name): dict(config or {}) for name, config in raw.items()}
+
+    @classmethod
     def load_profiles(cls) -> Dict[str, ProfileConfig]:
-        """Load profiles from YAML file.
+        """Load profiles, layering the user file over bundled defaults.
+
+        The package ships ``victor/config/profiles.default.yaml``. On first run
+        (no ``~/.victor/profiles.yaml``) it is seeded there so the CLI works
+        out of the box and stays user-editable. At load time bundled defaults
+        act as the base layer: a user profile with the same name overrides it
+        key-by-key, and bundled profiles added by package upgrades appear
+        automatically without touching the user's file.
 
         Returns:
             Dictionary of profile configurations
         """
         profiles_file = cls.get_config_dir() / "profiles.yaml"
+        bundled_text = cls._bundled_default_profiles_text()
 
         if not profiles_file.exists():
-            urls = getattr(cls, "lmstudio_base_urls", []) or [
-                "http://localhost:1234",
-            ]
-            default_model = cls._choose_default_lmstudio_model(
-                urls, max_vram_gb=cls().lmstudio_max_vram_gb
-            )
-            # Return default profiles
-            return {
-                "default": ProfileConfig(
-                    provider="lmstudio",
-                    model=default_model,
-                    temperature=0.6,
-                    max_tokens=4096,
-                    description=None,
-                    tool_selection=None,
+            if bundled_text is not None:
+                try:
+                    profiles_file.write_text(bundled_text, encoding="utf-8")
+                    logger.info("Seeded default profiles at %s", profiles_file)
+                except OSError as exc:
+                    logger.warning("Could not seed %s: %s", profiles_file, exc)
+            else:
+                # No bundled resource (unusual install) — legacy LM Studio probe.
+                urls = getattr(cls, "lmstudio_base_urls", []) or [
+                    "http://localhost:1234",
+                ]
+                default_model = cls._choose_default_lmstudio_model(
+                    urls, max_vram_gb=cls().lmstudio_max_vram_gb
                 )
-            }
+                return {
+                    "default": ProfileConfig(
+                        provider="lmstudio",
+                        model=default_model,
+                        temperature=0.6,
+                        max_tokens=4096,
+                        description=None,
+                        tool_selection=None,
+                    )
+                }
+
+        bundled_raw: Dict[str, Dict[str, Any]] = {}
+        if bundled_text is not None:
+            try:
+                bundled_raw = cls._parse_profiles_yaml(bundled_text)
+            except Exception as exc:
+                logger.warning("Failed to parse bundled default profiles: %s", exc)
 
         try:
-            with open(profiles_file, "r") as f:
-                data = yaml.safe_load(f)
-
-            profiles = {}
-            for name, config in data.get("profiles", {}).items():
-                profiles[name] = ProfileConfig(**config)
-
-            return profiles
-
+            user_raw = (
+                cls._parse_profiles_yaml(profiles_file.read_text(encoding="utf-8"))
+                if profiles_file.exists()
+                else {}
+            )
         except Exception as e:
             print(f"Warning: Failed to load profiles: {e}")
             return {}
+
+        profiles: Dict[str, ProfileConfig] = {}
+        for name in {**bundled_raw, **user_raw}:
+            merged = {**bundled_raw.get(name, {}), **user_raw.get(name, {})}
+            try:
+                profiles[name] = ProfileConfig(**merged)
+            except Exception as exc:
+                print(f"Warning: Skipping invalid profile '{name}': {exc}")
+        return profiles
 
     @classmethod
     def load_provider_config(cls, provider: str) -> Optional[ProviderConfig]:

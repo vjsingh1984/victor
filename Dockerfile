@@ -137,9 +137,11 @@ RUN mkdir -p /home/victor/.cache /home/victor/.victor/embeddings && \
     cp -r /tmp/.victor/* /home/victor/.victor/ 2>/dev/null || true && \
     rm -rf /tmp/.cache /tmp/.victor
 
-# Copy default profiles for Docker deployment (use example if profiles.yaml not present)
+# Seed default profiles for Docker deployment: prefer a repo-local
+# docker/profiles.yaml override, else the same bundled defaults the package
+# seeds on first run (victor/config/profiles.default.yaml).
 RUN cp /app/docker/profiles.yaml /home/victor/.victor/profiles.yaml 2>/dev/null || \
-    cp /app/docker/profiles.yaml.example /home/victor/.victor/profiles.yaml
+    cp /app/victor/config/profiles.default.yaml /home/victor/.victor/profiles.yaml
 
 # Set ownership
 RUN chown -R victor:victor /app /home/victor
