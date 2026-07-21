@@ -1,0 +1,132 @@
+# Copyright 2026 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Workspace guard for ``read`` must treat linked git worktrees as in-workspace.
+
+Live failure: reading a sibling git-worktree path (``../wt-web-tool/...``) was
+rejected as "outside the current workspace" while ``edit``/``write`` accepted it,
+forcing clunky ``sed`` fallbacks. Worktrees are the documented workflow, so the
+guard now allows the project root plus every linked worktree root.
+"""
+
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+import victor.tools.filesystem as fs
+from victor.tools.filesystem import (
+    _discover_read_roots,
+    _path_within_workspace,
+    read,
+)
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache_and_enable_guard(monkeypatch):
+    # The guard must be active (the shared filesystem test module disables it).
+    monkeypatch.delenv("VICTOR_DISABLE_WORKSPACE_GUARD", raising=False)
+    fs._ALLOWED_READ_ROOTS_CACHE.clear()
+    yield
+    fs._ALLOWED_READ_ROOTS_CACHE.clear()
+
+
+class TestPathWithinWorkspace:
+    def test_project_root_subpath_allowed(self):
+        root = Path("/repo/main").resolve()
+        with patch.object(fs, "_discover_read_roots", return_value=frozenset({str(root)})):
+            assert _path_within_workspace(root / "victor" / "x.py", root) is True
+
+    def test_worktree_path_allowed(self):
+        root = Path("/repo/main").resolve()
+        wt = Path("/repo/wt-feature").resolve()
+        with patch.object(fs, "_discover_read_roots", return_value=frozenset({str(root), str(wt)})):
+            assert _path_within_workspace(wt / "victor" / "tool.py", root) is True
+
+    def test_outside_path_rejected(self):
+        root = Path("/repo/main").resolve()
+        with patch.object(fs, "_discover_read_roots", return_value=frozenset({str(root)})):
+            assert _path_within_workspace(Path("/etc/passwd"), root) is False
+
+    def test_sibling_prefix_not_falsely_matched(self):
+        # "/repo/main-secrets" must NOT match root "/repo/main" (separator-aware).
+        root = Path("/repo/main").resolve()
+        with patch.object(fs, "_discover_read_roots", return_value=frozenset({str(root)})):
+            assert _path_within_workspace(Path("/repo/main-secrets/x"), root) is False
+
+    def test_refresh_picks_up_new_worktree(self):
+        # First discovery lacks the worktree; a mid-session worktree appears on refresh.
+        root = Path("/repo/main").resolve()
+        wt = Path("/repo/wt-new").resolve()
+        calls = [frozenset({str(root)}), frozenset({str(root), str(wt)})]
+        with patch.object(fs, "_discover_read_roots", side_effect=calls):
+            assert _path_within_workspace(wt / "f.py", root) is True
+
+
+class TestDiscoverReadRoots:
+    def test_parses_worktree_list_porcelain(self):
+        root = Path("/repo/main").resolve()
+        stdout = (
+            f"worktree {root}\nHEAD abc\nbranch refs/heads/develop\n\n"
+            "worktree /repo/wt-feature\nHEAD def\nbranch refs/heads/feat/x\n"
+        )
+        proc = MagicMock(returncode=0, stdout=stdout)
+        with patch("subprocess.run", return_value=proc):
+            roots = _discover_read_roots(root)
+        assert str(root) in roots
+        assert str(Path("/repo/wt-feature").resolve()) in roots
+
+    def test_git_failure_falls_back_to_project_root(self):
+        root = Path("/repo/main").resolve()
+        with patch("subprocess.run", side_effect=FileNotFoundError("no git")):
+            roots = _discover_read_roots(root)
+        assert roots == frozenset({str(root)})
+
+
+class TestReadGuardEndToEnd:
+    @pytest.mark.asyncio
+    async def test_read_rejects_genuine_outside_path(self, tmp_path):
+        project = tmp_path / "proj"
+        project.mkdir()
+        outside = tmp_path / "elsewhere" / "secret.txt"
+        outside.parent.mkdir()
+        outside.write_text("nope")
+        paths = MagicMock(project_root=str(project))
+        with (
+            patch("victor.config.settings.get_project_paths", return_value=paths),
+            patch.object(fs, "_discover_read_roots", return_value=frozenset({str(project)})),
+        ):
+            result = await read(path=str(outside))
+        assert "outside the current workspace" in result
+
+    @pytest.mark.asyncio
+    async def test_read_allows_worktree_path(self, tmp_path):
+        project = tmp_path / "proj"
+        project.mkdir()
+        worktree = tmp_path / "wt-feature"
+        worktree.mkdir()
+        target = worktree / "hello.py"
+        target.write_text("print('hi')\n")
+        paths = MagicMock(project_root=str(project))
+        with (
+            patch("victor.config.settings.get_project_paths", return_value=paths),
+            patch.object(
+                fs,
+                "_discover_read_roots",
+                return_value=frozenset({str(project.resolve()), str(worktree.resolve())}),
+            ),
+        ):
+            result = await read(path=str(target))
+        assert "outside the current workspace" not in result
+        assert "hi" in result
