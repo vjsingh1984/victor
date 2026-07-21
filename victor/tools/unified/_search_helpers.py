@@ -25,16 +25,61 @@ dispatchers reach for:
 Extracted here (out of ``search_tool.py``) so the helpers survive the
 ``search`` domain's retirement and can be reused without re-importing a
 deprecated tool module.
+
+When ripgrep (``rg``) is on PATH it is used as the search engine (binary and
+size skipping for free); otherwise a guarded Python walk runs. Both engines
+return the same result shape.
 """
 
 from __future__ import annotations
 
+import asyncio
+import logging
+import os
 import re
+import shutil
+import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-# Directories never worth scanning for code search.
-_SEARCH_SKIP_DIRS = {".git", ".venv", "__pycache__", "node_modules"}
+from victor.framework.tool_progress import emit_tool_progress, has_progress_sink
+
+logger = logging.getLogger(__name__)
+
+# Directories never worth scanning for code search. ``.victor`` holds the
+# project database and LanceDB embedding fragments — multi-GB binaries that
+# must never be text-scanned. ``.claude`` holds linked worktrees whose contents
+# would duplicate every match.
+_SEARCH_SKIP_DIRS = {
+    ".git",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+    ".victor",
+    ".claude",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    ".tox",
+    ".eggs",
+    "htmlcov",
+}
+
+# Files larger than this are skipped by the Python walk (and via
+# ``--max-filesize`` for ripgrep): source files this big are almost always
+# generated artifacts, and reading them dominates scan time.
+_MAX_FILE_BYTES = 2 * 1024 * 1024
+
+# Bytes sniffed from the head of each file to detect binary content.
+_BINARY_SNIFF_BYTES = 8192
+
+# How often (in files) the Python walk yields to the event loop and emits a
+# progress heartbeat to the live renderer.
+_PROGRESS_EVERY_FILES = 200
+
+# A slow-scan threshold that promotes the completion log line to WARNING so
+# multi-minute regressions are visible in the log instead of silent.
+_SLOW_SCAN_WARN_SECONDS = 5.0
 
 
 async def grep_search(
@@ -58,18 +103,109 @@ async def grep_search(
         matching line.
     """
     root = Path(path).expanduser()
-    targets = [root] if root.is_file() else [p for p in root.rglob("*") if p.is_file()]
+    started = time.monotonic()
+
+    results = await _ripgrep_search(query, root, regex=regex, case_sensitive=case_sensitive)
+    engine = "rg"
+    if results is None:
+        engine = "python"
+        results = await _python_walk_search(query, root, regex=regex, case_sensitive=case_sensitive)
+
+    elapsed = time.monotonic() - started
+    log = logger.warning if elapsed >= _SLOW_SCAN_WARN_SECONDS else logger.debug
+    log(
+        "grep_search engine=%s query=%r root=%s matches=%d elapsed=%.2fs",
+        engine,
+        query,
+        root,
+        len(results),
+        elapsed,
+    )
+    return results
+
+
+async def _ripgrep_search(
+    query: str,
+    root: Path,
+    *,
+    regex: bool,
+    case_sensitive: bool,
+) -> Optional[List[Dict[str, Any]]]:
+    """Run ripgrep when available; return ``None`` to fall back to the walk."""
+    rg = shutil.which("rg")
+    if rg is None or not root.exists():
+        return None
+
+    args = [
+        rg,
+        "--line-number",
+        "--no-heading",
+        "--with-filename",
+        "--color",
+        "never",
+        "--no-messages",
+        "--hidden",
+        f"--max-filesize={_MAX_FILE_BYTES}",
+    ]
+    for skip in sorted(_SEARCH_SKIP_DIRS):
+        args.append(f"--glob=!{skip}/")
+    if not case_sensitive:
+        args.append("--ignore-case")
+    if not regex:
+        args.append("--fixed-strings")
+    args += ["--", query, str(root)]
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await proc.communicate()
+    except OSError as exc:  # rg vanished or failed to spawn — use the walk
+        logger.debug("ripgrep unavailable (%s); falling back to Python walk", exc)
+        return None
+    if proc.returncode not in (0, 1):  # 1 = no matches; >=2 = usage/runtime error
+        logger.debug("ripgrep exited %s; falling back to Python walk", proc.returncode)
+        return None
+
+    results: List[Dict[str, Any]] = []
+    for raw in stdout.decode("utf-8", errors="ignore").splitlines():
+        file_part, sep, rest = raw.partition(":")
+        line_part, sep2, content = rest.partition(":")
+        if not sep or not sep2 or not line_part.isdigit():
+            continue
+        results.append({"file": file_part, "line": int(line_part), "content": content})
+    return results
+
+
+async def _python_walk_search(
+    query: str,
+    root: Path,
+    *,
+    regex: bool,
+    case_sensitive: bool,
+) -> List[Dict[str, Any]]:
+    """Guarded pure-Python fallback scan (no ripgrep on PATH)."""
     flags = 0 if case_sensitive else re.IGNORECASE
     pattern = re.compile(query if regex else re.escape(query), flags)
     results: List[Dict[str, Any]] = []
-    for file_path in targets:
-        if any(part in _SEARCH_SKIP_DIRS for part in file_path.parts):
+    scanned = 0
+
+    for file_path in _iter_search_files(root):
+        scanned += 1
+        if scanned % _PROGRESS_EVERY_FILES == 0:
+            if has_progress_sink():
+                emit_tool_progress(
+                    name="code",
+                    stdout=f"scanning… {scanned} files, {len(results)} matches",
+                )
+            # Keep the event loop responsive during large scans.
+            await asyncio.sleep(0)
+        text = _read_search_text(file_path)
+        if text is None:
             continue
-        try:
-            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
-        except OSError:
-            continue
-        for line_no, line in enumerate(lines, start=1):
+        for line_no, line in enumerate(text.splitlines(), start=1):
             if pattern.search(line):
                 results.append(
                     {
@@ -79,6 +215,34 @@ async def grep_search(
                     }
                 )
     return results
+
+
+def _iter_search_files(root: Path):
+    """Yield candidate files under ``root``, pruning skip-dirs without descending."""
+    if root.is_file():
+        yield root
+        return
+    if not root.is_dir():
+        return
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in _SEARCH_SKIP_DIRS]
+        for filename in filenames:
+            yield Path(dirpath) / filename
+
+
+def _read_search_text(file_path: Path) -> Optional[str]:
+    """Read a file for scanning, or ``None`` if oversized, binary, or unreadable."""
+    try:
+        if file_path.stat().st_size > _MAX_FILE_BYTES:
+            return None
+        with open(file_path, "rb") as fh:
+            head = fh.read(_BINARY_SNIFF_BYTES)
+            if b"\x00" in head:
+                return None
+            rest = fh.read()
+        return (head + rest).decode("utf-8", errors="ignore")
+    except OSError:
+        return None
 
 
 def format_grep_results(results: List[Dict[str, Any]], *, limit: int = 50) -> str:

@@ -1,4 +1,6 @@
 import argparse
+import asyncio
+import os
 from pathlib import Path
 import shlex
 import sys
@@ -56,6 +58,44 @@ async def analyze_metrics(path: str):
         functions += sum(1 for line in lines if line.lstrip().startswith("def "))
         classes += sum(1 for line in lines if line.lstrip().startswith("class "))
     return {"files": len(files), "loc": loc, "functions": functions, "classes": classes}
+
+
+# Wall-clock budget for literal scans so a pathological tree can never stall a
+# turn for minutes (env-overridable, mirroring the semantic path's
+# VICTOR_TIMEOUT_* convention).
+_LITERAL_SEARCH_TIMEOUT_ENV = "VICTOR_TIMEOUT_LITERAL_SEARCH"
+_LITERAL_SEARCH_TIMEOUT_DEFAULT = 30.0
+
+
+def _literal_search_timeout() -> float:
+    raw = os.environ.get(_LITERAL_SEARCH_TIMEOUT_ENV, "")
+    try:
+        return float(raw) if raw else _LITERAL_SEARCH_TIMEOUT_DEFAULT
+    except ValueError:
+        return _LITERAL_SEARCH_TIMEOUT_DEFAULT
+
+
+async def _timed_grep_search(
+    query: str,
+    path: str,
+    regex: bool = False,
+    case_sensitive: bool = False,
+):
+    """Run :func:`grep_search` under the literal-search wall-clock budget."""
+    from victor.tools.unified._search_helpers import grep_search
+
+    return await asyncio.wait_for(
+        grep_search(query=query, path=path, regex=regex, case_sensitive=case_sensitive),
+        timeout=_literal_search_timeout(),
+    )
+
+
+def _literal_timeout_message(query: str) -> str:
+    return (
+        f"### ❌ ERROR\nLiteral search for {query!r} exceeded "
+        f"{_literal_search_timeout():.0f}s and was cancelled. Narrow the path "
+        f"argument, or raise {_LITERAL_SEARCH_TIMEOUT_ENV}."
+    )
 
 
 class UnifiedCodeParser(argparse.ArgumentParser):
@@ -189,19 +229,18 @@ async def code_tool(cmd: str) -> str:
             return f"### ❌ ERROR\nMetrics analysis failed: {e}"
 
     elif parsed_args.subcommand == "grep":
-        from victor.tools.unified._search_helpers import (
-            format_grep_results,
-            grep_search,
-        )
+        from victor.tools.unified._search_helpers import format_grep_results
 
         try:
-            results = await grep_search(
+            results = await _timed_grep_search(
                 query=parsed_args.query,
                 path=parsed_args.path,
                 regex=parsed_args.regex,
                 case_sensitive=parsed_args.case_sensitive,
             )
             return format_grep_results(results)
+        except asyncio.TimeoutError:
+            return _literal_timeout_message(parsed_args.query)
         except Exception as e:
             return f"### ❌ ERROR\ngrep failed: {e}"
 
@@ -223,10 +262,13 @@ async def _code_search(parsed_args) -> str:
     otherwise (and for ``--mode literal``) falls back to a literal grep so the
     surface always works, per the graceful-degradation principle.
     """
-    from victor.tools.unified._search_helpers import format_grep_results, grep_search
+    from victor.tools.unified._search_helpers import format_grep_results
 
     if parsed_args.mode == "literal":
-        results = await grep_search(query=parsed_args.query, path=parsed_args.path)
+        try:
+            results = await _timed_grep_search(query=parsed_args.query, path=parsed_args.path)
+        except asyncio.TimeoutError:
+            return _literal_timeout_message(parsed_args.query)
         return format_grep_results(results)
 
     from victor.tools.unified._vertical_resolver import resolve_vertical_callable
@@ -238,7 +280,10 @@ async def _code_search(parsed_args) -> str:
     )
     if search_fn is None:
         # No semantic backend available — degrade to literal with a hint.
-        results = await grep_search(query=parsed_args.query, path=parsed_args.path)
+        try:
+            results = await _timed_grep_search(query=parsed_args.query, path=parsed_args.path)
+        except asyncio.TimeoutError:
+            return _literal_timeout_message(parsed_args.query)
         return (
             "### 💡 SYSTEM HINT\nSemantic code search requires the victor-coding "
             "package, which is not installed. Showing literal matches instead.\n\n"

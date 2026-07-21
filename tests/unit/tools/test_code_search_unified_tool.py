@@ -33,7 +33,9 @@ class TestCodeSearchLiteral:
         mock_grep = AsyncMock(return_value=[{"file": "a.py", "line": 1, "content": "auth"}])
         with patch("victor.tools.unified._search_helpers.grep_search", mock_grep):
             result = await code_tool('code search "auth" src --mode literal')
-        mock_grep.assert_awaited_once_with(query="auth", path="src")
+        mock_grep.assert_awaited_once_with(
+            query="auth", path="src", regex=False, case_sensitive=False
+        )
         assert "a.py:1" in result
 
 
@@ -101,7 +103,9 @@ class TestCodeSearchFallback:
             patch("victor.tools.unified._search_helpers.grep_search", mock_grep),
         ):
             result = await code_tool('code search "auth" src')
-        mock_grep.assert_awaited_once_with(query="auth", path="src")
+        mock_grep.assert_awaited_once_with(
+            query="auth", path="src", regex=False, case_sensitive=False
+        )
         assert "SYSTEM HINT" in result
         assert "literal" in result.lower()
         assert "a.py:1" in result
