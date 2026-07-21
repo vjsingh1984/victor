@@ -96,7 +96,15 @@ class FormatterRenderer:
             self.formatter.start_streaming(preserve_buffer=True)
             logger.debug("FormatterRenderer: resumed (depth=0)")
 
-    def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
+    def on_tool_start(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        tool_call_id: str | None = None,
+        batch_index: int | None = None,
+        batch_total: int | None = None,
+        execution_mode: str | None = None,
+    ) -> None:
         """Handle tool execution start - store info for result display.
 
         Args:
@@ -128,6 +136,7 @@ class FormatterRenderer:
         was_pruned: bool = False,
         original_result: Any = None,
         result: Any = None,  # Tool output for preview
+        tool_call_id: str | None = None,
     ) -> None:
         """Handle tool execution result.
 
