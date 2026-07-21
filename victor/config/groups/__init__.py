@@ -30,6 +30,7 @@ from victor.config.groups.agent_config import AgentSettings, PlanningConfig
 from victor.config.groups.server_config import ServerSettings
 from victor.config.groups.codebase_config import CodebaseSettings
 from victor.config.groups.usage_config import UsageSettings
+from victor.config.groups.usage_gateway_config import UsageGatewaySettings
 from victor.config.groups.subprocess_config import SubprocessSettings
 from victor.config.groups.headless_config import HeadlessSettings
 from victor.config.groups.workflow_config import WorkflowSettings
@@ -57,6 +58,8 @@ __all__ = [
     "CodebaseSettings",
     # Usage configuration
     "UsageSettings",
+    # Usage-gateway (sandhi) attribution configuration
+    "UsageGatewaySettings",
     # Subprocess configuration
     "SubprocessSettings",
     # Headless configuration
