@@ -39,6 +39,7 @@ from victor.providers.base import (
 from victor.core.utils.log_helpers import truncate_for_log
 from victor.providers.logging import ProviderLogger
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
+from victor.providers.usage_parsing import parse_usage_dict
 
 logger = logging.getLogger(__name__)
 from victor.providers.ollama_capability_detector import TOOL_SUPPORT_PATTERNS
@@ -1110,10 +1111,11 @@ class OllamaProvider(BaseProvider):
                 # Clear content since it was a tool call, not actual text response
                 content = ""
 
-        # Parse usage stats if available
+        # Parse usage stats if available — routed through sandhi's single-sourced
+        # parser (top-level eval counts, no envelope); native dict is the fallback.
         usage = None
         if "prompt_eval_count" in result or "eval_count" in result:
-            usage = {
+            usage = parse_usage_dict("ollama", result) or {
                 "prompt_tokens": result.get("prompt_eval_count", 0),
                 "completion_tokens": result.get("eval_count", 0),
                 "total_tokens": result.get("prompt_eval_count", 0) + result.get("eval_count", 0),
@@ -1171,11 +1173,13 @@ class OllamaProvider(BaseProvider):
         # Surface token usage on the final chunk: Ollama returns prompt_eval_count /
         # eval_count on the `done:true` chunk (same fields the non-streaming path reads).
         # Without this the streaming cost trace (C0) stays at total_tokens=0 for Ollama.
+        # Routed through sandhi's single-sourced parser (top-level eval counts, no
+        # envelope); the native dict is the fallback.
         usage = None
         if is_done and ("prompt_eval_count" in chunk_data or "eval_count" in chunk_data):
             prompt_tokens = chunk_data.get("prompt_eval_count", 0)
             completion_tokens = chunk_data.get("eval_count", 0)
-            usage = {
+            usage = parse_usage_dict("ollama", chunk_data) or {
                 "prompt_tokens": prompt_tokens,
                 "completion_tokens": completion_tokens,
                 "total_tokens": prompt_tokens + completion_tokens,
