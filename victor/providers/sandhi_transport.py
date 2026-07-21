@@ -309,7 +309,9 @@ class SandhiHttpxTransportMixin:
                 async for line in sse_lines(_iterate(byte_iter)):
                     yielded = True
                     yield line
-            except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+            except (GeneratorExit, asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+                # GeneratorExit = the consumer stopped early (e.g. on [DONE]) — clean close,
+                # never a transport failure, never a demotion cause.
                 raise
             except BaseException as exc:  # noqa: BLE001
                 mapped = map_sandhi_error(exc, provider_name, timeout)
