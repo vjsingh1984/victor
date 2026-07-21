@@ -49,7 +49,7 @@ help:
 	@echo "Utilities:"
 	@echo "  make docs          Generate documentation"
 	@echo "  make serve         Start API server"
-	@echo "  make tui           Start TUI"
+	@echo "  make tui           Start interactive CLI (rich terminal chat; Textual dashboard: victor dashboard)"
 
 # =============================================================================
 # Development
@@ -278,6 +278,8 @@ docs-serve:
 serve:
 	victor serve
 
+# "tui" is a historical alias: bare `victor` IS the interactive rich CLI
+# (same surface as `victor chat`). The Textual app is `victor dashboard`.
 tui:
 	victor
 

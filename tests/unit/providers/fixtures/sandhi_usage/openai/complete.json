@@ -1,0 +1,1 @@
+{"id":"chatcmpl-corpus","object":"chat.completion","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"Hello, world"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000,"completion_tokens":250,"total_tokens":1250,"prompt_tokens_details":{"cached_tokens":800}}}

@@ -1,0 +1,1 @@
+{"model":"llama3","message":{"role":"assistant","content":"Hello, world"},"done":true,"done_reason":"stop","prompt_eval_count":512,"eval_count":128,"total_duration":123456}

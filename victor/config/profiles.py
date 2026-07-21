@@ -14,6 +14,12 @@
 
 """Configuration profiles for different user levels.
 
+NOTE: this preset/scaffolding system is NOT what resolves ``victor chat -p``.
+The CLI profile flag is resolved by ``Settings.load_profiles()``
+(victor/config/settings.py), which layers ``~/.victor/profiles.yaml`` over the
+bundled ``victor/config/profiles.default.yaml``. The templates here generate
+global-config presets (tool budgets, thresholds) for onboarding.
+
 This module provides predefined configuration profiles that simplify onboarding
 by offering sensible defaults for different experience levels:
 

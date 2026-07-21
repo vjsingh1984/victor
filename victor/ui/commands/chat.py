@@ -3106,24 +3106,22 @@ def _create_cli_prompt_session(
 
 
 def _maybe_prompt_outcome(agent: Any, settings: Any, console: "Console") -> None:
-    """FEP-0012: after the agent declares task completion, ask for a reward.
+    """FEP-0012 (passive): log a ``task_completion`` decision on fresh completions.
 
     On a fresh completion (the orchestrator's task-completion detector flips
-    False→True across this turn, tracked per-session on the orchestrator) we:
-      1. log a ``task_completion`` decision — this is the chat-side spine that
-         was missing (only the benchmark adapter logged it before), so the
-         session's decisions can now join to an outcome;
-      2. prompt "Did this resolve your task? [y/n/skip]";
-      3. stamp the reward via ``record_session_outcome`` → ``decision_outcome``.
+    False→True across this turn, tracked per-session on the orchestrator) we
+    log a ``task_completion`` decision so the session's decisions can join to
+    an outcome. Reward recording is automatic (the serve→attribute→reward
+    loop); explicit feedback lives in ``/rate`` — a one-time hint is printed
+    instead of the old blocking "Did this resolve your task?" prompt, which
+    only fires anymore if the deprecated ``enable_rl_feedback_prompt`` is
+    explicitly set True.
 
     Non-invasive: uses a transition signal (not a detector reset), so it never
-    alters completion-detection behavior and never re-prompts on stale-True.
-    Interactive REPL only; gated by ``enable_rl_feedback_prompt``. Best-effort —
+    alters completion-detection behavior. Interactive REPL only; best-effort —
     never raises into the REPL.
     """
     try:
-        if not getattr(settings, "enable_rl_feedback_prompt", True):
-            return
         orch = agent.get_orchestrator() if hasattr(agent, "get_orchestrator") else None
         if orch is None:
             return
@@ -3156,22 +3154,30 @@ def _maybe_prompt_outcome(agent: Any, settings: Any, console: "Console") -> None
             session_id_override=sid,
         )
 
-        from rich.prompt import Prompt
+        if getattr(settings, "enable_rl_feedback_prompt", False):
+            # Deprecated opt-in: legacy blocking reward prompt.
+            from rich.prompt import Prompt
 
-        answer = Prompt.ask(
-            "[dim]Did this resolve your task?[/]",
-            choices=["y", "n", "skip"],
-            default="skip",
-        )
-        if answer == "skip":
-            return
-        success = answer == "y"
-        from victor.agent.decisions.outcome import record_session_outcome
+            answer = Prompt.ask(
+                "[dim]Did this resolve your task?[/]",
+                choices=["y", "n", "skip"],
+                default="skip",
+            )
+            if answer == "skip":
+                return
+            success = answer == "y"
+            from victor.agent.decisions.outcome import record_session_outcome
 
-        count = record_session_outcome(sid, success=success, quality_score=1.0 if success else 0.0)
-        console.print(
-            f"[dim]✓ Recorded {'success' if success else 'failure'} " f"for {count} decision(s).[/]"
-        )
+            count = record_session_outcome(
+                sid, success=success, quality_score=1.0 if success else 0.0
+            )
+            console.print(
+                f"[dim]✓ Recorded {'success' if success else 'failure'} "
+                f"for {count} decision(s).[/]"
+            )
+        elif not getattr(orch, "_rate_hint_shown", False):
+            orch._rate_hint_shown = True
+            console.print("[dim]Tip: rate this session anytime with /rate.[/]")
     except Exception:
         pass  # never break the REPL
 
