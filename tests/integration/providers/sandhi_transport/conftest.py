@@ -97,7 +97,7 @@ def make_pair():
         from victor.providers.deepseek_provider import DeepSeekProvider
         from victor.providers.sandhi_transport import SandhiDeepSeekProvider
 
-        kwargs = dict(api_key="parity-key", base_url=f"{server_url}/v1", timeout=timeout)
+        kwargs = {"api_key": "parity-key", "base_url": f"{server_url}/v1", "timeout": timeout}
         return DeepSeekProvider(**kwargs), SandhiDeepSeekProvider(**kwargs)
 
     return _make
