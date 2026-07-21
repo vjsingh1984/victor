@@ -39,6 +39,7 @@ from victor.providers.resolution import (
 )
 from victor.providers.logging import ProviderLogger
 from victor.providers.oauth_manager import OAuthTokenManager
+from victor.providers.usage_parsing import parse_usage_dict
 
 
 class AnthropicProvider(BaseProvider):
@@ -424,6 +425,9 @@ class AnthropicProvider(BaseProvider):
             tool_calls: Dict[str, Dict[str, Any]] = {}
             block_index_to_id: Dict[int, str] = {}
             usage: Optional[Dict[str, int]] = None
+            # Raw message_start usage block (usage is split across two SDK events);
+            # merged with message_delta's output_tokens for the sandhi-routed parse.
+            _raw_start_usage: Optional[dict] = None
 
             async with self.client.messages.stream(**request_params) as stream:
                 async for event in stream:
@@ -435,6 +439,11 @@ class AnthropicProvider(BaseProvider):
                         if message:
                             msg_usage = getattr(message, "usage", None)
                             if msg_usage:
+                                _raw_start_usage = (
+                                    msg_usage.model_dump()
+                                    if hasattr(msg_usage, "model_dump")
+                                    else None
+                                )
                                 usage = {
                                     "prompt_tokens": getattr(msg_usage, "input_tokens", 0),
                                     "completion_tokens": 0,
@@ -536,6 +545,13 @@ class AnthropicProvider(BaseProvider):
                                     "completion_tokens": output_tokens,
                                     "total_tokens": output_tokens,
                                 }
+                            # Routed parse over the merged raw block (sandhi's
+                            # single-sourced parser); incremental dict is the fallback.
+                            if _raw_start_usage is not None:
+                                merged = {**_raw_start_usage, "output_tokens": output_tokens}
+                                routed = parse_usage_dict("anthropic", merged)
+                                if routed is not None:
+                                    usage = routed
 
                     elif event_type == "message_stop":
                         for tc in tool_calls.values():
@@ -615,10 +631,11 @@ class AnthropicProvider(BaseProvider):
                     }
                 )
 
-        # Parse usage
+        # Parse usage — routed through sandhi's single-sourced parser (also recovers
+        # the prompt-cache split the native dict dropped); native dict is the fallback.
         usage = None
         if response.usage:
-            usage = {
+            usage = parse_usage_dict("anthropic", response.usage) or {
                 "prompt_tokens": response.usage.input_tokens,
                 "completion_tokens": response.usage.output_tokens,
                 "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
