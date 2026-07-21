@@ -47,8 +47,25 @@ from victor.providers.resolution import (
 from victor.providers.logging import ProviderLogger
 from victor.providers.usage_parsing import parse_usage_dict
 
-# Default Moonshot API endpoint
+# Default Moonshot API endpoint (K2 models, .cn platform)
 DEFAULT_BASE_URL = "https://api.moonshot.cn/v1"
+
+# Kimi K3 is served from the international .ai platform endpoint.
+KIMI_K3_BASE_URL = "https://api.moonshot.ai/v1"
+
+# K3 thinking is always on; effort is controlled via the top-level
+# reasoning_effort request field. Server default is "max" when omitted —
+# note there is NO "medium".
+KIMI_K3_REASONING_EFFORTS = frozenset({"low", "high", "max"})
+
+# Available Kimi K3 models
+KIMI_K3_MODELS = {
+    "kimi-k3": {
+        "description": "Kimi K3 - 2.8T MoE flagship, 1M context, always-on thinking, native vision",
+        "context_window": 1048576,
+        "supports_thinking": True,
+    },
+}
 
 # Available Kimi K2 models
 KIMI_K2_MODELS = {
@@ -71,12 +88,14 @@ KIMI_K2_MODELS = {
 
 
 class MoonshotProvider(BaseProvider):
-    """Provider for Moonshot AI's Kimi K2 models (OpenAI-compatible API).
+    """Provider for Moonshot AI's Kimi models (OpenAI-compatible API).
 
     Features:
     - Native tool calling support
     - Reasoning/thinking trace extraction
-    - 256k context window
+    - Kimi K2 (256k context, .cn endpoint) and Kimi K3 (1M context,
+      .ai endpoint — routed automatically per model)
+    - K3 reasoning_effort passthrough (low/high/max; server default max)
     - Streaming support with reasoning_content
     """
 
@@ -96,12 +115,17 @@ class MoonshotProvider(BaseProvider):
 
         Args:
             api_key: Moonshot API key (or set MOONSHOT_API_KEY env var)
-            base_url: API endpoint (default: https://api.moonshot.cn/v1)
+            base_url: API endpoint (default: https://api.moonshot.cn/v1 for K2;
+                kimi-k3* requests are routed to https://api.moonshot.ai/v1
+                automatically unless an explicit base_url is passed, which
+                always wins for every model)
             timeout: Request timeout (default: 120s)
             max_retries: Maximum retry attempts
             non_interactive: Force non-interactive mode (None = auto-detect)
             **kwargs: Additional configuration
         """
+        # An explicit, non-default base_url pins ALL models to that endpoint.
+        self._base_url_pinned = base_url != DEFAULT_BASE_URL
         # Initialize structured logger
         self._provider_logger = ProviderLogger("moonshot", __name__)
 
@@ -152,6 +176,38 @@ class MoonshotProvider(BaseProvider):
                 "Content-Type": "application/json",
             },
         )
+        # Per-endpoint clients created on demand for model→endpoint routing
+        # (kimi-k3 lives on the .ai platform while K2 stays on .cn).
+        self._endpoint_clients: Dict[str, httpx.AsyncClient] = {}
+        self._client_timeout = timeout
+
+    @classmethod
+    def resolve_base_url_for_model(cls, model: str) -> str:
+        """Return the platform endpoint that serves ``model``."""
+        if model.startswith("kimi-k3"):
+            return KIMI_K3_BASE_URL
+        return DEFAULT_BASE_URL
+
+    def _client_for_model(self, model: str) -> httpx.AsyncClient:
+        """Return the HTTP client for the endpoint serving ``model``.
+
+        An explicit base_url passed at construction pins all models to the
+        primary client; otherwise kimi-k3* requests route to the .ai endpoint.
+        """
+        if self._base_url_pinned:
+            return self.client
+        target = self.resolve_base_url_for_model(model)
+        if target == str(self.client.base_url).rstrip("/"):
+            return self.client
+        client = self._endpoint_clients.get(target)
+        if client is None:
+            client = httpx.AsyncClient(
+                base_url=target,
+                timeout=httpx.Timeout(self._client_timeout),
+                headers=dict(self.client.headers),
+            )
+            self._endpoint_clients[target] = client
+        return client
 
     @property
     def name(self) -> str:
@@ -214,7 +270,7 @@ class MoonshotProvider(BaseProvider):
                 )
 
                 response = await self._execute_with_circuit_breaker(
-                    self.client.post, "/chat/completions", json=payload
+                    self._client_for_model(model).post, "/chat/completions", json=payload
                 )
                 response.raise_for_status()
 
@@ -267,7 +323,9 @@ class MoonshotProvider(BaseProvider):
                 **kwargs,
             )
 
-            async with self.client.stream("POST", "/chat/completions", json=payload) as response:
+            async with self._client_for_model(model).stream(
+                "POST", "/chat/completions", json=payload
+            ) as response:
                 response.raise_for_status()
 
                 accumulated_content = ""
@@ -383,6 +441,19 @@ class MoonshotProvider(BaseProvider):
             "max_tokens": max_tokens,
             "stream": stream,
         }
+
+        # K3 thinking effort: top-level reasoning_effort ∈ {low, high, max}.
+        # Omitted when unset — the server default is "max" ("medium" does not
+        # exist, so validate instead of passing through silently).
+        reasoning_effort = kwargs.pop("reasoning_effort", None)
+        if reasoning_effort is not None:
+            effort = str(reasoning_effort).lower()
+            if effort not in KIMI_K3_REASONING_EFFORTS:
+                raise ValueError(
+                    f"Invalid reasoning_effort {reasoning_effort!r}: must be one of "
+                    f"{sorted(KIMI_K3_REASONING_EFFORTS)} (omit for the server default, 'max')"
+                )
+            payload["reasoning_effort"] = effort
 
         # Add tools if provided
         if tools:
@@ -563,7 +634,7 @@ class MoonshotProvider(BaseProvider):
         )
 
     async def list_models(self) -> List[Dict[str, Any]]:
-        """List available Kimi K2 models.
+        """List available Kimi models (K3 + K2).
 
         Returns:
             List of available models with metadata
@@ -575,9 +646,12 @@ class MoonshotProvider(BaseProvider):
                 "object": "model",
                 **model_info,
             }
-            for model_id, model_info in KIMI_K2_MODELS.items()
+            for model_id, model_info in {**KIMI_K3_MODELS, **KIMI_K2_MODELS}.items()
         ]
 
     async def close(self) -> None:
-        """Close HTTP client."""
+        """Close HTTP clients (primary + any per-endpoint clients)."""
         await self.client.aclose()
+        for client in self._endpoint_clients.values():
+            await client.aclose()
+        self._endpoint_clients.clear()
