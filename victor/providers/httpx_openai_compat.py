@@ -234,6 +234,34 @@ class HttpxOpenAICompatProvider(BaseProvider):
             raise
         return stream_context, response
 
+    async def _complete_raw(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """WIRE SEAM (FEP-0020 Phase 4b): one non-streaming call → parsed body dict.
+
+        Everything above this seam (payload build, response parsing, tool translation,
+        usage parsing, error classification) is transport-independent; an alternate
+        transport (e.g. the sandhi binding) overrides only this method.
+        """
+        response = await self._execute_with_circuit_breaker(
+            self._send_chat_completion_request, payload
+        )
+        return response.json()  # type: ignore[no-any-return]
+
+    async def _open_stream_lines(self, payload: Dict[str, Any]) -> "tuple[Any, AsyncIterator[str]]":
+        """WIRE SEAM (FEP-0020 Phase 4b): open a stream → ``(closer, line_iterator)``.
+
+        ``closer`` is an async callable the consumer must await exactly once when done
+        (lexically paired in the driving task — see ``_open_chat_completion_stream``).
+        The iterator yields decoded SSE lines; all chunk parsing stays in ``stream()``.
+        """
+        stream_context, response = await self._execute_with_circuit_breaker(
+            self._open_chat_completion_stream, payload
+        )
+
+        async def _closer() -> None:
+            await stream_context.__aexit__(None, None, None)
+
+        return _closer, response.aiter_lines()
+
     def _build_request_payload(
         self,
         messages: List[Message],
@@ -474,10 +502,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
                 payload = self._build_request_payload(
                     messages, model, temperature, max_tokens, tools, False, **kwargs
                 )
-                response = await self._execute_with_circuit_breaker(
-                    self._send_chat_completion_request, payload
-                )
-                result = response.json()
+                result = await self._complete_raw(payload)
                 parsed = self._parse_response(result, model)
                 tokens = parsed.usage.get("total_tokens") if parsed.usage else None
                 log_success(tokens=tokens)
@@ -510,14 +535,12 @@ class HttpxOpenAICompatProvider(BaseProvider):
             payload = self._build_request_payload(
                 messages, model, temperature, max_tokens, tools, True, **kwargs
             )
-            stream_context, response = await self._execute_with_circuit_breaker(
-                self._open_chat_completion_stream, payload
-            )
+            closer, lines = await self._open_stream_lines(payload)
             try:
                 accumulated_tool_calls: List[Dict[str, Any]] = []
                 has_sent_final = False
 
-                async for line in response.aiter_lines():
+                async for line in lines:
                     if not line.strip():
                         continue
                     if not line.startswith("data: "):
@@ -548,9 +571,9 @@ class HttpxOpenAICompatProvider(BaseProvider):
                             line[:100],
                         )
             finally:
-                # Close the stream context here — lexically paired with the __aenter__ in
-                # _open_chat_completion_stream, in whatever task drives this generator.
-                await stream_context.__aexit__(None, None, None)
+                # Close the wire seam here — lexically paired with the open in
+                # _open_stream_lines, in whatever task drives this generator.
+                await closer()
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
