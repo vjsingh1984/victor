@@ -325,3 +325,94 @@ class TestPrAndEdgeCases:
     @pytest.mark.asyncio
     async def test_tool_registered_with_canonical_name(self):
         assert git_tool.Tool.name == "git"
+
+
+class TestPorcelainFlags:
+    """P3: common porcelain flags accepted; rejections teach the shell fallback.
+
+    Measured (13-day telemetry): git had a 42.9% error rate dominated by
+    ``--oneline``/``--stat``/``--show-current`` and unsupported subcommands
+    (``fetch``, ``worktree``).
+    """
+
+    # -- parser acceptance --
+
+    def test_log_oneline_flag_parses(self):
+        ns = _parse("git log --oneline -n 5")
+        assert ns.subcommand == "log"
+        assert ns.oneline is True
+        assert ns.limit == 5
+
+    def test_log_stat_flag_parses(self):
+        assert _parse("git log --stat").stat is True
+
+    def test_diff_stat_flag_parses(self):
+        assert _parse("git diff --stat").stat is True
+
+    def test_diff_cached_is_alias_of_staged(self):
+        assert _parse("git diff --cached").staged is True
+        assert _parse("git diff --staged").staged is True
+
+    def test_status_short_flag_absorbed(self):
+        assert _parse("git status --short").short is True
+        assert _parse("git status -s").short is True
+
+    # -- fallback command construction --
+
+    def test_fallback_log_stat_replaces_oneline(self):
+        sub, argv, ro = _fallback_command(_parse("git log --stat -n 3"))
+        assert sub == "log" and ro is True
+        assert "--stat" in argv
+        assert "--oneline" not in argv
+        assert "-3" in argv
+
+    def test_fallback_diff_cached_stat_combo(self):
+        # The exact live-failure combo from the telemetry.
+        sub, argv, ro = _fallback_command(_parse("git diff --cached --stat"))
+        assert sub == "diff" and ro is True
+        assert argv == ["--staged", "--stat"]
+
+    def test_fallback_branch_show_current(self):
+        sub, argv, ro = _fallback_command(_parse("git branch --show-current"))
+        assert sub == "branch"
+        assert argv == ["--show-current"]
+        assert ro is True
+
+    # -- routing: format flags bypass the devops delegate --
+
+    @pytest.mark.asyncio
+    async def test_format_flags_bypass_devops_delegate(self):
+        mock_resolve = MagicMock()
+        mock_shell = AsyncMock(return_value={"success": True, "stdout": "2 files changed"})
+        with (
+            patch("victor.tools.unified.git_tool.resolve_vertical_callable", mock_resolve),
+            patch("victor.tools.bash.shell", mock_shell),
+        ):
+            result = await git_tool("git log --stat")
+        mock_resolve.assert_not_called()
+        called_cmd = mock_shell.call_args.kwargs["cmd"]
+        assert "--stat" in called_cmd
+        assert "2 files changed" in result
+
+    # -- rejection hints teach the shell fallback --
+
+    @pytest.mark.asyncio
+    async def test_fetch_rejection_teaches_shell_fallback(self):
+        result = await git_tool("git fetch origin")
+        assert "### ❌ ERROR" in result
+        assert "This tool supports:" in result
+        assert "shell(cmd='git ...', action='exec')" in result
+
+    @pytest.mark.asyncio
+    async def test_worktree_and_cd_rejection_teaches_shell_fallback(self):
+        for cmd in ("git worktree add ../wt", "git cd .."):
+            result = await git_tool(cmd)
+            assert "### ❌ ERROR" in result
+            assert "shell(cmd='git ...', action='exec')" in result
+
+    @pytest.mark.asyncio
+    async def test_unknown_flag_rejection_teaches_shell_fallback(self):
+        result = await git_tool("git log --graph")
+        assert "### ❌ ERROR" in result
+        assert "This tool supports:" in result
+        assert "shell(cmd='git ...', action='exec')" in result

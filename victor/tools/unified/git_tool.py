@@ -71,14 +71,24 @@ def create_git_parser() -> UnifiedGitParser:
     subparsers = parser.add_subparsers(dest="subcommand", help="The operation to perform")
 
     status_parser = subparsers.add_parser("status", help="Show working tree status")
+    status_parser.add_argument(
+        "--short", "-s", action="store_true", help="(absorbed) short format is always used"
+    )
     status_parser.add_argument("files", nargs="*", help="(ignored) path filter")
 
     diff_parser = subparsers.add_parser("diff", help="Show changes")
-    diff_parser.add_argument("--staged", action="store_true", help="Show staged changes")
+    diff_parser.add_argument(
+        "--staged", "--cached", action="store_true", dest="staged", help="Show staged changes"
+    )
+    diff_parser.add_argument("--stat", action="store_true", help="Show diffstat instead of patch")
     diff_parser.add_argument("files", nargs="*", help="Paths to diff")
 
     log_parser = subparsers.add_parser("log", help="Show commit history")
     log_parser.add_argument("-n", "--limit", type=int, default=10, help="Number of commits")
+    log_parser.add_argument(
+        "--oneline", action="store_true", help="(absorbed) one line per commit is the default"
+    )
+    log_parser.add_argument("--stat", action="store_true", help="Show diffstat per commit")
     log_parser.add_argument("files", nargs="*", help="(ignored) path filter")
 
     stage_parser = subparsers.add_parser("stage", help="Stage files (or all if none given)")
@@ -108,6 +118,12 @@ def create_git_parser() -> UnifiedGitParser:
 
     branch_parser = subparsers.add_parser("branch", help="List branches or switch to one")
     branch_parser.add_argument("name", nargs="?", default=None, help="Branch to create/switch to")
+    branch_parser.add_argument(
+        "--show-current",
+        action="store_true",
+        dest="show_current",
+        help="Print only the current branch name",
+    )
 
     push_parser = subparsers.add_parser("push", help="Push commits to remote")
     push_parser.add_argument("remote", nargs="?", default=None, help="Remote name (default origin)")
@@ -205,9 +221,12 @@ def _fallback_command(args: argparse.Namespace) -> Tuple[str, List[str], bool]:
         return "status", ["--short", "--branch"], True
     if sub == "diff":
         cmd_args = ["--staged"] if getattr(args, "staged", False) else []
+        if getattr(args, "stat", False):
+            cmd_args.append("--stat")
         return "diff", [*cmd_args, *(args.files or [])], True
     if sub == "log":
-        return "log", [f"-{args.limit}", "--oneline"], True
+        fmt = "--stat" if getattr(args, "stat", False) else "--oneline"
+        return "log", [f"-{args.limit}", fmt], True
     if sub == "stage":
         return "add", list(args.files) if args.files else ["."], False
     if sub == "commit":
@@ -215,6 +234,8 @@ def _fallback_command(args: argparse.Namespace) -> Tuple[str, List[str], bool]:
             raise ValueError("commit message required (-m) for the shell fallback")
         return "commit", ["-m", args.message], False
     if sub == "branch":
+        if getattr(args, "show_current", False):
+            return "branch", ["--show-current"], True
         if args.name:
             return "checkout", [args.name], False
         return "branch", ["-a"], True
@@ -256,8 +277,12 @@ def _fallback_command(args: argparse.Namespace) -> Tuple[str, List[str], bool]:
     task_types=["action", "analysis"],
 )
 async def git_tool(cmd: str) -> str:
-    """Git domain (bash-style): status, diff, log, stage, commit (--ai), branch, push, conflicts, pr.
-    Delegates to victor-devops git; falls back to shell git. e.g. git status · git commit -m "x".
+    """Git tool (bash-style). Subcommands: status [--short] · diff [--staged|--cached] [--stat] [paths]
+    · log [-n N] [--oneline] [--stat] · stage/add [paths] · commit -m "msg" | --ai · commit_msg
+    · branch [name | --show-current] · push [remote] [branch] [--force] [--tags] [--dry-run]
+    · conflicts · pr --title "t" [--base b].
+    Delegates to victor-devops git when installed; falls back to shell git.
+    Anything else (fetch, pull, rebase, stash, worktree, ...): use shell(cmd='git ...', action='exec').
     """
     parser = create_git_parser()
 
@@ -266,8 +291,18 @@ async def git_tool(cmd: str) -> str:
         if args_list and args_list[0] == "git":
             args_list = args_list[1:]
         parsed = parser.parse_args(args_list)
-    except ValueError as e:
-        return f"### ❌ ERROR\n{e}"
+    except (ValueError, argparse.ArgumentError) as e:
+        # 42.9% of git tool calls errored (13-day telemetry) — mostly porcelain
+        # flags and subcommands outside this surface. Teach the escape hatch.
+        return (
+            "### ❌ ERROR\n"
+            f"{e}\n"
+            "\n"
+            "This tool supports: status [--short], diff [--staged|--cached] [--stat], "
+            "log [-n N] [--oneline] [--stat], stage/add, commit (-m | --ai), commit_msg, "
+            "branch [name | --show-current], push, conflicts, pr.\n"
+            "For anything else use shell(cmd='git ...', action='exec')."
+        )
     except Exception as e:
         return f"### ❌ ERROR\nUnexpected error parsing command: {e}"
 
@@ -293,6 +328,15 @@ async def git_tool(cmd: str) -> str:
     # AI commit: generate message first, then commit.
     if parsed.subcommand == "commit" and getattr(parsed, "ai", False):
         return await _handle_ai_commit(parsed)
+
+    # Format flags (--stat, --show-current) have no devops kwarg mapping — route
+    # straight to plain git so the requested output format actually takes effect.
+    if getattr(parsed, "stat", False) or getattr(parsed, "show_current", False):
+        try:
+            subcommand, argv, readonly = _fallback_command(parsed)
+            return await _shell_git(subcommand, argv, readonly=readonly)
+        except Exception as e:
+            return f"### ❌ ERROR\ngit {parsed.subcommand} failed: {e}"
 
     git_fn, _src = resolve_vertical_callable(
         "git", fallback_module="victor_devops.tools.git_tool", fallback_attr="git"
