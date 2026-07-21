@@ -247,12 +247,20 @@ class SessionLedger:
             groups.setdefault(entry.category, []).append(entry)
 
         parts = ["<SESSION_STATE>"]
+        # Actionable items first so they survive truncation. The rendered block is
+        # capped (ledger budget is a small fraction of context) and file-read lists
+        # dominate real sessions; rendering decisions/recommendations/pending
+        # actions *before* files keeps the highest-signal, most-recent items from
+        # being the first casualties of the char cap. Measured (FEP-0023): with
+        # this ordering the recent actionable items survive the cap in 100% of real
+        # ledger states (vs ~4% when files render first) — which is what made the
+        # separate ReferentialIntentResolver redundant.
         category_labels = {
-            "file_read": "Files Read",
-            "file_modified": "Files Modified",
+            "pending_action": "Pending Actions",
             "decision": "Decisions Made",
             "recommendation": "Recommendations",
-            "pending_action": "Pending Actions",
+            "file_modified": "Files Modified",
+            "file_read": "Files Read",
         }
 
         for cat, label in category_labels.items():

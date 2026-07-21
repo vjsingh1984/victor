@@ -322,22 +322,6 @@ class ComponentAssembler:
             logger.debug("Context assembler creation failed (graceful): %s", e)
             orchestrator._context_assembler = None
 
-        # FEP-0023 P3: wire the referential-intent resolver only when the flag is
-        # on (presence == active at the shared pre-add enrichment seam).
-        orchestrator._referential_intent_resolver = None
-        try:
-            from victor.core.feature_flags import FeatureFlag, is_feature_enabled
-
-            if is_feature_enabled(FeatureFlag.USE_REFERENTIAL_INTENT):
-                create_resolver = getattr(factory, "create_referential_intent_resolver", None)
-                if callable(create_resolver):
-                    orchestrator._referential_intent_resolver = create_resolver(
-                        ledger=getattr(orchestrator, "_session_ledger", None)
-                    )
-        except Exception as e:
-            logger.debug("Referential intent resolver creation failed (graceful): %s", e)
-            orchestrator._referential_intent_resolver = None
-
         from victor.agent.context_manager import create_context_manager
 
         orchestrator._context_manager = create_context_manager(

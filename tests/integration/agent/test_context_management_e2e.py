@@ -15,8 +15,9 @@
 """Integration tests for conversation context management overhaul.
 
 Tests the end-to-end interaction of SessionLedger, CompactionSummarizer,
-ToolResultDeduplicator, ContextAssembler, and ReferentialIntentResolver
-working together as they would during a real conversation flow.
+ToolResultDeduplicator, and ContextAssembler working together as they would
+during a real conversation flow. (The ReferentialIntentResolver was proven
+redundant with a properly-ordered <SESSION_STATE> and removed — FEP-0023.)
 """
 
 import pytest
@@ -26,13 +27,11 @@ from victor.agent.compaction_summarizer import (
     LedgerAwareCompactionSummarizer,
 )
 from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
-from victor.agent.referential_intent_resolver import ReferentialIntentResolver
 from victor.agent.session_ledger import SessionLedger
 from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
 from victor.config.orchestrator_constants import (
     ContextAssemblerConfig,
     DeduplicationConfig,
-    ReferentialIntentConfig,
     SessionLedgerConfig,
 )
 from victor.providers.base import Message
@@ -48,14 +47,13 @@ class TestContextManagementPipeline:
     def _build_components(self):
         ledger = SessionLedger()
         deduplicator = ToolResultDeduplicator()
-        resolver = ReferentialIntentResolver(session_ledger=ledger)
         assembler = TurnBoundaryContextAssembler(session_ledger=ledger)
         summarizer = LedgerAwareCompactionSummarizer()
-        return ledger, deduplicator, resolver, assembler, summarizer
+        return ledger, deduplicator, assembler, summarizer
 
     def test_full_conversation_flow(self):
-        """Simulate a multi-turn conversation with file reads, decisions, and referential intent."""
-        ledger, deduplicator, resolver, assembler, summarizer = self._build_components()
+        """Simulate a multi-turn conversation with file reads, decisions, and assembly."""
+        ledger, deduplicator, assembler, summarizer = self._build_components()
 
         # Turn 1: User asks to read a file
         messages = [_msg("system", "You are a helpful coding assistant.")]
@@ -91,17 +89,17 @@ class TestContextManagementPipeline:
             assert count == 1  # First read stubbed
             assert "Previously read" in messages[2].content
 
-        # Turn 4: User says "do it" — referential intent
-        user_msg = "do it"
-        enriched = resolver.enrich(user_msg)
-        assert "Context:" in enriched
-        assert "recommendation" in enriched.lower() or "refactor" in enriched.lower()
-
-        # Context assembly
-        messages.append(_msg("user", enriched))
+        # Turn 4: User issues a brief follow-up. The populated ledger surfaces the
+        # recent recommendation via <SESSION_STATE> (no separate enrichment step —
+        # the ReferentialIntentResolver was proven redundant and removed, FEP-0023).
+        messages.append(_msg("user", "do it"))
         assembled = assembler.assemble(messages, max_context_chars=100000)
         # Should include system prompt + ledger + messages
         assert any("<SESSION_STATE>" in m.content for m in assembled)
+        # The recent recommendation must be present in the rendered session state
+        # so a follow-up like "do it" is resolvable from context alone.
+        state = next(m.content for m in assembled if "<SESSION_STATE>" in m.content)
+        assert "refactor" in state.lower()
 
     def test_compaction_with_ledger_produces_structured_summary(self):
         """Test that compaction produces structured summaries when ledger is available."""
@@ -197,28 +195,12 @@ class TestContextManagementPipeline:
             ledger.get_recent_actionable_items()
         )
 
-    def test_referential_resolver_no_false_positives_on_technical(self):
-        """Test that technical messages containing 'do' aren't falsely flagged."""
-        ledger = SessionLedger()
-        ledger.record_recommendation("something", turn_index=1)
-        resolver = ReferentialIntentResolver(session_ledger=ledger)
-
-        # These should NOT be referential
-        assert resolver.enrich("How do I configure logging?") == "How do I configure logging?"
-        assert resolver.enrich("What does the do_something function do?") == (
-            "What does the do_something function do?"
-        )
-
     def test_all_components_with_none_gracefully_degrade(self):
         """Test that all components work when optional dependencies are None."""
         # No ledger
         assembler = TurnBoundaryContextAssembler(session_ledger=None, score_fn=None)
         msgs = [_msg("user", "hello")]
         assert assembler.assemble(msgs, max_context_chars=100000) == msgs
-
-        # No ledger
-        resolver = ReferentialIntentResolver(session_ledger=None)
-        assert resolver.enrich("do it") == "do it"
 
         # Disabled dedup
         dedup = ToolResultDeduplicator(config=DeduplicationConfig(enabled=False))

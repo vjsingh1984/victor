@@ -92,7 +92,6 @@ if TYPE_CHECKING:
     from victor.agent.compaction_summarizer import LedgerAwareCompactionSummarizer
     from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
     from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
-    from victor.agent.referential_intent_resolver import ReferentialIntentResolver
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
     from victor.agent.streaming.handler import StreamingChatHandler
     from victor.agent.services.chat_stream_executor import StreamingChatExecutor

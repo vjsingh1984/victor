@@ -290,13 +290,6 @@ class ChatStreamHelperMixin:
             MessageSource,
         )
 
-        # FEP-0023 P3: shared referential-intent enrichment seam (mirrors the
-        # non-streaming path so the two cannot drift). No-op unless a resolver is
-        # wired (USE_REFERENTIAL_INTENT on).
-        from victor.agent.referential_intent_resolver import resolve_referential_intent
-
-        user_message = resolve_referential_intent(orch, user_message)
-
         orch.add_message(
             "user",
             user_message,
