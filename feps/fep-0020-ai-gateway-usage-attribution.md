@@ -227,11 +227,12 @@ A four-repo provider-layer deep-dive sharpened *how* this migration sequences fo
 (Python), so it is not mistaken for a "just import the crate" move:
 
 - **"Just import" is false cross-language.** `sandhi-providers` is Rust; Victor imports a
-  **wheel**, and that wheel must expose the transport as an **async Python API** — which the
-  PyO3 binding does **not** do today (it exposes *metering only*). So Victor's transport
-  migration is **gated on building an async-streaming PyO3 binding first** (Rust `Stream` →
-  `asyncio`); it is an engineering project, not layering. (ProximaDB, being Rust, is the clean
-  same-language first mover — ADR-0047 D10a step 1.)
+  **wheel**, and that wheel must expose the transport as an **async Python API**. That gate is
+  now **cleared** (2026-07-20): the async-streaming PyO3 transport binding shipped in Sandhi
+  (#22 `complete` / #23 `stream` / #24 `register_provider`; Node parity #25/#26), with FFI-glue
+  line coverage CI-gated ≥85 % (Python at 96.5 %). `stream()` yields verbatim upstream bytes via
+  a bounded channel (O(1), byte-exact); errors surface with deterministic messages. (ProximaDB,
+  being Rust, was the clean same-language first mover — ADR-0047 D10a step 1, landed.)
 - **The moved slice is small; the value is already mostly captured.** Transport is ~10–15 % of
   Victor's ~29 k-line provider layer; the ~85–90 % under "What stays in Victor" above is not
   duplicated across repos and stays regardless. Victor's streaming is on the **TTFT-critical
@@ -243,9 +244,11 @@ A four-repo provider-layer deep-dive sharpened *how* this migration sequences fo
   transport move required. Metering (Phase 2, shipped) + this parser-sharing capture most of
   D10's value.
 
-**Net:** the transport migration stays the **deferred tail** (a Phase-4b, behind the async
-binding + a flag + native fallback); it is the endorsed direction, not a near-term step. New
-provider work should still prefer the native path until the binding ships.
+**Net (updated 2026-07-20):** with the binding shipped, Phase 4b is **unblocked**. Sequencing
+stays parser-sharing first (the cheap win above — still pending in Victor's own adapters),
+then a **flag-gated in-process transport pilot** (OpenAI-compat pure-Bearer providers first,
+Anthropic per feasibility), default OFF, native adapters as fallback. New provider work should
+still prefer the native path until the pilot proves parity.
 
 ### API Changes
 
@@ -381,9 +384,14 @@ minus the deferred in-process Rust-transport tail of Phase 4 (see below).
   changes; the Python adapter (prompt assembly, tool translation, **streaming**) is
   unchanged. Opt-in (`enabled=False` default ⇒ direct, non-breaking). Covers OpenAI proper
   + the ~20 Chat Completions providers.
-- **Deferred tail:** migrating the in-process adapters onto the Rust `sandhi-providers`
-  transport directly (a PyO3 async binding) — marginal value over Phases 2+3, and bridging
-  streaming Rust futures across PyO3 is costly. Named-trigger deferral.
+- **Phase 4b (in-process transport pilot) — unblocked, in progress:** the named trigger
+  fired 2026-07-20 — Sandhi shipped the async-streaming PyO3 transport binding (`complete` /
+  `stream` / `register_provider`, glue coverage CI-gated). The pilot migrates in-process
+  adapters onto the binding behind a per-provider setting (default OFF, native fallback,
+  parity-battery gated): pure-Bearer OpenAI-compat providers first, then Anthropic
+  (api-key mode; OAuth stays native). Prerequisites tracked alongside: routing Victor's own
+  usage-parsing through the binding's `parse_usage` (D10a step 2), and Sandhi-side timeout +
+  metering-decorator hardening.
 
 ## Migration Path
 
