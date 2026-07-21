@@ -74,9 +74,10 @@ Run the test suite and summarize any failures
 
 Victor offers multiple ways to interact:
 
-### TUI Mode (Default)
+### Interactive CLI (Default)
 
-A rich terminal interface with syntax highlighting:
+A rich terminal chat interface with syntax highlighting (the same surface as
+`victor chat`; the separate Textual observability app is `victor dashboard`):
 
 ```bash
 victor
@@ -208,8 +209,9 @@ Installation:
   victor --version                # Check version
 
 Running Victor:
-  victor                          # TUI mode
-  victor chat                     # CLI mode
+  victor                          # Interactive CLI (same as victor chat)
+  victor chat                     # Interactive CLI
+  victor dashboard                # Textual observability dashboard
   victor "task"                   # One-shot mode
   victor chat --provider X        # Use specific provider
   victor --profile local          # Use saved profile
