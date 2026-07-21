@@ -159,6 +159,17 @@ gateway = [
 # Interactive examples and playground (typer, rich already in main deps)
 examples = []
 
+# Web tooling: headless browser rendering + high-quality text extraction.
+# Used by web_fetch (render: browser) and by the DDG browser fallback in
+# web_search/web_summarize, plus trafilatura-based content extraction. All
+# import sites are lazy/guarded (the _NATIVE_AVAILABLE pattern), so the base
+# install degrades to plain HTTP + BeautifulSoup without this extra.
+# Install the browser binary separately:  playwright install chromium
+web = [
+    "playwright>=1.40",
+    "trafilatura>=1.6",
+]
+
 # Web chat UI: a pure-Python Chainlit surface bound to VictorClient (`victor ui`)
 chat-ui = [
     "chainlit>=2,<3",  # 2.x cl.Action uses payload= (the 1.x value= kwarg was removed)
