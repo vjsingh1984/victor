@@ -1,10 +1,12 @@
 """Flag-gated in-process sandhi transport pilot (FEP-0020 Phase 4b / ADR-0047 D10 step 4).
 
-Routes the WIRE layer of selected OpenAI-compat providers through the ``sandhi_gateway``
-binding (Rust reqwest + decorator stack) while every keep-in-victor concern — prompt
-assembly, tool-format translation, SSE→StreamChunk parsing, usage parsing, resilience,
-logging — continues to run in the unmodified native adapter code. The sandhi variant of a
-provider is the native class with only its two wire seams overridden.
+Routes the WIRE layer of selected providers through the ``sandhi_gateway`` binding
+(Rust reqwest + decorator stack) while every keep-in-victor concern — prompt assembly,
+tool-format translation, SSE→StreamChunk parsing, usage parsing, resilience, logging —
+continues to run in the unmodified native adapter code. The sandhi variant of a provider
+is the native class with only its wire seams overridden: both seams for the OpenAI-compat
+pilot family, and (wave 2a) the NON-STREAMING seam only for Anthropic — Anthropic
+streaming stays fully native pending the wave 2b go/no-go.
 
 Default OFF and byte-identical when off: :func:`resolve_transport_class` returns the native
 class unless the provider is named in ``VICTOR_SANDHI_TRANSPORT_PROVIDERS`` (or the
@@ -27,6 +29,7 @@ import os
 import re
 from typing import Any, AsyncIterator, Dict, FrozenSet, Iterable, Optional, Tuple, Type
 
+from victor.providers.anthropic_provider import AnthropicProvider
 from victor.providers.base import (
     BaseProvider,
     ProviderAuthError,
@@ -208,18 +211,11 @@ async def sse_lines(byte_items: AsyncIterator[Dict[str, Any]]) -> AsyncIterator[
         yield buffer.rstrip(b"\r").decode("utf-8", errors="replace")
 
 
-class SandhiHttpxTransportMixin:
-    """Overrides the two wire seams of :class:`HttpxOpenAICompatProvider` with sandhi calls.
+class SandhiSeamState:
+    """Shared demotion state + helpers for every sandhi transport variant.
 
-    Everything else — payload build, SSE chunk parsing, tool translation, usage parsing,
-    victor-side resilience — is inherited native code. MRO puts this mixin first so its
-    seam overrides win and ``super()`` reaches the native implementation for fallback.
-
-    Failure semantics: upstream-semantic errors raise victor's typed errors (no fallback
-    re-execution — the native path would fail identically and re-executing would double-hit
-    the provider). Binding-internal failures demote this instance one-way to the native
-    wire path (transparently re-executing the current call), except mid-stream after the
-    first yielded chunk, where replay would duplicate content.
+    Mixed in ahead of the native provider class; defines only ``_sandhi_*``-prefixed
+    names and ``_demote`` so it never shadows native behavior.
     """
 
     _sandhi_demoted: bool = False
@@ -247,36 +243,83 @@ class SandhiHttpxTransportMixin:
                 cause,
             )
 
+
+async def _binding_complete(
+    slug: str,
+    model: str,
+    base_url: str,
+    api_key: str,
+    body_json: str,
+    timeout: float,
+    wait_grace: float,
+) -> str:
+    """One non-streaming call through ``_sg.complete``; returns the raw body string.
+
+    Raises victor's typed errors for upstream-semantic failures (including the
+    FFI-hang backstop timeout) and :class:`SandhiTransportUnavailable` for
+    binding-internal ones (the caller's demotion trigger).
+    """
+    try:
+        out = await asyncio.wait_for(
+            _sg.complete(  # type: ignore[union-attr]
+                slug,
+                model,
+                base_url,
+                api_key,
+                body_json,
+                None,
+                timeout_secs=timeout,
+                max_retries=0,  # victor's ResilientProvider is the sole retry owner
+            ),
+            timeout=timeout + wait_grace,
+        )
+        return str(out["body"])
+    except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+        raise
+    except asyncio.TimeoutError as exc:
+        raise ProviderTimeoutError(
+            f"sandhi transport FFI-level timeout after {timeout}s",
+            provider=slug,
+            timeout=timeout,
+        ) from exc
+    except BaseException as exc:  # noqa: BLE001 — pyo3 panics subclass BaseException
+        mapped = map_sandhi_error(exc, slug, timeout)
+        if mapped is not None:
+            raise mapped from exc
+        raise SandhiTransportUnavailable(str(exc)) from exc
+
+
+class SandhiHttpxTransportMixin(SandhiSeamState):
+    """Overrides the two wire seams of :class:`HttpxOpenAICompatProvider` with sandhi calls.
+
+    Everything else — payload build, SSE chunk parsing, tool translation, usage parsing,
+    victor-side resilience — is inherited native code. MRO puts this mixin first so its
+    seam overrides win and ``super()`` reaches the native implementation for fallback.
+
+    Failure semantics: upstream-semantic errors raise victor's typed errors (no fallback
+    re-execution — the native path would fail identically and re-executing would double-hit
+    the provider). Binding-internal failures demote this instance one-way to the native
+    wire path (transparently re-executing the current call), except mid-stream after the
+    first yielded chunk, where replay would duplicate content.
+    """
+
     async def _sandhi_complete(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """One non-streaming wire call through the binding; returns the parsed body dict."""
         timeout = self._sandhi_timeout()
+        body = await _binding_complete(
+            self._sandhi_slug(),
+            str(payload.get("model", "")),
+            str(getattr(self, "base_url", "")),
+            str(getattr(self, "_api_key", None) or getattr(self, "api_key", "") or ""),
+            json.dumps(payload),
+            timeout,
+            self._SANDHI_WAIT_GRACE_SECS,
+        )
         try:
-            out = await asyncio.wait_for(
-                _sg.complete(  # type: ignore[union-attr]
-                    self._sandhi_slug(),
-                    str(payload.get("model", "")),
-                    str(getattr(self, "base_url", "")),
-                    str(getattr(self, "_api_key", None) or getattr(self, "api_key", "") or ""),
-                    json.dumps(payload),
-                    None,
-                    timeout_secs=timeout,
-                    max_retries=0,  # victor's ResilientProvider is the sole retry owner
-                ),
-                timeout=timeout + self._SANDHI_WAIT_GRACE_SECS,
-            )
-            return json.loads(out["body"])
+            return json.loads(body)
         except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
             raise
-        except asyncio.TimeoutError as exc:
-            raise ProviderTimeoutError(
-                f"sandhi transport FFI-level timeout after {timeout}s",
-                provider=self._sandhi_slug(),
-                timeout=timeout,
-            ) from exc
-        except BaseException as exc:  # noqa: BLE001 — pyo3 panics subclass BaseException
-            mapped = map_sandhi_error(exc, self._sandhi_slug(), timeout)
-            if mapped is not None:
-                raise mapped from exc
+        except BaseException as exc:  # noqa: BLE001 — malformed body is binding-internal
             raise SandhiTransportUnavailable(str(exc)) from exc
 
     async def _complete_raw(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -389,15 +432,67 @@ class SandhiZAIProvider(SandhiHttpxTransportMixin, ZAIProvider):
     """Z.AI with the wire layer on sandhi transport (pilot)."""
 
 
+class SandhiAnthropicProvider(SandhiSeamState, AnthropicProvider):
+    """Anthropic with the NON-STREAMING wire on sandhi transport (wave 2a).
+
+    Overrides exactly one seam — :meth:`AnthropicProvider._create_message_raw` — so
+    prompt assembly (``_build_request_params``), circuit breaker, response parsing
+    (``_parse_response``), usage routing, and error taxonomy all stay native. The
+    binding POSTs ``{base_url}/v1/messages`` with ``x-api-key`` +
+    ``anthropic-version`` for slug ``anthropic``; the validated body feeds the SDK
+    ``Message`` model so ``_parse_response`` runs unchanged.
+
+    Scope: streaming stays 100% native (wave 2b is a separate go/no-go). OAuth-mode
+    instances never reach this class — the resolver excludes ``auth_mode="oauth"``
+    (the binding sends ``x-api-key`` only, not ``Authorization: Bearer``).
+
+    Failure semantics mirror the httpx mixin: upstream-semantic errors raise victor's
+    typed errors (no re-execution); binding-internal failures demote this instance
+    one-way to the native wire, transparently re-executing the current call.
+    """
+
+    _SANDHI_DEFAULT_BASE_URL = "https://api.anthropic.com"
+
+    async def _create_message_raw(self, **request_params: Any) -> Any:
+        if self._sandhi_demoted or _sg is None:
+            return await super()._create_message_raw(**request_params)
+        timeout = self._sandhi_timeout()
+        try:
+            body = await _binding_complete(
+                "anthropic",
+                str(request_params.get("model", "")),
+                str(getattr(self, "base_url", None) or self._SANDHI_DEFAULT_BASE_URL),
+                str(getattr(self, "_api_key", None) or getattr(self, "api_key", "") or ""),
+                json.dumps(request_params),
+                timeout,
+                self._SANDHI_WAIT_GRACE_SECS,
+            )
+        except SandhiTransportUnavailable as exc:
+            self._demote(exc)
+            return await super()._create_message_raw(**request_params)
+        try:
+            from anthropic.types import Message as AnthropicMessage
+
+            return AnthropicMessage.model_validate(json.loads(body))
+        except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
+            raise
+        except BaseException as exc:  # noqa: BLE001 — malformed body is binding-internal
+            self._demote(exc)
+            return await super()._create_message_raw(**request_params)
+
+
 _SANDHI_VARIANTS: Dict[Type[BaseProvider], Type[BaseProvider]] = {
     DeepSeekProvider: SandhiDeepSeekProvider,
     XAIProvider: SandhiXAIProvider,
     ZAIProvider: SandhiZAIProvider,
+    AnthropicProvider: SandhiAnthropicProvider,
 }
 
 __all__ = [
+    "SandhiAnthropicProvider",
     "SandhiDeepSeekProvider",
     "SandhiHttpxTransportMixin",
+    "SandhiSeamState",
     "SandhiTransportUnavailable",
     "SandhiXAIProvider",
     "SandhiZAIProvider",

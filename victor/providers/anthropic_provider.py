@@ -268,47 +268,16 @@ class AnthropicProvider(BaseProvider):
             has_tools=tools is not None,
         ) as log_success:
             try:
-                # Separate system messages from conversation
-                system_message = None
-                conversation_messages = []
-
-                for msg in messages:
-                    if msg.role == "system":
-                        system_message = msg.content
-                    else:
-                        conversation_messages.append(self._serialize_message(msg))
-
-                # Build request parameters
-                request_params = {
-                    "model": model,
-                    "messages": conversation_messages,
-                    "max_tokens": max_tokens,
-                    "temperature": temperature,
+                request_params = self._build_request_params(
+                    messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=tools,
                     **kwargs,
-                }
-
-                if system_message:
-                    request_params["system"] = [
-                        {
-                            "type": "text",
-                            "text": system_message,
-                            "cache_control": {"type": "ephemeral"},
-                        }
-                    ]
-
-                if tools:
-                    converted = self._convert_tools(tools)
-                    if converted:
-                        # Place cache_control at the stable/dynamic tier boundary.
-                        # Tools are sorted FULL -> COMPACT -> STUB; caching the
-                        # FULL+COMPACT prefix means STUB tools can change per-turn
-                        # without invalidating the cached prefix.
-                        cache_idx = self._find_cache_boundary(tools, converted)
-                        if 0 <= cache_idx < len(converted):
-                            converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
-                    request_params["tools"] = converted
+                )
                 response: AnthropicMessage = await self._execute_with_circuit_breaker(
-                    self.client.messages.create, **request_params
+                    self._create_message_raw, **request_params
                 )
 
                 parsed = self._parse_response(response, model)
@@ -378,49 +347,14 @@ class AnthropicProvider(BaseProvider):
         )
 
         try:
-            # Separate system messages
-            system_message = None
-            conversation_messages = []
-
-            for msg in messages:
-                if msg.role == "system":
-                    system_message = msg.content
-                else:
-                    conversation_messages.append(
-                        {
-                            "role": msg.role,
-                            "content": msg.content,
-                        }
-                    )
-
-            # Build request parameters
-            request_params = {
-                "model": model,
-                "messages": conversation_messages,
-                "max_tokens": max_tokens,
-                "temperature": temperature,
+            request_params = self._build_request_params(
+                messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                tools=tools,
                 **kwargs,
-            }
-
-            if system_message:
-                # Use content block format with cache_control for prefix caching.
-                # Anthropic caches the prefix (tools → system → messages) at 90%
-                # discount. The ephemeral TTL (5 min) refreshes on each use.
-                request_params["system"] = [
-                    {
-                        "type": "text",
-                        "text": system_message,
-                        "cache_control": {"type": "ephemeral"},
-                    }
-                ]
-
-            if tools:
-                converted = self._convert_tools(tools)
-                if converted:
-                    cache_idx = self._find_cache_boundary(tools, converted)
-                    if 0 <= cache_idx < len(converted):
-                        converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
-                request_params["tools"] = converted
+            )
 
             tool_calls: Dict[str, Dict[str, Any]] = {}
             block_index_to_id: Dict[int, str] = {}
@@ -577,6 +511,73 @@ class AnthropicProvider(BaseProvider):
 
         except Exception as e:
             raise self._handle_error(e)
+
+    def _build_request_params(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Build the Messages API request params shared by ``chat()`` and ``stream()``.
+
+        Single source of truth for prompt assembly (deduped from the former inline
+        blocks in both call sites): system message extraction with ``cache_control``,
+        message serialization (including image content blocks), and tool conversion
+        with the cache boundary placed at the stable/dynamic tier edge — tools are
+        sorted FULL -> COMPACT -> STUB; caching the FULL+COMPACT prefix means STUB
+        tools can change per-turn without invalidating the cached prefix.
+        """
+        system_message = None
+        conversation_messages = []
+
+        for msg in messages:
+            if msg.role == "system":
+                system_message = msg.content
+            else:
+                conversation_messages.append(self._serialize_message(msg))
+
+        request_params: Dict[str, Any] = {
+            "model": model,
+            "messages": conversation_messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            **kwargs,
+        }
+
+        if system_message:
+            # Content block format with cache_control for prefix caching. Anthropic
+            # caches the prefix (tools -> system -> messages) at 90% discount; the
+            # ephemeral TTL (5 min) refreshes on each use.
+            request_params["system"] = [
+                {
+                    "type": "text",
+                    "text": system_message,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+
+        if tools:
+            converted = self._convert_tools(tools)
+            if converted:
+                cache_idx = self._find_cache_boundary(tools, converted)
+                if 0 <= cache_idx < len(converted):
+                    converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
+            request_params["tools"] = converted
+
+        return request_params
+
+    async def _create_message_raw(self, **request_params: Any) -> AnthropicMessage:
+        """Non-streaming wire seam: one Messages API call returning the SDK ``Message``.
+
+        The sandhi transport variant overrides exactly this method (FEP-0020 Phase 4
+        wave 2a); everything around it — prompt assembly, circuit breaker, response
+        parsing, error taxonomy — is shared native code.
+        """
+        return await self.client.messages.create(**request_params)
 
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
         """Convert standard tools to Anthropic format."""
