@@ -34,6 +34,7 @@ return the same result shape.
 from __future__ import annotations
 
 import asyncio
+import fnmatch
 import logging
 import os
 import re
@@ -87,6 +88,7 @@ async def grep_search(
     path: str,
     regex: bool = False,
     case_sensitive: bool = False,
+    include_glob: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Search file contents and return grep-like match dictionaries.
 
@@ -97,6 +99,8 @@ async def grep_search(
             otherwise escape it for a literal substring match.
         case_sensitive: When ``True``, match case-sensitively; otherwise
             case-insensitively (the default, matching grep ``-i``).
+        include_glob: When set, only search files whose basename matches this
+            glob (grep ``--include=GLOB`` semantics, e.g. ``*.py``).
 
     Returns:
         List of ``{"file": str, "line": int, "content": str}`` dicts, one per
@@ -105,11 +109,15 @@ async def grep_search(
     root = Path(path).expanduser()
     started = time.monotonic()
 
-    results = await _ripgrep_search(query, root, regex=regex, case_sensitive=case_sensitive)
+    results = await _ripgrep_search(
+        query, root, regex=regex, case_sensitive=case_sensitive, include_glob=include_glob
+    )
     engine = "rg"
     if results is None:
         engine = "python"
-        results = await _python_walk_search(query, root, regex=regex, case_sensitive=case_sensitive)
+        results = await _python_walk_search(
+            query, root, regex=regex, case_sensitive=case_sensitive, include_glob=include_glob
+        )
 
     elapsed = time.monotonic() - started
     log = logger.warning if elapsed >= _SLOW_SCAN_WARN_SECONDS else logger.debug
@@ -130,6 +138,7 @@ async def _ripgrep_search(
     *,
     regex: bool,
     case_sensitive: bool,
+    include_glob: Optional[str] = None,
 ) -> Optional[List[Dict[str, Any]]]:
     """Run ripgrep when available; return ``None`` to fall back to the walk."""
     rg = shutil.which("rg")
@@ -149,6 +158,8 @@ async def _ripgrep_search(
     ]
     for skip in sorted(_SEARCH_SKIP_DIRS):
         args.append(f"--glob=!{skip}/")
+    if include_glob:
+        args.append(f"--glob={include_glob}")
     if not case_sensitive:
         args.append("--ignore-case")
     if not regex:
@@ -185,6 +196,7 @@ async def _python_walk_search(
     *,
     regex: bool,
     case_sensitive: bool,
+    include_glob: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Guarded pure-Python fallback scan (no ripgrep on PATH)."""
     flags = 0 if case_sensitive else re.IGNORECASE
@@ -193,6 +205,9 @@ async def _python_walk_search(
     scanned = 0
 
     for file_path in _iter_search_files(root):
+        if include_glob and not fnmatch.fnmatch(file_path.name, include_glob):
+            # grep --include matches on the basename, not the full path.
+            continue
         scanned += 1
         if scanned % _PROGRESS_EVERY_FILES == 0:
             if has_progress_sink():
@@ -245,12 +260,16 @@ def _read_search_text(file_path: Path) -> Optional[str]:
         return None
 
 
-def format_grep_results(results: List[Dict[str, Any]], *, limit: int = 50) -> str:
+def format_grep_results(
+    results: List[Dict[str, Any]], *, limit: int = 50, files_only: bool = False
+) -> str:
     """Render grep matches as ``file:line: content`` lines with a truncation hint.
 
     Args:
         results: Output of :func:`grep_search`.
         limit: Maximum number of matches to render before truncating.
+        files_only: When ``True``, emit only the unique file paths (first-seen
+            order, no ``:line:`` parts) — grep ``-l`` semantics.
 
     Returns:
         A human-readable string; ``"No matches found."`` when empty.
@@ -259,6 +278,22 @@ def format_grep_results(results: List[Dict[str, Any]], *, limit: int = 50) -> st
         return str(results)
 
     out: List[str] = []
+    if files_only:
+        seen: List[str] = []
+        for match in results:
+            file_path = match.get("file", "unknown")
+            if file_path not in seen:
+                seen.append(file_path)
+        out = seen[:limit]
+        if len(seen) > limit:
+            out.append(
+                f"\n### 💡 SYSTEM HINT\nToo many matching files ({len(seen)}). "
+                "Results truncated. Please refine your search query or directory."
+            )
+        if not out:
+            return "No matches found."
+        return "\n".join(out)
+
     for i, match in enumerate(results):
         if i >= limit:
             break
