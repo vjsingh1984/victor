@@ -98,6 +98,7 @@ class ChunkGenerator:
         tool_name: str,
         tool_args: Dict[str, Any],
         status_msg: str,
+        tool_call_id: Optional[str] = None,
     ) -> StreamChunk:
         """Generate chunk indicating tool execution start.
 
@@ -105,6 +106,8 @@ class ChunkGenerator:
             tool_name: Name of the tool being executed
             tool_args: Tool arguments
             status_msg: Status message to display
+            tool_call_id: Provider tool_calls[].id — forwarded so renderers can
+                track N concurrent tools independently (parallel batches)
 
         Returns:
             StreamChunk with tool start metadata
@@ -125,7 +128,9 @@ class ChunkGenerator:
                 )
             except Exception as e:
                 logger.debug(f"Failed to emit chunk tool start event: {e}")
-        return self.streaming_handler.generate_tool_start_chunk(tool_name, tool_args, status_msg)
+        return self.streaming_handler.generate_tool_start_chunk(
+            tool_name, tool_args, status_msg, tool_call_id=tool_call_id
+        )
 
     def generate_tool_result_chunks(
         self,
