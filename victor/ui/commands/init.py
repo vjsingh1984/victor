@@ -579,7 +579,7 @@ def _query_edge_type_breakdown(root: Path) -> dict[str, int]:
             conn.close()
     except Exception:
         return {}
-    return {t: c for t, c in rows}
+    return dict(rows)
 
 
 def _report_ccg_coverage(root: Path, edge_breakdown: dict[str, int], console_) -> None:
@@ -1442,7 +1442,11 @@ providers:
             # it needs via tools; the one-shot path keeps the legacy
             # generate_enhanced_init_md flow.
             try:
-                if agentic and deep:
+                # `is True` (not truthiness): when init() is called directly as
+                # a Python function (tests, scripts) an omitted Typer option is
+                # a truthy OptionInfo object — which must not silently launch a
+                # real tool-driven LLM agent.
+                if agentic is True and deep:
                     new_content = _run_agentic_synthesis(
                         provider=provider,
                         model=model,
