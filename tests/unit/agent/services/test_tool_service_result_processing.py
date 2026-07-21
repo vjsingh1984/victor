@@ -435,3 +435,93 @@ def test_recursive_tool_result_is_logged_without_breaking_metrics_post_processin
         name="metrics",
         tool_call_id="call_metrics_recursive_1",
     )
+
+
+# ---------------------------------------------------------------------------
+# Telemetry truth (P2): the tool_result EVENT must reflect string-marker errors
+# while the LLM-visible content path stays untouched.
+# ---------------------------------------------------------------------------
+
+
+def _logged_tool_result_event(ctx):
+    calls = [c for c in ctx.usage_logger.log_event.call_args_list if c.args[0] == "tool_result"]
+    assert calls, "no tool_result event logged"
+    return calls[-1].args[1]
+
+
+def test_tool_result_event_error_marker_string_logs_success_false():
+    service = _make_service()
+    ctx = _make_ctx()
+    error_text = "### ❌ ERROR\nArgument parsing error: unrecognized arguments: -rn"
+    results = service.process_tool_results(
+        FakePipelineResult(results=[FakeCallResult("code", True, result=error_text)]),
+        ctx,
+    )
+    event = _logged_tool_result_event(ctx)
+    assert event["success"] is False
+    assert event["outcome_kind"] == "tool_error"
+    assert event["error_detail"].startswith("Argument parsing error")
+    # LLM-visible content untouched: the SUCCESS formatting branch still received
+    # the full corrective text (the event demotion must not reroute the LLM path)
+    assert any(
+        "### ❌ ERROR" in str(call) for call in ctx.format_tool_output.call_args_list
+    ), "success-branch formatter never saw the corrective text"
+    assert results, "tool results should still be produced"
+
+
+def test_tool_result_event_warning_marker_keeps_success_true_with_outcome_kind():
+    service = _make_service()
+    ctx = _make_ctx()
+    warn_text = "### ⚠️ SHELL OPERATOR NOT SUPPORTED\nuse the shell tool"
+    service.process_tool_results(
+        FakePipelineResult(results=[FakeCallResult("code", True, result=warn_text)]),
+        ctx,
+    )
+    event = _logged_tool_result_event(ctx)
+    assert event["success"] is True
+    assert event["outcome_kind"] == "warning"
+
+
+def test_tool_result_event_plain_string_unchanged():
+    service = _make_service()
+    ctx = _make_ctx()
+    service.process_tool_results(
+        FakePipelineResult(results=[FakeCallResult("read", True, result="file contents here")]),
+        ctx,
+    )
+    event = _logged_tool_result_event(ctx)
+    assert event["success"] is True
+    assert event.get("outcome_kind") in (None, "")
+
+
+def test_tool_result_event_dict_semantic_failure_still_false():
+    service = _make_service()
+    ctx = _make_ctx()
+    service.process_tool_results(
+        FakePipelineResult(
+            results=[FakeCallResult("shell", True, result={"success": False, "error": "boom"})]
+        ),
+        ctx,
+    )
+    event = _logged_tool_result_event(ctx)
+    assert event["success"] is False
+
+
+def test_tool_result_event_existing_outcome_kind_not_clobbered():
+    service = _make_service()
+    ctx = _make_ctx()
+    service.process_tool_results(
+        FakePipelineResult(
+            results=[
+                FakeCallResult(
+                    "read",
+                    True,
+                    result="### ⚠️ warn",
+                    outcome_kind="duplicate_read",
+                )
+            ]
+        ),
+        ctx,
+    )
+    event = _logged_tool_result_event(ctx)
+    assert event["outcome_kind"] == "duplicate_read"

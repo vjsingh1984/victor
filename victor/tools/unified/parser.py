@@ -1,5 +1,6 @@
-import shlex
 import re
+import shlex
+from typing import Optional
 
 
 def split_command(command: str) -> list[str]:
@@ -135,3 +136,46 @@ def shell_operator_rejection(tool_name: str, operator: str) -> str:
         f"  • Or drop the operator and run each step as its own `{tool_name}` "
         "call."
     )
+
+
+# ---------------------------------------------------------------------------
+# String-result outcome classification (P2 telemetry truth; also used by the
+# RL emitter). Unified tools return markdown strings whose leading marker is
+# the only machine-readable outcome signal.
+# ---------------------------------------------------------------------------
+
+TOOL_ERROR_MARKER = "### ❌"
+TOOL_WARNING_MARKER = "### ⚠️"
+
+
+def classify_tool_outcome(result: object) -> "tuple[Optional[str], Optional[str]]":
+    """Return ``(marker_kind, error_detail)`` for a tool result.
+
+    ``error_detail`` is the first body line (200 chars) of an error-marker
+    string, else None. Lives here (not in tool_service) so the telemetry
+    hotspot stays within its size ratchet.
+    """
+    kind = classify_result_marker(result)
+    detail = None
+    if kind == "tool_error" and isinstance(result, str):
+        body = result.lstrip().splitlines()
+        detail = (body[1] if len(body) > 1 else body[0])[:200]
+    return kind, detail
+
+
+def classify_result_marker(result: object) -> Optional[str]:
+    """Classify a unified-tool string result by its leading marker.
+
+    Returns ``"tool_error"`` for strings starting with ``### ❌``, ``"warning"``
+    for strings starting with ``### ⚠️`` (leading whitespace tolerated), else
+    ``None`` (including all non-string results — dict outcomes carry their own
+    ``success`` field and are classified elsewhere).
+    """
+    if not isinstance(result, str):
+        return None
+    stripped = result.lstrip()
+    if stripped.startswith(TOOL_ERROR_MARKER):
+        return "tool_error"
+    if stripped.startswith(TOOL_WARNING_MARKER):
+        return "warning"
+    return None
