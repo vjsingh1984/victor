@@ -170,6 +170,20 @@ make lint
 make check-repo-hygiene
 ```
 
+### Optional extras
+
+The base install degrades gracefully when optional dependencies are absent
+(lazy/guarded imports). Install an extra only when you want that capability:
+
+```bash
+pip install -e ".[web]"          # headless browser rendering + trafilatura extraction
+                                #   (web_fetch render=browser; DDG browser fallback)
+                                #   then: playwright install chromium
+pip install -e ".[embeddings]"   # sentence-transformers + lancedb for semantic search
+pip install -e ".[docker]"       # sandboxed code execution / container deploy
+pip install -e ".[langchain]"    # adapt LangChain tools as native Victor tools
+```
+
 Subprojects are scoped:
 
 ```bash
