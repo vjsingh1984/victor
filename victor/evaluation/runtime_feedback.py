@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
-from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
+from victor_contracts.runtime_evaluation import RuntimeEvaluationFeedback
 
 RUNTIME_EVALUATION_FEEDBACK_FILENAME = "runtime_evaluation_feedback.json"
 VALIDATED_RUNTIME_FEEDBACK_SOURCES = {

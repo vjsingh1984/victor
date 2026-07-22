@@ -26,8 +26,18 @@ runner = CliRunner()
 
 
 def _all_output(result) -> str:
-    """Combine stdout and stderr so assertions are robust to Click routing."""
-    return (result.output or "") + (getattr(result, "stderr", "") or "")
+    """Combine stdout and stderr so assertions are robust to Click routing/version.
+
+    Click <8.2's ``CliRunner`` mixes stderr into stdout and raises
+    ``ValueError("stderr not separately captured")`` on ``result.stderr``;
+    Click >=8.2 captures it separately. Tolerate both.
+    """
+    output = result.output or ""
+    try:
+        output += getattr(result, "stderr", "") or ""
+    except ValueError:
+        pass  # stderr not separately captured (Click <8.2 with mixed streams)
+    return output
 
 
 def test_unknown_command_suggests_nested_subcommand():
