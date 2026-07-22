@@ -611,6 +611,20 @@ def get_safety_checker() -> SafetyChecker:
     return _default_checker
 
 
+def reset_safety_checker() -> None:
+    """Reset the global safety-checker singleton so it is rebuilt on next use.
+
+    The singleton caches its approval mode (from settings at first creation) and
+    accumulates mutable state — a confirmation callback (``set_confirmation_callback``)
+    and custom deny patterns (added via the capability registry). Nothing resets it
+    between test runs, so a test that leaves it in a denying/mutated state silently
+    blocks unrelated tools in later tests (an order-dependent failure). The test
+    suite calls this via an autouse fixture; production never needs it.
+    """
+    global _default_checker
+    _default_checker = None
+
+
 def set_confirmation_callback(callback: ConfirmationCallback) -> None:
     """Set the global confirmation callback for dangerous operations.
 
