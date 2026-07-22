@@ -453,6 +453,13 @@ jobs:
     # Cap is generous (25m) because broad PRs (repo-wide formatting/refactor) map to a large
     # mirror-test set that legitimately needs ~15-20m — observed a 228-file formatting PR pass
     # all tests but get cancelled at 61% under the old 12m cap.
+    #
+    # SKIP on develop -> main release PRs: there base_ref=main, so `git diff origin/main...HEAD`
+    # spans the entire release delta (thousands of files) and maps to the whole mirror-test set,
+    # which blows the 25m cap every time. That exact gate is redundant here — the full sharded
+    # suite already runs on the promotion via ci-test.yml — so skipping keeps it green without
+    # losing coverage.
+    if: ${{ github.base_ref != 'main' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
