@@ -226,7 +226,8 @@ jobs:
   smoke-test:
     name: CLI Smoke Test
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Was 5; bumped for the install-sandhi source-build overhead (~2m).
+    timeout-minutes: 10
     env:
       PYTHONPATH: ${{ github.workspace }}
     steps:
