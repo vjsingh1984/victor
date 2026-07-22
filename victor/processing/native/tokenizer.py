@@ -97,13 +97,17 @@ def count_tokens_batch(texts: List[str]) -> List[int]:
     Returns:
         List of token counts, one per input text
     """
+    # Prefer a single native crossing for the whole batch — this is what
+    # actually amortises the FFI overhead (a per-item loop does not).
+    if _NATIVE_AVAILABLE and hasattr(_native, "count_tokens_fast_batch"):
+        return _native.count_tokens_fast_batch(texts)
     if _NATIVE_AVAILABLE and hasattr(_native, "count_tokens_fast"):
         return [_native.count_tokens_fast(text) for text in texts]
 
-    # Pure Python fallback
+    # Pure Python fallback (tiktoken's encode_batch avoids a Python-level loop)
     encoder = _get_tiktoken_encoder()
     if encoder is not None:
-        return [len(encoder.encode(text)) for text in texts]
+        return [len(ids) for ids in encoder.encode_batch(texts)]
 
     # Last resort: word-based estimation
     return [len(text.split()) * 13 // 10 for text in texts]
