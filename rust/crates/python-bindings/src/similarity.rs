@@ -121,22 +121,13 @@ pub fn cosine_similarity(a: Vec<f32>, b: Vec<f32>) -> PyResult<f32> {
     Ok(dot / (norm_a * norm_b))
 }
 
-/// Compute cosine similarity between a query vector and multiple corpus vectors.
-///
-/// This function is optimized for the common case of comparing one query
-/// against many candidates, using parallel processing for large corpora.
-///
-/// # Arguments
-/// * `query` - Query embedding vector
-/// * `corpus` - List of corpus embedding vectors
-///
-/// # Returns
-/// List of similarity scores, one per corpus vector
-///
-/// # Raises
-/// * `ValueError` - If query dimension doesn't match corpus dimensions
-#[pyfunction]
-pub fn batch_cosine_similarity(query: Vec<f32>, corpus: Vec<Vec<f32>>) -> PyResult<Vec<f32>> {
+/// Rust-facing implementation of [`batch_cosine_similarity`] (no GIL, no
+/// `PyErr`): the wrapper releases the GIL around this, and errors are plain
+/// `String`s because a `PyErr` is `!Ungil` and cannot cross `allow_threads`.
+pub fn batch_cosine_similarity_impl(
+    query: Vec<f32>,
+    corpus: Vec<Vec<f32>>,
+) -> Result<Vec<f32>, String> {
     if corpus.is_empty() {
         return Ok(Vec::new());
     }
@@ -145,12 +136,12 @@ pub fn batch_cosine_similarity(query: Vec<f32>, corpus: Vec<Vec<f32>>) -> PyResu
     let query_dim = query.len();
     for (i, vec) in corpus.iter().enumerate() {
         if vec.len() != query_dim {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            return Err(format!(
                 "Dimension mismatch: query has {} dims, corpus[{}] has {} dims",
                 query_dim,
                 i,
                 vec.len()
-            )));
+            ));
         }
     }
 
@@ -181,6 +172,30 @@ pub fn batch_cosine_similarity(query: Vec<f32>, corpus: Vec<Vec<f32>>) -> PyResu
     Ok(results)
 }
 
+/// Compute cosine similarity between a query vector and multiple corpus vectors.
+///
+/// This function is optimized for the common case of comparing one query
+/// against many candidates, using parallel processing for large corpora.
+///
+/// # Arguments
+/// * `query` - Query embedding vector
+/// * `corpus` - List of corpus embedding vectors
+///
+/// # Returns
+/// List of similarity scores, one per corpus vector
+///
+/// # Raises
+/// * `ValueError` - If query dimension doesn't match corpus dimensions
+#[pyfunction]
+pub fn batch_cosine_similarity(
+    py: Python<'_>,
+    query: Vec<f32>,
+    corpus: Vec<Vec<f32>>,
+) -> PyResult<Vec<f32>> {
+    py.allow_threads(|| batch_cosine_similarity_impl(query, corpus))
+        .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
 /// Compute a full similarity matrix of `queries` x `corpus` in a SINGLE FFI
 /// crossing (rayon-parallel over queries), instead of looping
 /// `batch_cosine_similarity` from Python (which crossed once per query).
@@ -192,13 +207,11 @@ pub fn batch_cosine_similarity(query: Vec<f32>, corpus: Vec<Vec<f32>>) -> PyResu
 /// * `corpus` - Corpus embedding vectors (matrix columns)
 /// * `normalize` - If true, pre-normalize the corpus once and reuse it for
 ///   every query (avoids recomputing corpus norms per row)
-#[pyfunction]
-#[pyo3(signature = (queries, corpus, normalize = true))]
-pub fn similarity_matrix(
+pub fn similarity_matrix_impl(
     queries: Vec<Vec<f32>>,
     corpus: Vec<Vec<f32>>,
     normalize: bool,
-) -> PyResult<Vec<Vec<f32>>> {
+) -> Result<Vec<Vec<f32>>, String> {
     if queries.is_empty() || corpus.is_empty() {
         return Ok(Vec::new());
     }
@@ -207,22 +220,22 @@ pub fn similarity_matrix(
     let qdim = queries[0].len();
     for (i, q) in queries.iter().enumerate() {
         if q.len() != qdim {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            return Err(format!(
                 "Query dimension mismatch: queries[0] has {} dims, queries[{}] has {}",
                 qdim,
                 i,
                 q.len()
-            )));
+            ));
         }
     }
     for (i, c) in corpus.iter().enumerate() {
         if c.len() != qdim {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            return Err(format!(
                 "Dimension mismatch: query has {} dims, corpus[{}] has {}",
                 qdim,
                 i,
                 c.len()
-            )));
+            ));
         }
     }
 
@@ -258,6 +271,18 @@ pub fn similarity_matrix(
     }
 }
 
+#[pyfunction]
+#[pyo3(signature = (queries, corpus, normalize = true))]
+pub fn similarity_matrix(
+    py: Python<'_>,
+    queries: Vec<Vec<f32>>,
+    corpus: Vec<Vec<f32>>,
+    normalize: bool,
+) -> PyResult<Vec<Vec<f32>>> {
+    py.allow_threads(|| similarity_matrix_impl(queries, corpus, normalize))
+        .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
 /// Find top-k most similar vectors from a corpus.
 ///
 /// # Arguments
@@ -278,7 +303,8 @@ pub fn top_k_similar(
         return Ok(Vec::new());
     }
 
-    let similarities = batch_cosine_similarity(query, corpus)?;
+    let similarities = batch_cosine_similarity_impl(query, corpus)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
 
     // Create (index, similarity) pairs
     let mut indexed: Vec<(usize, f32)> = similarities.into_iter().enumerate().collect();
@@ -309,23 +335,25 @@ pub fn top_k_similar(
 ///
 /// # Returns
 /// List of normalized vectors (unit length)
-#[pyfunction]
-pub fn batch_normalize_vectors(vectors: Vec<Vec<f32>>) -> PyResult<Vec<Vec<f32>>> {
+pub fn batch_normalize_vectors_impl(vectors: Vec<Vec<f32>>) -> Vec<Vec<f32>> {
     if vectors.is_empty() {
-        return Ok(Vec::new());
+        return Vec::new();
     }
 
     // Use parallel processing for larger batches
-    let results: Vec<Vec<f32>> = if vectors.len() > 100 {
+    if vectors.len() > 100 {
         vectors
             .par_iter()
             .map(|vec| normalize_vector(vec))
             .collect()
     } else {
         vectors.iter().map(|vec| normalize_vector(vec)).collect()
-    };
+    }
+}
 
-    Ok(results)
+#[pyfunction]
+pub fn batch_normalize_vectors(py: Python<'_>, vectors: Vec<Vec<f32>>) -> PyResult<Vec<Vec<f32>>> {
+    Ok(py.allow_threads(|| batch_normalize_vectors_impl(vectors)))
 }
 
 /// Normalize a single vector to unit length using SIMD.
@@ -346,11 +374,10 @@ fn normalize_vector(vec: &[f32]) -> Vec<f32> {
 ///
 /// # Returns
 /// List of similarity scores, one per corpus vector
-#[pyfunction]
-pub fn batch_cosine_similarity_normalized(
+pub fn batch_cosine_similarity_normalized_impl(
     query: Vec<f32>,
     normalized_corpus: Vec<Vec<f32>>,
-) -> PyResult<Vec<f32>> {
+) -> Result<Vec<f32>, String> {
     if normalized_corpus.is_empty() {
         return Ok(Vec::new());
     }
@@ -359,12 +386,12 @@ pub fn batch_cosine_similarity_normalized(
     let query_dim = query.len();
     for (i, vec) in normalized_corpus.iter().enumerate() {
         if vec.len() != query_dim {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            return Err(format!(
                 "Dimension mismatch: query has {} dims, corpus[{}] has {} dims",
                 query_dim,
                 i,
                 vec.len()
-            )));
+            ));
         }
     }
 
@@ -387,6 +414,16 @@ pub fn batch_cosine_similarity_normalized(
     Ok(results)
 }
 
+#[pyfunction]
+pub fn batch_cosine_similarity_normalized(
+    py: Python<'_>,
+    query: Vec<f32>,
+    normalized_corpus: Vec<Vec<f32>>,
+) -> PyResult<Vec<f32>> {
+    py.allow_threads(|| batch_cosine_similarity_normalized_impl(query, normalized_corpus))
+        .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
 /// Find top-k similar vectors from a pre-normalized corpus.
 ///
 /// More efficient version of top_k_similar when corpus is already normalized.
@@ -405,7 +442,8 @@ pub fn top_k_similar_normalized(
     normalized_corpus: Vec<Vec<f32>>,
     k: usize,
 ) -> PyResult<Vec<(usize, f32)>> {
-    let similarities = batch_cosine_similarity_normalized(query, normalized_corpus)?;
+    let similarities = batch_cosine_similarity_normalized_impl(query, normalized_corpus)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
 
     // Use a binary heap for efficient top-k selection
     use std::cmp::Ordering;
@@ -481,7 +519,7 @@ mod tests {
             vec![0.0, 1.0, 0.0],  // orthogonal
             vec![-1.0, 0.0, 0.0], // opposite
         ];
-        let sims = batch_cosine_similarity(query, corpus).unwrap();
+        let sims = batch_cosine_similarity_impl(query, corpus).unwrap();
         assert_eq!(sims.len(), 3);
         assert!((sims[0] - 1.0).abs() < 1e-6);
         assert!(sims[1].abs() < 1e-6);
@@ -505,14 +543,17 @@ mod tests {
         ];
 
         for normalize in [true, false] {
-            let matrix = similarity_matrix(queries.clone(), corpus.clone(), normalize).unwrap();
+            let matrix =
+                similarity_matrix_impl(queries.clone(), corpus.clone(), normalize).unwrap();
             assert_eq!(matrix.len(), queries.len());
             for (i, q) in queries.iter().enumerate() {
-                let row =
-                    batch_cosine_similarity(q.clone(), corpus.clone()).unwrap();
+                let row = batch_cosine_similarity_impl(q.clone(), corpus.clone()).unwrap();
                 assert_eq!(matrix[i].len(), row.len());
                 for (a, b) in matrix[i].iter().zip(row.iter()) {
-                    assert!((a - b).abs() < 1e-5, "matrix mismatch at row {i} (normalize={normalize})");
+                    assert!(
+                        (a - b).abs() < 1e-5,
+                        "matrix mismatch at row {i} (normalize={normalize})"
+                    );
                 }
             }
         }
@@ -521,11 +562,11 @@ mod tests {
     #[test]
     fn test_similarity_matrix_empty() {
         assert_eq!(
-            similarity_matrix(vec![], vec![vec![1.0, 0.0]], true).unwrap(),
+            similarity_matrix_impl(vec![], vec![vec![1.0, 0.0]], true).unwrap(),
             Vec::<Vec<f32>>::new()
         );
         assert_eq!(
-            similarity_matrix(vec![vec![1.0, 0.0]], vec![], true).unwrap(),
+            similarity_matrix_impl(vec![vec![1.0, 0.0]], vec![], true).unwrap(),
             Vec::<Vec<f32>>::new()
         );
     }
@@ -577,7 +618,7 @@ mod tests {
             vec![1.0, 0.0], // norm = 1
             vec![0.0, 2.0], // norm = 2
         ];
-        let normalized = batch_normalize_vectors(vectors).unwrap();
+        let normalized = batch_normalize_vectors_impl(vectors);
 
         assert_eq!(normalized.len(), 3);
 
@@ -600,7 +641,7 @@ mod tests {
         ];
         let query = vec![1.0, 0.0, 0.0]; // Will be normalized internally
 
-        let sims = batch_cosine_similarity_normalized(query, corpus).unwrap();
+        let sims = batch_cosine_similarity_normalized_impl(query, corpus).unwrap();
         assert_eq!(sims.len(), 3);
         assert!((sims[0] - 1.0).abs() < 1e-6); // Identical
         assert!(sims[1].abs() < 1e-6); // Orthogonal
