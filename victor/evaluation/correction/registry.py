@@ -17,10 +17,11 @@ Enterprise Integration Patterns:
 """
 
 import importlib
+import importlib.metadata
 import logging
 import pkgutil
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from .base import BaseCodeValidator
@@ -53,6 +54,11 @@ class CodeValidatorRegistry:
     1. Create validators/my_language_validator.py
     2. Implement class inheriting BaseCodeValidator
     3. Registry auto-discovers on next discover_validators() call
+
+    External packages (verticals, future LSP-backed validators) can instead declare
+    a ``victor.code_validators`` Python entry point pointing at a ``BaseCodeValidator``
+    subclass; those are discovered and take precedence over built-ins (FEP-0024),
+    with no edits to ``victor/``.
     """
 
     _instance: Optional["CodeValidatorRegistry"] = None
@@ -133,14 +139,33 @@ class CodeValidatorRegistry:
         return language in self._validators
 
     def discover_validators(self) -> int:
-        """Auto-discover and register validators from validators/ package.
+        """Auto-discover and register validators.
 
-        Scans the validators/ package for modules containing classes
-        that inherit from BaseCodeValidator.
+        Two sources, in order (later registrations override earlier ones for a given
+        language, so entry-point validators take precedence over built-ins):
+
+        1. Built-in validators path-scanned from the ``validators/`` package.
+        2. Entry-point validators declared under the ``victor.code_validators`` group
+           (FEP-0024). This lets external verticals and future LSP-backed validators
+           register without editing ``victor/``.
 
         Returns:
-            Number of validators discovered
+            Total number of validators discovered (built-in + entry-point).
         """
+        builtin_count = self._discover_builtin_validators()
+        entry_point_count = self._discover_entry_point_validators()
+        self._discovered = True
+        total = builtin_count + entry_point_count
+        logger.debug(
+            "Discovered %d validators (%d built-in, %d entry-point)",
+            total,
+            builtin_count,
+            entry_point_count,
+        )
+        return total
+
+    def _discover_builtin_validators(self) -> int:
+        """Path-scan the local ``validators/`` package for built-in validators."""
         from .base import BaseCodeValidator
 
         validators_package = "victor.evaluation.correction.validators"
@@ -148,7 +173,6 @@ class CodeValidatorRegistry:
 
         if not validators_path.exists():
             logger.warning(f"Validators directory not found: {validators_path}")
-            self._discovered = True
             return 0
 
         count = 0
@@ -184,9 +208,67 @@ class CodeValidatorRegistry:
             except Exception as e:
                 logger.warning(f"Failed to import validator module {module_name}: {e}")
 
-        self._discovered = True
-        logger.debug(f"Discovered {count} validators")
         return count
+
+    def _discover_entry_point_validators(self) -> int:
+        """Load validators declared under the ``victor.code_validators`` entry-point group.
+
+        Each entry point's target may be a ``BaseCodeValidator`` subclass (preferred,
+        per FEP-0024 Q1), an already-instantiated validator, or a zero-arg callable
+        returning one. Failures loading/instantiating a single entry point are logged
+        and skipped (one bad registration must not break discovery).
+        """
+        from .base import BaseCodeValidator
+
+        try:
+            entry_points = importlib.metadata.entry_points(group="victor.code_validators")
+        except Exception as e:  # pragma: no cover - defensive: metadata API/stdlib edge
+            logger.debug("Could not read victor.code_validators entry points: %s", e)
+            return 0
+
+        count = 0
+        for ep in entry_points:
+            try:
+                loaded = ep.load()
+            except Exception as e:
+                logger.warning("Failed to load code validator entry point %s: %s", ep.name, e)
+                continue
+
+            validator = self._coerce_entry_point_validator(loaded, ep.name)
+            if validator is None:
+                logger.warning("Entry point %s did not yield a BaseCodeValidator instance", ep.name)
+                continue
+
+            self.register(validator)
+            count += 1
+            logger.debug(
+                "Discovered entry-point validator: %s for %s",
+                ep.name,
+                [lang.name for lang in validator.supported_languages],
+            )
+        return count
+
+    @staticmethod
+    def _coerce_entry_point_validator(loaded: Any, name: str) -> Optional["BaseCodeValidator"]:
+        """Coerce an entry-point target into a ``BaseCodeValidator`` instance.
+
+        Accepts a class (instantiated), an instance (used directly), or a zero-arg
+        callable returning one. Returns None (and logs) if it cannot be coerced.
+        """
+        from .base import BaseCodeValidator
+
+        try:
+            if isinstance(loaded, BaseCodeValidator):
+                return loaded
+            if isinstance(loaded, type) and issubclass(loaded, BaseCodeValidator):
+                return loaded()
+            if callable(loaded):
+                candidate = loaded()
+                if isinstance(candidate, BaseCodeValidator):
+                    return candidate
+        except Exception as e:
+            logger.warning("Failed to instantiate entry-point validator %s: %s", name, e)
+        return None
 
     def _create_fallback(self) -> "BaseCodeValidator":
         """Create the generic fallback validator."""
