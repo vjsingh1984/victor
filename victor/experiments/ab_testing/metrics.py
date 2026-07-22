@@ -25,17 +25,12 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-try:  # scipy ships in the [ml] extra — keep the CLI import chain scipy-free.
-    from scipy import stats
-
-    SCIPY_AVAILABLE = True
-except ImportError:  # pragma: no cover - environment-dependent
-    stats = None  # type: ignore[assignment]
-    SCIPY_AVAILABLE = False
-
 from victor.core.events import MessagingEvent, get_observability_bus
 from victor.experiments.ab_testing.paths import get_default_ab_test_db_path
-from victor.experiments.ab_testing.statistics import _require_scipy
+
+# ``stats`` is a lazy proxy (and ``_require_scipy`` its guard) defined in
+# statistics.py — reusing it keeps scipy out of the CLI cold-start path.
+from victor.experiments.ab_testing.statistics import _require_scipy, stats
 from victor.experiments.ab_testing.models import (
     AggregatedMetrics,
     ExecutionMetrics,

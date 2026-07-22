@@ -18,9 +18,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol, Union, runtime_checkable
 
-import jsonschema
-from jsonschema import Draft7Validator, ValidationError as JsonSchemaValidationError
 from pydantic import BaseModel, Field
+
+# NOTE: ``jsonschema`` is imported lazily inside ``validate_parameters_detailed``.
+# Importing it at module scope pulls ``rfc3987`` (and its format-checking machinery)
+# into the CLI cold-start path via ``import victor.tools``; deferring it keeps
+# ``victor --help`` fast. See tests/unit/runtime/test_cli_import_weight_guard.py.
 
 # Import enums from separate module
 from victor.tools.enums import (
@@ -598,6 +601,11 @@ class BaseTool(ABC):
             # Ensure schema has proper structure for validation
             if "type" not in schema:
                 schema = {"type": "object", **schema}
+
+            # Deferred import (kept out of module scope to avoid pulling
+            # rfc3987 into the CLI cold-start path).
+            import jsonschema
+            from jsonschema import Draft7Validator, ValidationError as JsonSchemaValidationError
 
             # Create validator with format checking disabled for flexibility
             validator = Draft7Validator(schema)
