@@ -405,7 +405,7 @@ route shipped in #569; its in-process provider migration remains parity-gated an
   per-subject/team view. The metering mechanism is reused from `sandhi` (its
   `meter*` auto-records the budget); Victor owns only the ingress + forwarding.
 
-### Phase 4: Provider transport migration (ADR-0047 D10) — 🚧 In progress for 0.1.2
+### Phase 4: Provider transport migration (ADR-0047 D10) — ✅ Complete for 0.1.2
 - Sandhi now owns `ChatRequestV1`, `ChatResponseV1`, typed stream events, structured errors,
   `UsageV2`, persistent provider handles, retries/timeouts/circuit state, and the OpenAI/Anthropic
   proxy ingress codecs. FFI and proxy use the same `ProviderRuntime`.
@@ -416,9 +416,10 @@ route shipped in #569; its in-process provider migration remains parity-gated an
   handles in the provider registry. Azure, Hugging Face, Vertex, Bedrock, Replicate, and MLX use
   different protocols/execution models and are explicitly Victor-native in 0.1.2; the resolver
   fails closed for any Victor-owned provider that is neither typed nor on that declared list.
-  Removing the admitted native/local classes' bypassed legacy direct-wire methods and making
-  subscription auth explicit (Anthropic Messages bearer auth; OpenAI's distinct Responses codec)
-  are the remaining release blockers, tracked in Sandhi TD-0002.
+  The admitted native/local classes' bypassed legacy direct-wire methods are removed — each is a
+  concrete policy shell that delegates transport to its Sandhi typed variant (a guard stub), and
+  subscription auth is explicit (Anthropic Messages bearer auth; OpenAI's distinct Responses codec).
+  Both are complete; see Sandhi TD-0002.
 - Sandhi 0.1.1 remains the last published release. All typed-runtime work ships together as 0.1.2
   with no provider-native compatibility FFI.
 
