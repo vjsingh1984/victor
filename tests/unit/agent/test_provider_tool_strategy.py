@@ -60,8 +60,14 @@ class TestSupportsPromptCaching:
 
         mod = importlib.import_module(provider_module)
         cls = getattr(mod, provider_class)
-        # Call unbound method to avoid __init__ side effects
-        assert cls.supports_prompt_caching(MagicMock()) is True
+        # Query on an uninitialized instance, the way discovery does: the
+        # OpenAI-compat shells derive capability facts from validated config via
+        # ``getattr(self, "_spec", None) or provider_spec()``, which must be
+        # reachable before __init__ (no credentials/HTTP). A MagicMock ``self``
+        # defeats that fallback by fabricating a truthy ``_spec``, so build the
+        # instance without __init__ (matches test_anthropic_provider_returns_true).
+        instance = cls.__new__(cls)
+        assert instance.supports_prompt_caching() is True
 
     @pytest.mark.parametrize(
         "provider_module,provider_class",
@@ -79,7 +85,9 @@ class TestSupportsPromptCaching:
 
         mod = importlib.import_module(provider_module)
         cls = getattr(mod, provider_class)
-        assert cls.supports_prompt_caching(MagicMock()) is False
+        # Uninitialized instance (see test_cloud_caching_providers_return_true).
+        instance = cls.__new__(cls)
+        assert instance.supports_prompt_caching() is False
 
     @pytest.mark.parametrize(
         "provider_module,provider_class",
@@ -102,7 +110,10 @@ class TestSupportsPromptCaching:
 
         mod = importlib.import_module(provider_module)
         cls = getattr(mod, provider_class)
-        assert cls.supports_kv_prefix_caching(MagicMock()) is True
+        # Uninitialized instance (see test_cloud_caching_providers_return_true):
+        # avoids the MagicMock-self anti-pattern that defeats config fallbacks.
+        instance = cls.__new__(cls)
+        assert instance.supports_kv_prefix_caching() is True
 
     def test_base_provider_kv_prefix_defaults_false(self):
         from victor.providers.base import BaseProvider
