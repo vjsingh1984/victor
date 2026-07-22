@@ -109,23 +109,35 @@ class SandhiOpenAICompatPolicy(SandhiHttpxTransportMixin, HttpxOpenAICompatProvi
         return get_openai_compat_provider_spec(cls.CONFIG_KEY)
 
     @property
+    def _policy_spec(self) -> OpenAICompatProviderSpec:
+        """The effective provider policy spec, safe to query before ``__init__``.
+
+        Capability and context facts live in validated config (``provider_spec()``);
+        ``__init__`` copies that spec onto ``self._spec``. Discovery queries these
+        facts on partially-constructed instances (before credentials or HTTP exist),
+        so this falls back to the class-level spec until ``_spec`` is set. Centralizing
+        the fallback keeps the pre-init-safe contract explicit rather than duplicated.
+        """
+        return getattr(self, "_spec", None) or self.provider_spec()
+
+    @property
     def name(self) -> str:
         return self._spec.slug
 
     def supports_tools(self) -> bool:
-        return (getattr(self, "_spec", None) or self.provider_spec()).capabilities.tools
+        return self._policy_spec.capabilities.tools
 
     def supports_streaming(self) -> bool:
-        return (getattr(self, "_spec", None) or self.provider_spec()).capabilities.streaming
+        return self._policy_spec.capabilities.streaming
 
     def supports_prompt_caching(self) -> bool:
-        return (getattr(self, "_spec", None) or self.provider_spec()).capabilities.prompt_caching
+        return self._policy_spec.capabilities.prompt_caching
 
     def supports_kv_prefix_caching(self) -> bool:
-        return (getattr(self, "_spec", None) or self.provider_spec()).capabilities.kv_prefix_caching
+        return self._policy_spec.capabilities.kv_prefix_caching
 
     def cache_cost_model(self) -> CacheCostModel:
-        policy = (getattr(self, "_spec", None) or self.provider_spec()).cache
+        policy = self._policy_spec.cache
         return CacheCostModel(
             supported=self.supports_prompt_caching(),
             read_discount=policy.read_discount,
@@ -139,7 +151,7 @@ class SandhiOpenAICompatPolicy(SandhiHttpxTransportMixin, HttpxOpenAICompatProvi
     def context_window(self, model: Optional[str] = None) -> int:
         # Context budgeting is also queried on an uninitialized instance by
         # discovery code, so it must not depend on credentials or HTTP setup.
-        spec = getattr(self, "_spec", None) or self.provider_spec()
+        spec = self._policy_spec
         target = model or getattr(self, "_current_model", None)
         if target:
             for model_prefix, tokens in spec.context_window_routes:
