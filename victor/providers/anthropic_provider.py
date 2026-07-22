@@ -16,8 +16,6 @@
 
 from typing import Any, AsyncIterator, Dict, List, Optional
 
-from anthropic import AsyncAnthropic
-
 from victor.providers.base import (
     BaseProvider,
     CacheCostModel,
@@ -128,23 +126,20 @@ class AnthropicProvider(BaseProvider):
             max_retries=max_retries,
             **kwargs,
         )
-        self.client = AsyncAnthropic(
-            api_key=None if auth_mode == "oauth" else self._api_key,
-            auth_token=self._api_key if auth_mode == "oauth" else None,
-            base_url=base_url,
-            timeout=timeout,
-            max_retries=max_retries,
-        )
 
     async def _ensure_valid_token(self) -> None:
-        """Refresh OAuth token if needed. No-op for api_key mode."""
+        """Refresh OAuth token if needed. No-op for api_key mode.
+
+        The refreshed token lands on ``self._api_key``, which the Sandhi typed
+        handle reads when it is (re)constructed. The policy shell owns no
+        provider generation client (TD-0002 deletion gate), so there is no SDK
+        client to mutate here.
+        """
         if self._oauth_manager is None:
             return
         token = await self._oauth_manager.get_valid_token()
         if token != self._api_key:
             self._api_key = token
-            self.client.api_key = None
-            self.client.auth_token = token
 
     @property
     def name(self) -> str:
@@ -397,5 +392,5 @@ class AnthropicProvider(BaseProvider):
         )
 
     async def close(self) -> None:
-        """Close HTTP client."""
-        await self.client.close()
+        """No provider client to close; transport is owned by the Sandhi handle."""
+        pass

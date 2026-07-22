@@ -51,7 +51,9 @@ async def test_initialization():
     assert provider.base_url == "https://custom.url"
     assert provider.timeout == 45
     assert provider.max_retries == 5
-    assert provider.client is not None
+    # Transport is owned by the Sandhi typed variant; the policy shell must NOT
+    # own a provider generation client (TD-0002 deletion gate).
+    assert not hasattr(provider, "client")
 
 
 @pytest.mark.asyncio
@@ -71,7 +73,10 @@ async def test_oauth_mode_uses_claude_code_token_source():
         provider = AnthropicProvider(auth_mode="oauth", oauth_source="claude-code")
 
     MockMgr.assert_called_once_with("anthropic", token_source="claude-code")
-    assert provider.client.auth_token == "claude_oauth_token"
+    # OAuth acquisition stays in Victor; the cached token lands on _api_key,
+    # which the Sandhi typed handle consumes with bearer auth (no SDK client).
+    assert provider._api_key == "claude_oauth_token"
+    assert provider._sandhi_auth_scheme == "bearer"
 
 
 @pytest.mark.asyncio
@@ -131,12 +136,9 @@ async def test_convert_tools(anthropic_provider):
 
 
 @pytest.mark.asyncio
-async def test_close(anthropic_provider):
-    """Test closing the provider client."""
-    with patch.object(
-        anthropic_provider.client,
-        "close",
-        new_callable=AsyncMock,
-    ) as mock_close:
-        await anthropic_provider.close()
-        mock_close.assert_called_once()
+async def test_close_is_safe_without_generation_client(anthropic_provider):
+    """Transport is owned by Sandhi; the policy shell owns no client to close."""
+    # The policy shell must not own a provider generation client (TD-0002 gate),
+    # so close() is a safe no-op rather than a client.teardown.
+    assert not hasattr(anthropic_provider, "client")
+    await anthropic_provider.close()  # must not raise

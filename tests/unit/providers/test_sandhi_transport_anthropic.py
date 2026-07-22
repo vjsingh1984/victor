@@ -170,3 +170,44 @@ async def test_stream_uses_typed_anthropic_events(runtime):
         "cache_creation_input_tokens": 3,
         "cache_read_input_tokens": 7,
     }
+
+
+@pytest.mark.asyncio
+async def test_stream_assembles_parallel_tool_calls(runtime):
+    """Streaming tool-call events assemble into the final chunk's tool_calls.
+
+    Relocated from test_anthropic_stream_tool_use, which exercised the deleted
+    native SDK stream. The Sandhi typed stream owns tool assembly now.
+    """
+
+    async def tool_events():
+        yield json.dumps(
+            {"event": "tool_call_start", "index": 0, "id": "call_1", "name": "dummy_tool"}
+        )
+        yield json.dumps(
+            {"event": "tool_call_arguments_delta", "index": 0, "delta": '{"echo": "hi"}'}
+        )
+        yield json.dumps({"event": "tool_call_start", "index": 1, "id": "call_2", "name": "other"})
+        yield json.dumps({"event": "tool_call_arguments_delta", "index": 1, "delta": '{"x": 2}'})
+        yield json.dumps({"event": "finish", "reason": "tool_calls"})
+
+    runtime.handle.stream_json = lambda request_json: tool_events()
+    provider = make_provider()
+    chunks = [
+        chunk
+        async for chunk in provider.stream(
+            [Message(role="user", content="hi")],
+            model="claude-test",
+            tools=[
+                ToolDefinition(name="dummy_tool", description="d", parameters={"type": "object"})
+            ],
+        )
+    ]
+
+    final = chunks[-1]
+    assert final.is_final
+    assert final.stop_reason == "tool_calls"
+    assert final.tool_calls == [
+        {"id": "call_1", "name": "dummy_tool", "arguments": {"echo": "hi"}},
+        {"id": "call_2", "name": "other", "arguments": {"x": 2}},
+    ]
