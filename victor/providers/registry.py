@@ -246,8 +246,7 @@ class _ProviderRegistryImpl(BaseRegistry[str, Type[BaseProvider]]):
             ProviderNotFoundError: If provider not found
         """
         provider_class = self.get_or_raise(name)
-        # FEP-0020 Phase 4b: flag-gated sandhi transport pilot. resolve_transport_class is
-        # exception-free and returns provider_class unchanged unless the provider is opted in.
+        # Sandhi is the typed wire/runtime boundary for every admitted provider family.
         from victor.providers.sandhi_transport import resolve_transport_class
 
         provider_class = resolve_transport_class(name, provider_class, kwargs)
@@ -474,7 +473,7 @@ def _register_default_providers() -> None:
         class_name="DeepSeekProvider",
     )
     _register_lazy_provider(
-        ["groqcloud"],
+        ["groq", "groqcloud"],
         module_path="victor.providers.groq_provider",
         class_name="GroqProvider",
     )

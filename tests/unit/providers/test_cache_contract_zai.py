@@ -64,12 +64,8 @@ class TestZAIPromptCachingFlag:
         """Z.AI reuses KV cache for stable prompt prefixes (TTFT reduction)."""
         assert zai_provider.supports_kv_prefix_caching() is True
 
-    def test_overrides_are_resolved_on_zai_not_inherited(self):
-        """The methods must be defined on ZAIProvider itself, not BaseProvider.
-
-        Guards against an accidental removal of the override: if the methods
-        were deleted, getmembers would resolve to BaseProvider (returning False).
-        """
+    def test_cache_contract_is_owned_by_the_shared_model_policy(self):
+        """The methods resolve to the typed policy shell, never BaseProvider defaults."""
         import inspect
 
         for method_name in (
@@ -78,6 +74,6 @@ class TestZAIPromptCachingFlag:
         ):
             func = dict(inspect.getmembers(ZAIProvider))[method_name]
             owner = func.__qualname__.split(".")[0]
-            assert owner == "ZAIProvider", (
-                f"{method_name} should be defined on ZAIProvider, " f"but resolves to {owner}"
+            assert owner == "SandhiOpenAICompatPolicy", (
+                f"{method_name} should resolve to shared model policy, but resolves to {owner}"
             )

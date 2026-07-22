@@ -74,6 +74,8 @@ class AnthropicProvider(BaseProvider):
         # Initialize structured logger
         self._provider_logger = ProviderLogger("anthropic", __name__)
         self._oauth_manager: Optional[OAuthTokenManager] = None
+        self._auth_mode = auth_mode
+        self._sandhi_auth_scheme = "bearer" if auth_mode == "oauth" else "api_key"
 
         if auth_mode == "oauth":
             self._oauth_manager = OAuthTokenManager("anthropic", token_source=oauth_source)

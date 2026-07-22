@@ -107,8 +107,8 @@ class TestBaseProvider:
             "victor.providers.deepseek_provider",
             "DeepSeekProvider",
             "deepseek-chat",
-            64_000,
-            64_000,
+            131_072,
+            131_072,
         ),
         (
             "victor.providers.ollama_provider",

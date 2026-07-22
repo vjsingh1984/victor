@@ -4,7 +4,7 @@ title: "AI usage gateway: per-user/team attribution + shared-key metering"
 type: Standards Track
 status: Draft
 created: 2026-07-18
-modified: 2026-07-18
+modified: 2026-07-21
 authors:
   - name: Vijaykumar Singh
     email: singhvjd@gmail.com
@@ -93,8 +93,8 @@ the authoritative open-core split is AnvaiOps ADR-0047.
   authoritative multi-tenant billing, invoicing, and tier→$ policy are AnvaiOps
   (the commercial side of the open-core line below).
 - **Governance (SSO/SAML/SCIM/RBAC, compliance/audit).** Commercial (AnvaiOps).
-- Replacing the provider layer — the middleware **wraps** `BaseProvider`, reusing
-  the `usage` dict already on `CompletionResponse` / `StreamChunk`.
+- Replacing Victor's framework-facing `BaseProvider` contract. Concrete Python wire
+  implementations are intentionally migrated to Sandhi once parity is proven.
 
 ## Proposed Change
 
@@ -108,9 +108,9 @@ parsers, the neutral-event emitter — exposed to Victor via a **PyO3 Python bin
 drifting ones" answer to "why not a Rust core with Python/TS wrappers" — that *is*
 the core.
 
-- **In-process (via the PyO3 binding)** — Victor keeps its 28-provider layer and
-  calls `sandhi-core` for accounting + virtual keys + budgets, wrapping `BaseProvider`
-  and reading its existing `usage` dict. Zero network hop; transport stays Python.
+- **In-process (via the PyO3 binding)** — Victor keeps `BaseProvider` as its framework
+  contract while Sandhi supplies metering and the admitted Rust wire transports. Zero network
+  hop; an admitted provider has no Python wire fallback or second retry owner.
 - **Reverse-proxy serve mode (the same core + an HTTP listener)** — `sandhi` runs as a
   small server; agents point their provider `base_url` at it with a **virtual key**.
   The proxy resolves `vk_…` → `subject_id`/`group_id`, **holds the real upstream key
@@ -216,10 +216,41 @@ hand-rolling most of the APIs").
   adapter** (a Python callback), so Victor's custom / air-gapped / community providers
   register **without** a Rust contribution — Victor's extensibility principle ("extensibility
   must not compromise reliability") is preserved.
-- **Phased, opt-in, never big-bang.** Migrate provider-by-provider behind a flag; keep the
-  existing Python adapters as fallback until Sandhi's transport is proven. Victor's mature
-  resilience path (circuit breaker, OAuth FEP-0004, health, capability detection) is not
-  hard-cut in one step.
+- **Parity-gated admission, one production path.** Provider families are admitted only after
+  request/response/stream/error/usage parity is proven. Once admitted, Victor uses Sandhi as the
+  sole wire and retains OAuth credential acquisition, health, and capability policy outside it.
+
+#### Co-designed ownership boundary (normative)
+
+The boundary follows information ownership, not language or file count:
+
+The cross-session implementation ledger and canonical typed-contract specification live in
+Sandhi at `docs/td/TD-0002-typed-provider-runtime.md`. That file is authoritative for schema,
+runtime, FFI/proxy convergence, provider-wave checkboxes, acceptance gates, and release sequencing;
+this FEP remains authoritative for Victor rollout and support-boundary policy.
+
+| Victor owns (agent/model policy) | Sandhi owns (provider wire facts) |
+|---|---|
+| Normalized messages and tools; prompt/cache policy; model capabilities, context limits, defaults, and discovery UX | Endpoint and model endpoint routing; authentication/header encoding; HTTP/SSE; provider error mapping; retry, timeout, and circuit-breaking; neutral usage/cache-split extraction |
+
+- The **active wire is the sole resilience owner**. Admitted calls pass configured retry/timeout
+  policy to Sandhi; Victor never retries or replays the same upstream request.
+- Sandhi returns neutral usage from the same wire call that observed it. Victor maps that
+  object into its compatibility `usage` shape and does not send the raw response back through
+  the binding for a second parse. Streaming keeps byte-exact SSE delivery; terminal usage is
+  finalized by Sandhi and remains present on the provider's terminal SSE record.
+- For OpenAI-compatible Chat Completions, Victor preserves normalized history for
+  `developer`, `system`, `user`, `assistant`, `tool`, and legacy `function`. Sandhi validates
+  those stable wire roles and the required `tool_call_id`/legacy function `name` linkage before
+  HTTP. Provider/model-specific support or role downgrade policy remains in Victor; Sandhi does
+  not silently rewrite roles.
+- Sandhi's provider catalog contains only stable wire facts (canonical slug, aliases, base URL,
+  model-specific endpoint routes). It is deliberately **not** a second model catalog. Victor
+  retains volatile model metadata and agent-facing capability policy.
+- A Python adapter may be removed only after request, response, tool-call, streaming, error,
+  header, and usage parity tests pass for its Sandhi route. Provider-specific behavior must
+  first become an explicit Sandhi extension point; it must not be hidden in a nominally generic
+  adapter.
 
 #### Grounded sequencing (AnvaiOps ADR-0047 **D10a**, added 2026-07-20)
 
@@ -244,11 +275,12 @@ A four-repo provider-layer deep-dive sharpened *how* this migration sequences fo
   transport move required. Metering (Phase 2, shipped) + this parser-sharing capture most of
   D10's value.
 
-**Net (updated 2026-07-20):** with the binding shipped, Phase 4b is **unblocked**. Sequencing
-stays parser-sharing first (the cheap win above — still pending in Victor's own adapters),
-then a **flag-gated in-process transport pilot** (OpenAI-compat pure-Bearer providers first,
-Anthropic per feasibility), default OFF, native adapters as fallback. New provider work should
-still prefer the native path until the pilot proves parity.
+**Net (updated 2026-07-22):** the typed in-process runtime and proxy share one Rust factory and
+canonical chat/usage contracts. The admitted OpenAI-compatible cloud providers are thin Victor
+policy classes over direct typed FFI, including Moonshot model routing/K3 constraints, Groq,
+Cerebras, DeepSeek, xAI, Z.AI, and Mistral. Groq prompt-size policy and Cerebras inline-reasoning
+presentation stay host-side. New provider wire behavior belongs in Sandhi; unsupported protocols
+remain explicit rather than falling back silently.
 
 ### API Changes
 
@@ -340,8 +372,8 @@ usage_gateway:
 ## Implementation Plan
 
 This FEP is the decision doc; the phased build lands in follow-up PRs.
-**Phases 1–4 are shipped** (Phase 1+2 in #567, Phase 3 in #568, Phase 4 in #569),
-minus the deferred in-process Rust-transport tail of Phase 4 (see below).
+**Phases 1–3 are shipped** (Phase 1+2 in #567, Phase 3 in #568). Phase 4's gateway
+route shipped in #569; its in-process provider migration remains parity-gated and incremental.
 
 ### Phase 1: Attribution join (Victor-local, non-breaking) — ✅ Shipped (#567)
 - Carry `subject_id`/`group_id` from the API-server auth seam into the cost
@@ -352,8 +384,8 @@ minus the deferred in-process Rust-transport tail of Phase 4 (see below).
 ### Phase 2: `sandhi` middleware adoption — ✅ Shipped (#567)
 - Depend on `sandhi`; wrap `BaseProvider` with the metering middleware; emit the
   neutral event to a local sink; render per-subject display.
-- **Landed:** the `victor[sandhi]` optional extra (`sandhi-gateway>=0.1,<0.2`)
-  plus `victor/observability/sandhi_meter.py` — an in-process bridge that maps
+- **Landed:** the required, coordinated provider-runtime dependency (`sandhi-gateway==0.1.2`)
+  plus the default-off `victor/observability/sandhi_meter.py` integration — an in-process bridge that maps
   each subject to a virtual key and emits one neutral usage event per provider
   call (full prompt-cache split); `SessionCostTracker.record_request` mirrors
   each request into the gateway when a meter is attached. Default-off, no-op
@@ -373,25 +405,22 @@ minus the deferred in-process Rust-transport tail of Phase 4 (see below).
   per-subject/team view. The metering mechanism is reused from `sandhi` (its
   `meter*` auto-records the budget); Victor owns only the ingress + forwarding.
 
-### Phase 4: Provider transport migration (ADR-0047 D10) — ✅ Shipped, OpenAI-compat (#569)
-- Migrate Victor's Python adapters onto `sandhi-providers` provider-by-provider behind a
-  flag (OpenAI-compat first → Anthropic → rest), Python adapters as fallback, the Python
-  escape hatch for custom providers. Victor retains prompt assembly / FEP-0011 hints /
-  tool translation / agent-aware selection. Runs in parallel with / after Phase 2.
-- **Landed (OpenAI-compat):** `victor/observability/gateway_client.py` — `GatewayRoute`
-  + `build_gateway_routed_provider()` point Victor's existing OpenAI-compatible provider
-  at a running gateway (Phase 3) with a per-user virtual key. Only the egress endpoint
-  changes; the Python adapter (prompt assembly, tool translation, **streaming**) is
-  unchanged. Opt-in (`enabled=False` default ⇒ direct, non-breaking). Covers OpenAI proper
-  + the ~20 Chat Completions providers.
-- **Phase 4b (in-process transport pilot) — unblocked, in progress:** the named trigger
-  fired 2026-07-20 — Sandhi shipped the async-streaming PyO3 transport binding (`complete` /
-  `stream` / `register_provider`, glue coverage CI-gated). The pilot migrates in-process
-  adapters onto the binding behind a per-provider setting (default OFF, native fallback,
-  parity-battery gated): pure-Bearer OpenAI-compat providers first, then Anthropic
-  (api-key mode; OAuth stays native). Prerequisites tracked alongside: routing Victor's own
-  usage-parsing through the binding's `parse_usage` (D10a step 2), and Sandhi-side timeout +
-  metering-decorator hardening.
+### Phase 4: Provider transport migration (ADR-0047 D10) — 🚧 In progress for 0.1.2
+- Sandhi now owns `ChatRequestV1`, `ChatResponseV1`, typed stream events, structured errors,
+  `UsageV2`, persistent provider handles, retries/timeouts/circuit state, and the OpenAI/Anthropic
+  proxy ingress codecs. FFI and proxy use the same `ProviderRuntime`.
+- Victor's admitted OpenAI-compatible cloud providers execute only through typed FFI. Their
+  compatibility classes retain model/context/cache/tool-selection policy, not Python HTTP/SSE.
+  OAuth credential acquisition and agent history repair remain Victor concerns.
+- Anthropic, Gemini, Ollama, Qwen, and OpenAI-compatible local servers resolve through typed
+  handles in the provider registry. Azure, Hugging Face, Vertex, Bedrock, Replicate, and MLX use
+  different protocols/execution models and are explicitly Victor-native in 0.1.2; the resolver
+  fails closed for any Victor-owned provider that is neither typed nor on that declared list.
+  Removing the admitted native/local classes' bypassed legacy direct-wire methods and making
+  subscription auth explicit (Anthropic Messages bearer auth; OpenAI's distinct Responses codec)
+  are the remaining release blockers, tracked in Sandhi TD-0002.
+- Sandhi 0.1.1 remains the last published release. All typed-runtime work ships together as 0.1.2
+  with no provider-native compatibility FFI.
 
 ## Migration Path
 

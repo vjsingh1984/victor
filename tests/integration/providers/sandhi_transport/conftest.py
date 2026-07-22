@@ -89,13 +89,17 @@ def fixture_server():
 
 @pytest.fixture
 def make_pair():
-    """Factory fixture: (native, sandhi-backed) DeepSeek providers for a fixture server."""
+    """Factory fixture: two independent typed handles for determinism checks."""
 
     def _make(server_url: str, timeout: int = 30) -> Tuple[Any, Any]:
         from victor.providers.deepseek_provider import DeepSeekProvider
-        from victor.providers.sandhi_transport import SandhiDeepSeekProvider
 
-        kwargs = {"api_key": "parity-key", "base_url": f"{server_url}/v1", "timeout": timeout}
-        return DeepSeekProvider(**kwargs), SandhiDeepSeekProvider(**kwargs)
+        kwargs = {
+            "api_key": "parity-key",
+            "base_url": f"{server_url}/v1",
+            "timeout": timeout,
+            "max_retries": 0,
+        }
+        return DeepSeekProvider(**kwargs), DeepSeekProvider(**kwargs)
 
     return _make

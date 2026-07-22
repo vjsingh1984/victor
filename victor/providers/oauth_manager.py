@@ -32,6 +32,7 @@ from json import JSONDecodeError
 import logging
 import os
 import getpass
+import base64
 import hashlib
 import platform
 import stat
@@ -54,6 +55,34 @@ logger = logging.getLogger(__name__)
 
 # Grace period: refresh token if it expires within this window
 REFRESH_GRACE_MINUTES = 5
+
+
+def _jwt_payload(token: Optional[str]) -> Dict[str, Any]:
+    """Decode an unsigned JWT payload for routing metadata, never authentication decisions."""
+    if not token:
+        return {}
+    parts = token.split(".")
+    if len(parts) < 2:
+        return {}
+    try:
+        raw = parts[1] + "=" * (-len(parts[1]) % 4)
+        value = json_loads(base64.urlsafe_b64decode(raw).decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, JSONDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _chatgpt_account_id_from_tokens(tokens: Optional[SSOTokens]) -> Optional[str]:
+    if tokens is None:
+        return None
+    for token in (tokens.id_token, tokens.access_token):
+        claims = _jwt_payload(token)
+        auth = claims.get("https://api.openai.com/auth")
+        if isinstance(auth, dict) and isinstance(auth.get("chatgpt_account_id"), str):
+            return auth["chatgpt_account_id"]
+        if isinstance(claims.get("chatgpt_account_id"), str):
+            return claims["chatgpt_account_id"]
+    return None
 
 # OAuth client ID environment variables (highest priority)
 OAUTH_CLIENT_ID_ENV_VARS = {
@@ -435,6 +464,28 @@ class OAuthTokenManager:
                 return tokens.access_token
 
         return cached.access_token
+
+    def get_chatgpt_account_id(self, tokens: Optional[SSOTokens] = None) -> Optional[str]:
+        """Return optional ChatGPT workspace routing metadata without exposing token contents."""
+        if self._provider != "openai":
+            return None
+        if self._token_source in {"codex", "auto"} and self._codex_auth_path.exists():
+            try:
+                data = json_loads(self._codex_auth_path.read_text())
+                token_data = data.get("tokens") if isinstance(data, dict) else None
+                if isinstance(token_data, dict):
+                    explicit = token_data.get("account_id")
+                    if isinstance(explicit, str) and explicit:
+                        return explicit
+                    external = SSOTokens(
+                        access_token=str(token_data.get("access_token") or ""),
+                        id_token=token_data.get("id_token"),
+                    )
+                    if account_id := _chatgpt_account_id_from_tokens(external):
+                        return account_id
+            except (JSONDecodeError, OSError, TypeError):
+                pass
+        return _chatgpt_account_id_from_tokens(tokens or self._load_cached())
 
     async def login(self) -> SSOTokens:
         """Perform browser-based OAuth PKCE login."""

@@ -1,7 +1,7 @@
-"""Golden parity battery: native httpx transport vs the real sandhi binding (T5).
+"""Golden typed-runtime determinism battery using the real Sandhi binding.
 
-Both providers hit the SAME localhost fixture server with identical inputs; the pilot's
-contract is byte-level request parity and semantic response parity. Fixture bodies mirror
+Two independent handles hit equivalent localhost fixture servers with identical inputs; the
+contract is byte-level request determinism and semantic response parity. Fixture bodies mirror
 the sandhi recorded corpus (commit 3102dd8) plus tool-call shapes the corpus lacks.
 """
 
@@ -134,8 +134,8 @@ class TestCompletionParity:
         ]
 
     async def test_no_double_request(self, fixture_server, make_pair):
-        # (d) the layering contract: sandhi is called with max_retries=0, victor's
-        # resilience is not engaged at this layer — exactly ONE upstream POST per chat.
+        # Retries are explicitly disabled by this fixture, so there is exactly one
+        # upstream POST per chat.
         srv = fixture_server(body=json.dumps(COMPLETE_BODY).encode())
         _, sandhi = make_pair(srv.url)
         await run_chat(sandhi)
@@ -156,16 +156,14 @@ class TestStreamParity:
         assert "".join(c.content for c in sandhi_chunks) == "Hello, world"
         final = sandhi_chunks[-1]
         assert final.is_final
-        # (b) usage flows through victor's own parsing (sandhi terminal usage ignored)
+        # Terminal usage is parsed at the Sandhi wire boundary.
         usage_chunks = [c for c in sandhi_chunks if c.usage]
         assert usage_chunks and usage_chunks[-1].usage["cache_read_input_tokens"] == 800
 
-        # Request-side parity for the streaming call: sandhi's adapter injects
-        # stream_options.include_usage=true (its at-the-source usage guarantee — documented
-        # sandhi behavior, outside the cacheable prompt prefix). Everything else, including
-        # the full prompt assembly, must be identical.
+        # Both handles use Sandhi, which injects include_usage at the wire boundary.
         native_body = json.loads(native_srv.requests[0].body)
         sandhi_body = json.loads(sandhi_srv.requests[0].body)
+        assert native_body.pop("stream_options", None) == {"include_usage": True}
         assert sandhi_body.pop("stream_options", None) == {"include_usage": True}
         assert native_body == sandhi_body
 
@@ -181,16 +179,13 @@ class TestErrorParity:
     )
     async def test_error_class_parity(self, fixture_server, make_pair, status, expected):
         body = json.dumps({"error": {"message": "boom"}}).encode()
-        native_srv = fixture_server(status=status, body=body)
         sandhi_srv = fixture_server(status=status, body=body)
-        native, _ = make_pair(native_srv.url)
         _, sandhi = make_pair(sandhi_srv.url)
 
         with pytest.raises(expected):
-            await run_chat(native)
-        with pytest.raises(expected):
             await run_chat(sandhi)
-        assert sandhi._sandhi_demoted is False
+        assert not hasattr(sandhi, "_sandhi_demoted")
+        assert len(sandhi_srv.requests) == 1
 
     async def test_timeout_surfaces_within_bound(self, fixture_server, make_pair):
         srv = fixture_server(body=json.dumps(COMPLETE_BODY).encode(), delay_secs=8.0)
@@ -201,4 +196,4 @@ class TestErrorParity:
         with pytest.raises(ProviderTimeoutError):
             await run_chat(sandhi)
         assert time.monotonic() - start < 7.0, "timeout must fire well before the 8s delay"
-        assert sandhi._sandhi_demoted is False
+        assert not hasattr(sandhi, "_sandhi_demoted")

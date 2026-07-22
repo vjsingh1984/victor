@@ -230,53 +230,6 @@ class TestCerebrasTimingAugmentation:
 
 
 # ---------------------------------------------------------------------------
-# Qwen (slug "openai"): SDK pydantic usage object inside chat()
-# ---------------------------------------------------------------------------
-
-
-def _qwen_provider_with_fake_client(usage_obj: Any) -> Any:
-    from victor.providers.qwen_provider import QwenProvider
-
-    provider = QwenProvider(api_key="test-key")
-    message = SimpleNamespace(content="hello", tool_calls=None)
-    choice = SimpleNamespace(message=message, finish_reason="stop")
-    response = SimpleNamespace(
-        choices=[choice], usage=usage_obj, model_dump=lambda: {"mocked": True}
-    )
-
-    async def create(**kwargs: Any) -> Any:
-        return response
-
-    provider.client = SimpleNamespace(
-        chat=SimpleNamespace(completions=SimpleNamespace(create=create))
-    )
-    return provider
-
-
-def _fake_sdk_usage(raw_block: Dict[str, Any]) -> SimpleNamespace:
-    return SimpleNamespace(
-        model_dump=lambda: dict(raw_block),
-        prompt_tokens=raw_block.get("prompt_tokens", 0),
-        completion_tokens=raw_block.get("completion_tokens", 0),
-        total_tokens=raw_block.get("total_tokens", 0),
-    )
-
-
-class TestQwen:
-    async def test_routed_path_gains_cached_split(self, monkeypatch):
-        monkeypatch.setattr(up, "_sg", fake_sg(NEUTRAL))
-        provider = _qwen_provider_with_fake_client(_fake_sdk_usage(RAW_BLOCK))
-        response = await provider.chat(messages=[], model="qwen-test")
-        assert response.usage == ROUTED_USAGE
-
-    async def test_fallback_without_binding(self, monkeypatch):
-        monkeypatch.setattr(up, "_sg", None)
-        provider = _qwen_provider_with_fake_client(_fake_sdk_usage(RAW_BLOCK))
-        response = await provider.chat(messages=[], model="qwen-test")
-        assert response.usage == LEGACY_USAGE
-
-
-# ---------------------------------------------------------------------------
 # Ollama (slug "ollama"): top-level eval counts, no {"usage": ...} envelope
 # ---------------------------------------------------------------------------
 

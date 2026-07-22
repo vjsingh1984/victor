@@ -1,5 +1,7 @@
 """Tests for OpenAI-compatible utilities."""
 
+import pytest
+
 from victor.providers.openai_compat import (
     convert_tools_to_openai_format,
     convert_tools_to_anthropic_format,
@@ -123,6 +125,46 @@ class TestConvertMessagesToOpenAIFormat:
         messages = [Message(role="assistant", content="")]
         result = convert_messages_to_openai_format(messages)
         assert result[0]["content"] == ""
+
+    def test_supports_all_chat_completion_roles(self):
+        messages = [
+            Message(role="developer", content="policy", name="app"),
+            Message(role="system", content="compatibility policy"),
+            Message(role="user", content="question"),
+            Message(
+                role="assistant",
+                content="",
+                tool_calls=[{"id": "call_1", "name": "lookup", "arguments": {}}],
+            ),
+            Message(role="tool", content="result", tool_call_id="call_1"),
+            Message(role="function", content="legacy result", name="lookup"),
+        ]
+
+        result = convert_messages_to_openai_format(messages)
+
+        assert [message["role"] for message in result] == [
+            "developer",
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "function",
+        ]
+        assert result[0]["name"] == "app"
+        assert result[4]["tool_call_id"] == "call_1"
+        assert result[5]["name"] == "lookup"
+
+    @pytest.mark.parametrize(
+        "message,match",
+        [
+            (Message(role="model", content="x"), "must be one of"),
+            (Message(role="tool", content="x"), "requires tool_call_id"),
+            (Message(role="function", content="x"), "requires name"),
+        ],
+    )
+    def test_rejects_unknown_or_unlinked_roles(self, message, match):
+        with pytest.raises(ValueError, match=match):
+            convert_messages_to_openai_format([message])
 
 
 class TestParseOpenAIToolCalls:
@@ -349,6 +391,51 @@ class TestBuildOpenAIMessages:
         result = build_openai_messages([{"role": "user", "content": "Summarize this"}])
 
         assert result == [{"role": "user", "content": "Summarize this"}]
+
+    def test_preserves_every_supported_role_and_role_linkage(self):
+        messages = [
+            {"role": "developer", "content": "policy", "name": "app"},
+            {"role": "system", "content": "compatibility policy"},
+            {"role": "user", "content": "question"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "lookup", "arguments": "{}"},
+                    }
+                ],
+            },
+            {"role": "tool", "content": "result", "tool_call_id": "call_1"},
+            {"role": "function", "content": "legacy result", "name": "lookup"},
+        ]
+
+        result = build_openai_messages(messages)
+
+        assert [message["role"] for message in result] == [
+            "developer",
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "function",
+        ]
+        assert result[0]["name"] == "app"
+        assert result[4]["tool_call_id"] == "call_1"
+        assert result[5]["name"] == "lookup"
+
+    @pytest.mark.parametrize(
+        "message,match",
+        [
+            ({"role": "model", "content": "x"}, "must be one of"),
+            ({"role": "function", "content": "x"}, "requires name"),
+        ],
+    )
+    def test_rejects_unknown_or_invalid_function_role(self, message, match):
+        with pytest.raises(ValueError, match=match):
+            build_openai_messages([message])
 
     def test_raw_dict_tool_calls_are_normalized(self):
         """Raw OpenAI-style dict tool calls should survive provider serialization."""

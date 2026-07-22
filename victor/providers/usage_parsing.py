@@ -2,9 +2,10 @@
 
 Routes the metering-critical usage/cache-split extraction through ``sandhi_gateway``'s
 fixture-proven parsers (Sandhi TD-0001) instead of per-adapter hand parsing — the
-"three parsers = three chances to mis-meter" consolidation. The binding is optional
-(``victor[sandhi]`` extra); every helper returns ``None`` on any failure so callers keep
-their native inline parse as the fallback. Metering must never break chat.
+"three parsers = three chances to mis-meter" consolidation. The binding is required by the
+typed provider runtime; every helper remains defensive and returns ``None`` on failure so legacy callers keep
+their local inline parser as the fallback. This is parser compatibility only, never a transport
+fallback. Metering must never break chat.
 
 Semantic mapping (victor convention vs sandhi neutral units)
 ============================================================
@@ -102,12 +103,12 @@ def sandhi_parse_usage(slug: str, usage_obj: Any) -> Optional[Dict[str, int]]:
             "cache_read_tokens": int(parsed.get("cache_read_tokens", 0) or 0),
         }
     except Exception as exc:
-        logger.debug("sandhi parse_usage failed for slug=%s (native fallback): %s", slug, exc)
+        logger.debug("sandhi parse_usage failed for slug=%s (local parser fallback): %s", slug, exc)
         return None
 
 
 def parse_usage_dict(slug: str, usage_obj: Any) -> Optional[Dict[str, int]]:
-    """Victor-convention usage dict via sandhi's parser, or None (caller falls back native).
+    """Victor-convention usage dict via sandhi's parser, or None (caller uses its local parser).
 
     See the module docstring for the pinned per-slug mapping. Never raises.
     """
@@ -145,6 +146,53 @@ def parse_usage_dict(slug: str, usage_obj: Any) -> Optional[Dict[str, int]]:
     prompt = parsed["tokens_in"] + read
     try:
         total = int(block["total_tokens"])
+    except (KeyError, TypeError, ValueError):
+        total = prompt + completion
+    usage = {
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "total_tokens": total,
+    }
+    if creation:
+        usage["cache_creation_input_tokens"] = creation
+    if read:
+        usage["cache_read_input_tokens"] = read
+    return usage
+
+
+def usage_dict_from_neutral(
+    neutral_usage: Any,
+    raw_usage: Any,
+    *,
+    slug: str = "openai",
+) -> Optional[Dict[str, int]]:
+    """Map usage already measured by Sandhi into Victor's compatibility shape.
+
+    Unlike :func:`parse_usage_dict`, this does not call back through the binding.
+    The transport path has already parsed and trusted these neutral counts at the
+    source; reparsing the raw response would duplicate the metering-critical work.
+    """
+    neutral = _coerce(neutral_usage)
+    if neutral is None:
+        return None
+    try:
+        fresh = int(neutral.get("tokens_in", 0) or 0)
+        completion = int(neutral.get("tokens_out", 0) or 0)
+        creation = int(neutral.get("cache_creation_tokens", 0) or 0)
+        read = int(neutral.get("cache_read_tokens", 0) or 0)
+    except (TypeError, ValueError):
+        return None
+
+    raw = _coerce(raw_usage) or {}
+    if slug == "anthropic":
+        prompt = fresh
+    elif slug in _TOP_LEVEL_SLUGS:
+        prompt = fresh
+    else:
+        prompt = fresh + read
+
+    try:
+        total = int(raw["total_tokens"])
     except (KeyError, TypeError, ValueError):
         total = prompt + completion
     usage = {

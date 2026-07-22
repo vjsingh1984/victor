@@ -133,21 +133,6 @@ MLX_DEFAULT = 32_768  # Apple Silicon usually loads larger-context models
 LLAMACPP_DEFAULT = 8_192
 VLLM_DEFAULT = 32_768  # Self-hosted vLLM commonly serves 32K+ models
 
-TOGETHER: list[tuple[str, int]] = [
-    ("meta-llama/Llama-3.3-70B", 128_000),
-    ("meta-llama/Llama-3.1-405B", 128_000),
-    ("meta-llama/Llama-3.1-70B", 128_000),
-    ("meta-llama/Llama-3.1-8B", 128_000),
-    ("Qwen/Qwen2.5-Coder", 32_768),
-    ("Qwen/Qwen2.5", 32_768),
-    ("deepseek-ai/DeepSeek", 64_000),
-    ("mistralai/Mixtral-8x22B", 65_536),
-    ("mistralai/Mixtral-8x7B", 32_768),
-]
-TOGETHER_DEFAULT = 32_768
-
-OPENROUTER_DEFAULT = 128_000  # Most routed models support ≥128K
-
 XAI: list[tuple[str, int]] = [
     ("grok-4-1-fast", 2_000_000),
     ("grok-4", 256_000),
@@ -164,16 +149,6 @@ CEREBRAS: list[tuple[str, int]] = [
     ("qwen", 32_768),
 ]
 CEREBRAS_DEFAULT = 128_000
-
-FIREWORKS: list[tuple[str, int]] = [
-    ("accounts/fireworks/models/llama-v3p3-70b", 128_000),
-    ("accounts/fireworks/models/llama-v3p1-405b", 128_000),
-    ("accounts/fireworks/models/llama-v3p1-70b", 128_000),
-    ("accounts/fireworks/models/qwen2p5", 32_768),
-    ("accounts/fireworks/models/deepseek", 64_000),
-    ("accounts/fireworks/models/mixtral", 32_768),
-]
-FIREWORKS_DEFAULT = 32_768
 
 AZURE_OPENAI: list[tuple[str, int]] = OPENAI  # Same models, same windows
 AZURE_OPENAI_DEFAULT = OPENAI_DEFAULT

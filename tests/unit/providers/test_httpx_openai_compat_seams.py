@@ -16,11 +16,25 @@ import pytest
 import respx
 
 from victor.providers.base import Message
-from victor.providers.deepseek_provider import DeepSeekProvider
+from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
 
 
-def make_provider() -> DeepSeekProvider:
-    return DeepSeekProvider(api_key="k", base_url="https://api.deepseek.com/v1")
+class FixtureCompatProvider(HttpxOpenAICompatProvider):
+    @property
+    def name(self) -> str:
+        return "fixture"
+
+    def supports_tools(self) -> bool:
+        return True
+
+    def supports_streaming(self) -> bool:
+        return True
+
+
+def make_provider() -> FixtureCompatProvider:
+    return FixtureCompatProvider(
+        api_key="k", base_url="https://api.deepseek.com/v1", provider_name="fixture"
+    )
 
 
 OK_BODY = {

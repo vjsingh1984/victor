@@ -94,12 +94,12 @@ class OpenAIProvider(BaseProvider):
 
         # OAuth token manager (None when using api_key mode)
         self._oauth_manager: Optional[OAuthTokenManager] = None
+        self._auth_mode = auth_mode
 
         if auth_mode == "oauth":
             # OAuth mode uses ChatGPT subscription via Codex API.
-            # The /v1/chat/completions path is bridged to the Responses API.
             if base_url is None:
-                base_url = "https://chatgpt.com/backend-api/codex/v1"
+                base_url = "https://chatgpt.com/backend-api/codex"
 
             self._oauth_manager = OAuthTokenManager("openai", token_source=oauth_source)
             # Use pre-obtained tokens or load cached (sync-safe)
@@ -178,6 +178,14 @@ class OpenAIProvider(BaseProvider):
                 "originator": "victor",
                 "User-Agent": f"victor/{__version__} ({platform.system()})",
             }
+            # Auth and endpoint protocol are independent explicit choices. ChatGPT subscription
+            # OAuth uses the item/event-shaped Responses protocol; API keys retain Chat
+            # Completions unless a caller explicitly chooses otherwise.
+            self._sandhi_protocol = "chatgpt_responses"
+            self._wire_headers = dict(default_headers)
+            account_id = self._oauth_manager.get_chatgpt_account_id(oauth_tokens)
+            if isinstance(account_id, str) and account_id:
+                self._wire_headers["ChatGPT-Account-ID"] = account_id
 
         self.client = AsyncOpenAI(
             api_key=self._api_key,
@@ -203,6 +211,11 @@ class OpenAIProvider(BaseProvider):
         if token != self.client.api_key:
             self.client.api_key = token
             self._api_key = token
+        account_id = self._oauth_manager.get_chatgpt_account_id()
+        if isinstance(account_id, str) and account_id:
+            self._wire_headers["ChatGPT-Account-ID"] = account_id
+        else:
+            self._wire_headers.pop("ChatGPT-Account-ID", None)
 
     def _is_o_series_model(self, model: str) -> bool:
         """Check if model is an O-series reasoning model.

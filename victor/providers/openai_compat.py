@@ -27,13 +27,34 @@ import logging
 import re
 import uuid
 from contextvars import ContextVar
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, FrozenSet, List, Literal, Mapping, Optional, Tuple
 
 import httpx
 
 from victor.providers.base import Message, ToolDefinition
 
 logger = logging.getLogger(__name__)
+
+OpenAIChatMessageRole = Literal[
+    "developer",
+    "system",
+    "user",
+    "assistant",
+    "tool",
+    "function",
+]
+OPENAI_CHAT_MESSAGE_ROLES: FrozenSet[str] = frozenset(
+    {"developer", "system", "user", "assistant", "tool", "function"}
+)
+
+
+def _validate_openai_chat_role(role: Any, *, index: Optional[int] = None) -> str:
+    """Return a supported Chat Completions role or fail before provider I/O."""
+    location = "message role" if index is None else f"messages[{index}].role"
+    if not isinstance(role, str) or role not in OPENAI_CHAT_MESSAGE_ROLES:
+        supported = ", ".join(sorted(OPENAI_CHAT_MESSAGE_ROLES))
+        raise ValueError(f"{location} must be one of: {supported}; got {role!r}")
+    return role
 
 # Last-computed stability fingerprints for the serialized tools arrays.
 # Exposed for observability/diagnostics so callers (or tests) can compare the
@@ -179,9 +200,10 @@ def convert_messages_to_openai_format(messages: List[Message]) -> List[Dict[str,
         OpenAI-formatted messages list
     """
     result = []
-    for msg in messages:
+    for index, msg in enumerate(messages):
+        role = _validate_openai_chat_role(msg.role, index=index)
         formatted: Dict[str, Any] = {
-            "role": msg.role,
+            "role": role,
             "content": msg.content or "",
         }
 
@@ -204,12 +226,17 @@ def convert_messages_to_openai_format(messages: List[Message]) -> List[Dict[str,
             ]
 
         # Add tool_call_id for tool responses
-        if msg.role == "tool" and hasattr(msg, "tool_call_id") and msg.tool_call_id:
+        if role == "tool":
+            if not msg.tool_call_id:
+                raise ValueError(f"messages[{index}] with role=tool requires tool_call_id")
             formatted["tool_call_id"] = msg.tool_call_id
 
         # Add name if present (for function responses)
         if hasattr(msg, "name") and msg.name:
             formatted["name"] = msg.name
+
+        if role == "function" and not msg.name:
+            raise ValueError(f"messages[{index}] with role=function requires name")
 
         result.append(formatted)
 
@@ -484,16 +511,20 @@ def build_openai_messages(messages: List[Any]) -> List[Dict[str, Any]]:
     valid_tool_call_ids: set = set()
     skipped_tool_messages_without_id = 0
 
-    for msg in messages:
+    for index, msg in enumerate(messages):
         role = _message_field(msg, "role")
         if not role:
             logger.warning("[build_openai_messages] Message without role - SKIPPING")
             continue
+        role = _validate_openai_chat_role(role, index=index)
         content = _message_field(msg, "content", "")
         entry: Dict[str, Any] = {
             "role": role,
             "content": content if content is not None else "",
         }
+        name = _message_field(msg, "name")
+        if name:
+            entry["name"] = name
 
         if role == "assistant":
             tool_calls = _message_field(msg, "tool_calls")
@@ -527,9 +558,6 @@ def build_openai_messages(messages: List[Any]) -> List[Dict[str, Any]]:
                 continue
             entry["tool_call_id"] = tool_call_id
             # name field for function responses (required by some providers)
-            name = _message_field(msg, "name")
-            if name:
-                entry["name"] = name
             # DeepSeek and some other providers reject empty content in tool messages.
             # Use a placeholder to avoid 400 errors while maintaining API compatibility.
             if not entry.get("content"):
@@ -539,6 +567,9 @@ def build_openai_messages(messages: List[Any]) -> List[Dict[str, Any]]:
                 tool_call_id,
                 entry.get("name", ""),
             )
+
+        elif role == "function" and not name:
+            raise ValueError(f"messages[{index}] with role=function requires name")
 
         formatted.append(entry)
 

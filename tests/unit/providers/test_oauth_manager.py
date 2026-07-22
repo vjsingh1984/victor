@@ -172,6 +172,7 @@ class TestOAuthTokenManagerPersistence:
                     "tokens": {
                         "access_token": "codex_access",
                         "refresh_token": "codex_refresh",
+                        "account_id": "workspace_123",
                         "scope": "openid profile email offline_access",
                     },
                 }
@@ -191,6 +192,7 @@ class TestOAuthTokenManagerPersistence:
         assert loaded.access_token == "codex_access"
         assert loaded.refresh_token == "codex_refresh"
         assert loaded.scopes == ["openid", "profile", "email", "offline_access"]
+        assert manager.get_chatgpt_account_id() == "workspace_123"
         assert not (tmp_path / ".victor" / "oauth_tokens.yaml").exists()
 
     def test_load_cached_reads_claude_code_env_token(self, tmp_path, monkeypatch):
