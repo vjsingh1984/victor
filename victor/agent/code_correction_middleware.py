@@ -31,7 +31,7 @@ from __future__ import annotations
 import enum
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Optional, Set, Tuple
 
 from victor.evaluation.correction import (
     SelfCorrector,
@@ -43,6 +43,7 @@ from victor.evaluation.correction import (
     CorrectionMetricsCollector,
 )
 from victor.tools.tool_names import get_canonical_name
+from victor.core.vertical_types import MiddlewarePriority, MiddlewareResult
 
 logger = logging.getLogger(__name__)
 
@@ -133,16 +134,24 @@ class CodeCorrectionMiddleware:
         self,
         config: Optional[CodeCorrectionConfig] = None,
         metrics_collector: Optional[CorrectionMetricsCollector] = None,
+        tool_resolver: Optional[Callable[[str], Any]] = None,
     ):
         """Initialize the middleware.
 
         Args:
             config: Configuration options
             metrics_collector: Optional collector for correction metrics
+            tool_resolver: Optional ``tool_name -> tool object`` resolver used by
+                :meth:`before_tool_call` (the ``MiddlewareChain`` path) to fetch the tool
+                for contract-trait gating (``access_mode``/``argument_kinds``). The
+                framework's default correction runs in the ``ToolExecutor`` (which has the
+                tool object directly); this resolver lets the middleware function as a
+                ``MiddlewareProtocol`` chain member where only the tool name is available.
         """
         self.config = config or CodeCorrectionConfig()
         self.metrics_collector = metrics_collector
         self._corrector: Optional[SelfCorrector] = None
+        self._tool_resolver = tool_resolver
 
     @property
     def corrector(self) -> SelfCorrector:
@@ -369,6 +378,44 @@ class CodeCorrectionMiddleware:
         updated = arguments.copy()
         updated[code_arg[0]] = result.corrected_code
         return updated
+
+    # -- MiddlewareProtocol (FEP-0024 Phase 2) -------------------------------------
+    # Lets a vertical register this middleware on its own MiddlewareChain for domain
+    # interception. The framework's default correction runs in the ToolExecutor (the
+    # choke point covering all call paths); this surface makes correction a first-class
+    # chain citizen without the executor needing a chain of its own.
+
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+        """MiddlewareProtocol hook: correct executable-code args before execution."""
+        tool = self._tool_resolver(tool_name) if self._tool_resolver else None
+        new_arguments, result = self.process(tool_name, arguments, tool=tool)
+        metadata: Dict[str, Any] = {}
+        if result is not None:
+            metadata["code_corrected"] = result.was_corrected
+            if not result.validation.valid:
+                metadata["code_validation_errors"] = list(result.validation.errors)
+        return MiddlewareResult(
+            modified_arguments=new_arguments if new_arguments is not arguments else None,
+            metadata=metadata,
+        )
+
+    async def after_tool_call(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        result: Any,
+        success: bool,
+    ) -> Any:
+        """MiddlewareProtocol hook: no post-execution transformation."""
+        return None
+
+    def get_priority(self) -> MiddlewarePriority:
+        """Run after safety/policy middleware, before execution."""
+        return MiddlewarePriority.NORMAL
+
+    def get_applicable_tools(self) -> Optional[Set[str]]:
+        """Apply to all tools; :meth:`should_validate` decides per tool."""
+        return None
 
     def format_validation_error(self, result: CorrectionResult) -> str:
         """Format validation errors for display."""
