@@ -12,34 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Abstract base class for httpx-based OpenAI-compatible providers.
+"""Policy/payload base for OpenAI-compatible cloud providers (gap #2).
 
-Providers that use the OpenAI /v1/chat/completions REST API via raw httpx
-(Z.AI/GLM, xAI/Grok, DeepSeek) should extend ``HttpxOpenAICompatProvider``
-instead of ``BaseProvider`` directly.
+The 11 OpenAI-compatible cloud providers (groq, together, fireworks, openrouter,
+xai, mistral, deepseek, moonshot, zai, cerebras, qwen) share this base for their
+model-facing policy and request shaping. Provider I/O transport (raw httpx
+``/v1/chat/completions`` POST + SSE streaming) was removed in TD-0002 gap #2:
+execution is owned by the Sandhi typed variant. ``SandhiOpenAICompatPolicy``
+mixes in ``SandhiHttpxTransportMixin`` which overrides ``chat``/``stream`` to
+build the OpenAI payload here (``_build_request_payload``) and hand it to Sandhi.
 
-This base class consolidates ZAI's refined transport code:
-- Complete message serialization including tool_calls and orphaned-message fixing
-- SSE streaming with tool-call delta accumulation
-- Detailed HTTP error mapping (JSON body parsing for 400 errors)
+This base still owns the shared, transport-independent surface:
+- Request payload assembly (``_build_request_payload``) — consumed by the Sandhi mixin
+- Response/stream parsing template methods (``_parse_response``, ``_parse_stream_chunk``)
+  kept as the shared API the cloud-provider subclasses decorate and tests exercise
 - Template Method hooks for provider-specific behaviour
 
-Usage:
-
-    class MyProvider(HttpxOpenAICompatProvider):
-        @property
-        def name(self) -> str:
-            return "myprovider"
-
-        def supports_tools(self) -> bool:
-            return True
-
-        def supports_streaming(self) -> bool:
-            return True
-
-        def _get_provider_params(self, model, temperature, max_tokens, **kwargs):
-            # provider-specific max_tokens variant, model flags, etc.
-            return {"temperature": temperature, "max_tokens": max_tokens}
+``chat``/``stream`` are left as ``NotImplementedError`` guard stubs so the policy
+shell stays concrete for discovery/capability use and for direct unit testing of
+the payload/parse surface; the live transport is always the Sandhi typed variant.
 """
 
 from __future__ import annotations
@@ -56,9 +47,6 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderError,
-    ProviderConnectionError,
-    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
@@ -66,7 +54,6 @@ from victor.providers.openai_compat import (
     accumulate_tool_call_delta,
     build_openai_messages,
     convert_tools_to_openai_format,
-    handle_httpx_status_error,
     parse_openai_tool_calls,
 )
 from victor.providers.logging import ProviderLogger
@@ -81,12 +68,15 @@ TRANSPORT_NEUTRAL_USAGE_KEY = "__victor_transport_neutral_usage__"
 
 
 class HttpxOpenAICompatProvider(BaseProvider):
-    """Abstract base for httpx-based OpenAI-API-compatible providers.
+    """Policy/payload base for OpenAI-API-compatible providers (transport owned by Sandhi).
 
     Subclasses must implement:
         - ``name`` (property)
         - ``supports_tools()``
         - ``supports_streaming()``
+
+    ``chat``/``stream`` are guard stubs; the live transport is the Sandhi typed
+    variant (``SandhiHttpxTransportMixin``), which consumes ``_build_request_payload``.
 
     Subclasses may override the Template Method hooks:
         - ``_clean_model_name(model)``       — strip provider suffixes before the API call
@@ -204,74 +194,6 @@ class HttpxOpenAICompatProvider(BaseProvider):
 
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
         return convert_tools_to_openai_format(tools)
-
-    async def _send_chat_completion_request(self, payload: Dict[str, Any]) -> httpx.Response:
-        """Send a non-streaming chat-completions request with status validation.
-
-        This helper ensures transient HTTP failures are raised inside the shared
-        retry wrapper rather than after it returns.
-        """
-        response = await self.client.post("/chat/completions", json=payload)
-        response.raise_for_status()
-        return response
-
-    async def _open_chat_completion_stream(
-        self, payload: Dict[str, Any]
-    ) -> "tuple[Any, httpx.Response]":
-        """Open a streaming chat-completions response with status validation.
-
-        Returns ``(stream_context, response)``. The caller (``stream()``) owns closing the
-        context in its own ``finally`` so enter and exit are lexically paired in the same
-        task — avoiding the "exit cancel scope in a different task" / "ignored GeneratorExit"
-        errors that the previous response-attribute readback hack allowed.
-
-        For non-200 responses we eagerly read the body so the raised ``HTTPStatusError``
-        carries the provider's error payload and can be retried/classified consistently by
-        the shared resilience layer.
-        """
-        stream_context = self.client.stream("POST", "/chat/completions", json=payload)
-        response = await stream_context.__aenter__()
-
-        # Once __aenter__ has opened the httpx stream, ANY failure before we hand the
-        # context back to stream() (a non-200 body read, or task cancellation) must close it
-        # here — otherwise the open response is orphaned and finalized off-task by GC, raising
-        # "async generator ignored GeneratorExit" / "exit cancel scope in a different task".
-        try:
-            if response.status_code != 200:
-                await response.aread()
-                response.raise_for_status()
-        except BaseException:
-            await stream_context.__aexit__(None, None, None)
-            raise
-        return stream_context, response
-
-    async def _complete_raw(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """WIRE SEAM (FEP-0020 Phase 4b): one non-streaming call → parsed body dict.
-
-        Everything above this seam (payload build, response parsing, tool translation,
-        usage parsing, error classification) is transport-independent; an alternate
-        transport (e.g. the sandhi binding) overrides only this method.
-        """
-        response = await self._execute_with_circuit_breaker(
-            self._send_chat_completion_request, payload
-        )
-        return response.json()  # type: ignore[no-any-return]
-
-    async def _open_stream_lines(self, payload: Dict[str, Any]) -> "tuple[Any, AsyncIterator[str]]":
-        """WIRE SEAM (FEP-0020 Phase 4b): open a stream → ``(closer, line_iterator)``.
-
-        ``closer`` is an async callable the consumer must await exactly once when done
-        (lexically paired in the driving task — see ``_open_chat_completion_stream``).
-        The iterator yields decoded SSE lines; all chunk parsing stays in ``stream()``.
-        """
-        stream_context, response = await self._execute_with_circuit_breaker(
-            self._open_chat_completion_stream, payload
-        )
-
-        async def _closer() -> None:
-            await stream_context.__aexit__(None, None, None)
-
-        return _closer, response.aiter_lines()
 
     def _build_request_payload(
         self,
@@ -507,35 +429,19 @@ class HttpxOpenAICompatProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
-        """Send a chat completion request via httpx."""
-        model = self._clean_model_name(model)
+        """Chat transport is owned by the Sandhi typed variant.
 
-        with self._provider_logger.log_api_call(
-            endpoint="/chat/completions",
-            model=model,
-            operation="chat",
-            num_messages=len(messages),
-            has_tools=tools is not None,
-        ) as log_success:
-            try:
-                payload = self._build_request_payload(
-                    messages, model, temperature, max_tokens, tools, False, **kwargs
-                )
-                result = await self._complete_raw(payload)
-                parsed = self._parse_response(result, model)
-                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                log_success(tokens=tokens)
-                return parsed
-
-            except httpx.TimeoutException as e:
-                raise ProviderTimeoutError(
-                    message=f"{self.name} request timed out after {self.timeout}s",
-                    provider=self.name,
-                ) from e
-            except httpx.HTTPStatusError as e:
-                raise handle_httpx_status_error(e, self.name) from e
-            except Exception as e:
-                raise self.classify_error(e) from e
+        This policy/payload shell stays concrete so its discovery, capability, and
+        request-shaping surface (``_build_request_payload`` and the parse template
+        methods) remain directly unit-testable. Completion transport is delegated to
+        the Sandhi runtime. Obtain the typed provider via ``resolve_transport_class()``
+        (the dynamic ``SandhiHttpxTransportMixin`` variant mixed into every
+        ``SandhiOpenAICompatPolicy`` subclass).
+        """
+        raise NotImplementedError(
+            f"{self.name} chat() is owned by the Sandhi typed variant; "
+            "use resolve_transport_class() to obtain the typed provider."
+        )
 
     async def stream(
         self,
@@ -547,114 +453,13 @@ class HttpxOpenAICompatProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
-        """Stream a chat completion via httpx SSE."""
-        model = self._clean_model_name(model)
-
-        try:
-            payload = self._build_request_payload(
-                messages, model, temperature, max_tokens, tools, True, **kwargs
-            )
-            closer, lines = await self._open_stream_lines(payload)
-            try:
-                accumulated_tool_calls: List[Dict[str, Any]] = []
-                has_sent_final = False
-                pending_final: Optional[StreamChunk] = None
-                pending_raw_usage: Optional[Dict[str, Any]] = None
-                transport_neutral_usage: Optional[Dict[str, Any]] = None
-
-                def _terminal_usage() -> Optional[Dict[str, int]]:
-                    if transport_neutral_usage is not None:
-                        return usage_dict_from_neutral(
-                            transport_neutral_usage,
-                            pending_raw_usage,
-                            slug="openai",
-                        )
-                    if pending_raw_usage is not None:
-                        return parse_usage_dict("openai", pending_raw_usage)
-                    return None
-
-                async for line in lines:
-                    if not line.strip():
-                        continue
-                    if not line.startswith("data: "):
-                        continue
-
-                    data_str = line[6:]
-                    if data_str.strip() == "[DONE]":
-                        terminal_usage = _terminal_usage()
-                        if pending_final is not None:
-                            if terminal_usage is not None:
-                                pending_final.usage = terminal_usage
-                            yield pending_final
-                            has_sent_final = True
-                        elif not has_sent_final or accumulated_tool_calls or terminal_usage:
-                            yield StreamChunk(
-                                content="",
-                                tool_calls=(accumulated_tool_calls or None),
-                                stop_reason="stop",
-                                is_final=True,
-                                usage=terminal_usage,
-                            )
-                            has_sent_final = True
-                        break
-
-                    try:
-                        chunk_data = json_loads(data_str)
-                        neutral_usage = chunk_data.get(TRANSPORT_NEUTRAL_USAGE_KEY)
-                        if isinstance(neutral_usage, dict):
-                            transport_neutral_usage = neutral_usage
-                            continue
-                        raw_usage = chunk_data.get("usage")
-                        if isinstance(raw_usage, dict):
-                            pending_raw_usage = raw_usage
-                        chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
-                        if chunk:
-                            if chunk.is_final:
-                                pending_final = chunk
-                            else:
-                                yield chunk
-                    except JSONDecodeError:
-                        self._provider_logger.logger.warning(
-                            "%s JSON decode error on SSE line: %s",
-                            self.name,
-                            line[:100],
-                        )
-                if pending_final is not None and not has_sent_final:
-                    terminal_usage = _terminal_usage()
-                    if terminal_usage is not None:
-                        pending_final.usage = terminal_usage
-                    yield pending_final
-            finally:
-                # Close the wire seam here — lexically paired with the open in
-                # _open_stream_lines, in whatever task drives this generator.
-                await closer()
-
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"{self.name} stream timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            raise handle_httpx_status_error(e, self.name) from e
-        except httpx.ReadError as e:
-            # Mid-stream connection drop — surface a clear message rather than an empty error_msg.
-            # The classify_error() path sets error_msg=str(e) which is "" for bare ReadError().
-            error_detail = str(e) or "connection dropped mid-stream (no additional detail)"
-            logger.warning(
-                "%s stream ReadError: %s — surfacing as ProviderConnectionError "
-                "(turn retried upstream)",
-                self.name,
-                error_detail,
-            )
-            raise ProviderConnectionError(
-                message=f"{self.name} stream disconnected mid-response: {error_detail}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
-        except (ProviderTimeoutError, ProviderError):
-            raise
-        except Exception as e:
-            raise self.classify_error(e) from e
+        """Stream transport is owned by the Sandhi typed variant (see ``chat``)."""
+        if False:  # pragma: no cover - async-generator marker for typing
+            yield StreamChunk()
+        raise NotImplementedError(
+            f"{self.name} stream() is owned by the Sandhi typed variant; "
+            "use resolve_transport_class() to obtain the typed provider."
+        )
 
     async def close(self) -> None:
         """Close the underlying httpx client (idempotent)."""
