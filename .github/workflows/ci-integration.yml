@@ -58,6 +58,8 @@ jobs:
             ${{ runner.os }}-pip-integration-
             ${{ runner.os }}-pip-
 
+      - uses: ./.github/actions/install-sandhi
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
@@ -99,6 +101,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-verticals-
             ${{ runner.os }}-pip-
+
+      - uses: ./.github/actions/install-sandhi
 
       - name: Install victor with verticals
         run: |

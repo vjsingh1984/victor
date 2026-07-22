@@ -163,6 +163,8 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+      - uses: ./.github/actions/install-sandhi
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
@@ -189,6 +191,8 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+
+      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies with verticals
         run: |
@@ -296,6 +300,8 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+      - uses: ./.github/actions/install-sandhi
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
@@ -327,6 +333,8 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+
+      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies
         run: |
@@ -471,6 +479,8 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      - uses: ./.github/actions/install-sandhi
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
@@ -529,6 +539,8 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      - uses: ./.github/actions/install-sandhi
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
@@ -560,6 +572,8 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+
+      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies
         run: |
