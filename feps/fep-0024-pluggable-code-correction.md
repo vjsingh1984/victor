@@ -164,16 +164,49 @@ register here instead of living under `victor/`.
 
 ### 2. Route correction through `MiddlewareChain`
 
-`CodeCorrectionMiddleware` implements `MiddlewareProtocol`
-(`victor/core/verticals/protocols.py`) and is registered on the chain. Its
-`process_before(tool, args)` is the #622 `process(...)` logic. The inline
-correction blocks in `tool_pipeline.py` and `tool_executor.py` are **removed**;
-the chain already invokes `process_before` at `tool_pipeline.py:3057`. The
-`code_corrected` / `code_validation_errors` flags flow back via the chain's
-`MiddlewareResult`.
+> **Revision (v1.1, 2026-07-22):** Investigation while implementing Phase 1/3
+> **invalidated this section's original premise.** The factory builds
+> `ToolPipelineConfig` without `enable_code_correction`, so it defaults to `False`
+> — the pipeline's inline correction block is **dead code in production**.
+> `ToolExecutor` (`enable_code_correction=True` from settings) is the *actual*
+> correction choke point, and it is invoked **directly** by `tool_service`,
+> `orchestrator_protocol_adapter`, `parallel_executor`, etc. — not only via the
+> pipeline. Therefore routing correction through the *pipeline-level*
+> `MiddlewareChain` (the original design) would neither cover all call paths nor
+> replace anything live. The original text is retained below for context; the
+> **corrected design** follows it.
 
-This makes correction one extensible transform among many and removes the
-deduplication obligation entirely (one chain, one call site).
+*Original (pre-finding) design:* `CodeCorrectionMiddleware` implements
+`MiddlewareProtocol` (`victor/core/verticals/protocols.py`) and is registered on
+the chain. Its `process_before(tool, args)` is the #622 `process(...)` logic. The
+inline correction blocks in `tool_pipeline.py` and `tool_executor.py` are
+**removed**; the chain already invokes `process_before` at
+`tool_pipeline.py:3057`. The `code_corrected` / `code_validation_errors` flags
+flow back via the chain's `MiddlewareResult`.
+
+**Corrected design (replaces the above):**
+
+1. **Consolidate to the choke point — the executor — not the pipeline.** Remove
+   the dead pipeline inline correction block (it never fires:
+   `ToolPipelineConfig.enable_code_correction` defaults `False`). Keep the
+   `ToolExecutor` correction (the single active site, covering both
+   pipeline-routed and direct calls). This removes the latent double-application
+   risk and the deduplication obligation, with **no production behavior change**.
+2. **Make `CodeCorrectionMiddleware` implement `MiddlewareProtocol`** (add
+   `before_tool_call`/`get_priority`/`get_applicable_tools`) so verticals *can*
+   register it on their own `MiddlewareChain` for domain interception. Because
+   `MiddlewareProtocol.before_tool_call(tool_name, arguments)` carries no tool
+   object — and the gate needs one (`access_mode`/`argument_kinds`) — inject a
+   `tool_resolver: Callable[[str], Any]` at construction (the pipeline/executor
+   wires `lambda name: executor.get_tool_function(name)`); no `MiddlewareProtocol`
+   signature change, so existing vertical middleware is unaffected.
+3. **(Optional, larger)** give `ToolExecutor` an optional `middleware_chain` so
+   chain-based interception happens at the true choke point for *all* paths.
+   Deferred — only needed if verticals must intercept direct-executor calls.
+
+This keeps correction covering every call path (executor is authoritative),
+removes dead code, and adds the chain-membership surface for extensibility —
+achieving the section's goal without the invalidated pipeline-routing premise.
 
 ### 3. Per-argument kind trait (FEP-0009 extension)
 
@@ -296,17 +329,24 @@ maps it.
 
 **Deliverable:** validators register without editing `victor/`.
 
-### Phase 2 — MiddlewareChain routing (1 PR, root repo)
+### Phase 2 — Consolidate to the executor + chain-membership surface (1 PR, root repo)
 
-- [ ] `CodeCorrectionMiddleware` implements `MiddlewareProtocol`; its
-      `process_before` is the #622 `process()` logic.
-- [ ] Register it on the chain; remove the inline blocks in `tool_pipeline.py` and
-      `tool_executor.py`; thread `code_corrected`/`code_validation_errors` via
-      `MiddlewareResult`.
-- [ ] Parity tests: a code-execution tool is corrected identically; a file tool is
-      untouched (the #622 regression suite still passes).
+> Revised per the v1.1 finding (see §2): the executor, not the pipeline, is the
+> correction choke point; the pipeline block is dead code.
 
-**Deliverable:** one extensible transform pipeline; correction is a chain member.
+- [ ] Remove the dead inline correction block from `tool_pipeline.py` (production
+      `enable_code_correction` defaults `False`; executor remains the single active
+      site). Update `tests/unit/tools/test_search_router_pipeline.py`
+      (`TestToolPipelineCodeCorrection`) accordingly.
+- [ ] `CodeCorrectionMiddleware` implements `MiddlewareProtocol`
+      (`before_tool_call`/`get_priority`/`get_applicable_tools`) with an injected
+      `tool_resolver` so the gate can fetch the tool by name without a protocol
+      change. Verticals may register it on their own `MiddlewareChain`.
+- [ ] Parity tests: a code-execution tool is corrected identically and a file tool
+      untouched, via the executor (the #622 regression suite still passes).
+
+**Deliverable:** single correction site (executor) covering all call paths; no dead
+code / no double-application; chain-membership surface for vertical extensibility.
 
 ### Phase 3 — Argument-kind trait (1 PR contracts, 1 PR root)
 
@@ -424,6 +464,15 @@ maps it.
 
 1. **v1.0** (2026-07-22): Initial submission. Stacks on #622; proposes entry-point
    validator registry, `MiddlewareChain` routing, and `ToolContract.argument_kinds`.
+2. **v1.1** (2026-07-22): Phase 1 (#624) and Phase 3 (#625) implemented (TDD). Phase 2
+   **revised after investigation**: the pipeline inline correction block is dead code
+   (`ToolPipelineConfig.enable_code_correction` defaults `False`) and `ToolExecutor` is
+   the real choke point (called directly by `tool_service`/`orchestrator_protocol_adapter`/
+   `parallel_executor`), so pipeline-level `MiddlewareChain` routing was the wrong
+   premise. Corrected Phase 2 to: remove the dead pipeline block (executor stays the
+   single active site) + make `CodeCorrectionMiddleware` a `MiddlewareProtocol` member
+   with an injected `tool_resolver` for vertical extensibility. See §2 and the Phase 2
+   plan.
 
 ## Acceptance Criteria
 
