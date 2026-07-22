@@ -26,6 +26,52 @@
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder, MatchKind};
 use pyo3::prelude::*;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
+
+/// Cache of compiled Aho-Corasick automata keyed by
+/// `(case_insensitive, leftmost_longest, patterns joined with NUL)`.
+///
+/// The free `#[pyfunction]`s below are frequently called in loops over the SAME
+/// small, static pattern sets (e.g. tool-selection keyword categories), so
+/// rebuilding the automaton on every call is pure waste — compile once, reuse.
+type AcKey = (bool, bool, String);
+static AC_CACHE: OnceLock<Mutex<HashMap<AcKey, Arc<AhoCorasick>>>> = OnceLock::new();
+
+/// Cap on retained automata so a caller passing per-request-varying patterns
+/// cannot grow the cache without bound. Realistic callers use a handful of sets.
+const AC_CACHE_MAX_ENTRIES: usize = 512;
+
+/// Return a compiled automaton for `patterns`, building and caching it on first
+/// use. `leftmost_longest` selects `MatchKind::LeftmostLongest` (vs the default
+/// `Standard`) and is part of the cache key so the two never collide. Returns
+/// `None` only if the patterns fail to compile.
+fn cached_automaton(
+    patterns: &[String],
+    case_insensitive: bool,
+    leftmost_longest: bool,
+) -> Option<Arc<AhoCorasick>> {
+    let key: AcKey = (case_insensitive, leftmost_longest, patterns.join("\u{0}"));
+    let cache = AC_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    {
+        let guard = cache.lock().ok()?;
+        if let Some(ac) = guard.get(&key) {
+            return Some(Arc::clone(ac));
+        }
+    }
+    let mut builder = AhoCorasickBuilder::new();
+    builder.ascii_case_insensitive(case_insensitive);
+    if leftmost_longest {
+        builder.match_kind(MatchKind::LeftmostLongest);
+    }
+    let ac = Arc::new(builder.build(patterns).ok()?);
+    if let Ok(mut guard) = cache.lock() {
+        // Simple cap: once full, keep serving the hot first-seen sets.
+        if guard.len() < AC_CACHE_MAX_ENTRIES {
+            guard.insert(key, Arc::clone(&ac));
+        }
+    }
+    Some(ac)
+}
 
 /// Owned version of PatternMatch for Python compatibility
 /// (stores owned strings to avoid lifetime issues across Python FFI boundary)
@@ -222,13 +268,9 @@ impl PatternMatcher {
 #[pyfunction]
 #[pyo3(signature = (text, patterns, case_insensitive=true))]
 pub fn contains_any_pattern(text: &str, patterns: Vec<String>, case_insensitive: bool) -> bool {
-    let ac = AhoCorasickBuilder::new()
-        .ascii_case_insensitive(case_insensitive)
-        .build(&patterns);
-
-    match ac {
-        Ok(ac) => ac.is_match(text),
-        Err(_) => false,
+    match cached_automaton(&patterns, case_insensitive, false) {
+        Some(ac) => ac.is_match(text),
+        None => false,
     }
 }
 
@@ -240,13 +282,8 @@ pub fn find_all_patterns(
     patterns: Vec<String>,
     case_insensitive: bool,
 ) -> Vec<PatternMatch> {
-    let ac = AhoCorasickBuilder::new()
-        .ascii_case_insensitive(case_insensitive)
-        .match_kind(MatchKind::LeftmostLongest)
-        .build(&patterns);
-
-    match ac {
-        Ok(ac) => ac
+    match cached_automaton(&patterns, case_insensitive, true) {
+        Some(ac) => ac
             .find_iter(text)
             .map(|m| PatternMatch {
                 pattern_idx: m.pattern().as_usize(),
@@ -255,7 +292,7 @@ pub fn find_all_patterns(
                 end: m.end(),
             })
             .collect(),
-        Err(_) => Vec::new(),
+        None => Vec::new(),
     }
 }
 
@@ -266,13 +303,8 @@ pub fn find_all_patterns_internal<'a>(
     patterns: &[String],
     case_insensitive: bool,
 ) -> Vec<MatchResult<'a>> {
-    let ac = AhoCorasickBuilder::new()
-        .ascii_case_insensitive(case_insensitive)
-        .match_kind(MatchKind::LeftmostLongest)
-        .build(patterns);
-
-    match ac {
-        Ok(ac) => ac
+    match cached_automaton(patterns, case_insensitive, true) {
+        Some(ac) => ac
             .find_iter(text)
             .map(|m| MatchResult {
                 pattern_idx: m.pattern().as_usize(),
@@ -281,7 +313,7 @@ pub fn find_all_patterns_internal<'a>(
                 end: m.end(),
             })
             .collect(),
-        Err(_) => Vec::new(),
+        None => Vec::new(),
     }
 }
 
@@ -289,13 +321,9 @@ pub fn find_all_patterns_internal<'a>(
 #[pyfunction]
 #[pyo3(signature = (text, patterns, case_insensitive=true))]
 pub fn count_pattern_matches(text: &str, patterns: Vec<String>, case_insensitive: bool) -> usize {
-    let ac = AhoCorasickBuilder::new()
-        .ascii_case_insensitive(case_insensitive)
-        .build(&patterns);
-
-    match ac {
-        Ok(ac) => ac.find_iter(text).count(),
-        Err(_) => 0,
+    match cached_automaton(&patterns, case_insensitive, false) {
+        Some(ac) => ac.find_iter(text).count(),
+        None => 0,
     }
 }
 
@@ -307,12 +335,8 @@ pub fn get_matched_pattern_indices(
     patterns: Vec<String>,
     case_insensitive: bool,
 ) -> Vec<usize> {
-    let ac = AhoCorasickBuilder::new()
-        .ascii_case_insensitive(case_insensitive)
-        .build(&patterns);
-
-    match ac {
-        Ok(ac) => {
+    match cached_automaton(&patterns, case_insensitive, false) {
+        Some(ac) => {
             let mut seen = vec![false; patterns.len()];
             let mut result = Vec::new();
 
@@ -325,7 +349,7 @@ pub fn get_matched_pattern_indices(
             }
             result
         }
-        Err(_) => Vec::new(),
+        None => Vec::new(),
     }
 }
 
@@ -337,13 +361,9 @@ pub fn batch_contains_any(
     patterns: Vec<String>,
     case_insensitive: bool,
 ) -> Vec<bool> {
-    let ac = AhoCorasickBuilder::new()
-        .ascii_case_insensitive(case_insensitive)
-        .build(&patterns);
-
-    match ac {
-        Ok(ac) => texts.iter().map(|t| ac.is_match(t)).collect(),
-        Err(_) => vec![false; texts.len()],
+    match cached_automaton(&patterns, case_insensitive, false) {
+        Some(ac) => texts.iter().map(|t| ac.is_match(t)).collect(),
+        None => vec![false; texts.len()],
     }
 }
 
@@ -366,10 +386,9 @@ pub fn weighted_pattern_score(
         )));
     }
 
-    let ac = AhoCorasickBuilder::new()
-        .ascii_case_insensitive(case_insensitive)
-        .build(&patterns)
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+    let ac = cached_automaton(&patterns, case_insensitive, true).ok_or_else(|| {
+        pyo3::exceptions::PyValueError::new_err("failed to build pattern automaton")
+    })?;
 
     let mut seen = vec![false; patterns.len()];
     let mut score = 0.0;
@@ -434,5 +453,31 @@ mod tests {
         let score = weighted_pattern_score("Please read and analyze this", patterns, weights, true)
             .unwrap();
         assert_eq!(score, 4.0); // read (1.0) + analyze (3.0)
+    }
+
+    #[test]
+    fn test_cached_free_functions_consistent() {
+        let patterns = vec!["read".to_string(), "write".to_string()];
+        // Repeated calls hit the cache and must return identical results.
+        let a = find_all_patterns("read and write and read", patterns.clone(), true);
+        let b = find_all_patterns("read and write and read", patterns.clone(), true);
+        assert_eq!(a.len(), b.len());
+        assert_eq!(a.len(), 3);
+        assert!(contains_any_pattern("please read", patterns.clone(), true));
+        assert!(!contains_any_pattern(
+            "nothing here",
+            patterns.clone(),
+            true
+        ));
+        // Standard match_kind: "read" x2 + "write" x1 = 3.
+        assert_eq!(
+            count_pattern_matches("read read write", patterns.clone(), true),
+            3
+        );
+        // Same patterns, different match_kind must not collide in the cache.
+        assert_eq!(
+            get_matched_pattern_indices("write only", patterns, true),
+            vec![1]
+        );
     }
 }
