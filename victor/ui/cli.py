@@ -19,7 +19,9 @@ import typer
 from rich.console import Console
 from typing import Optional
 
-from victor.core.async_utils import run_sync
+# NOTE: ``run_sync`` is imported function-locally in ``run_command`` (see below);
+# keeping it out of module scope avoids pulling ``victor.core`` eagerly at CLI
+# import time.
 
 try:
     from victor import __version__

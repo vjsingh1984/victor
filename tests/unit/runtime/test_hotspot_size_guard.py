@@ -33,6 +33,10 @@ HOTSPOT_LINE_CAPS = {
     # F-003: context_compactor is a 1827-LOC god-object; decomposition deferred as
     # low-ROI (works, not a proven bottleneck). Ratchet prevents further growth.
     "victor/agent/context_compactor.py": 1827,
+    # Audited 2026-07-22. [CANONICAL] chat service (1,740 LOC) — the largest
+    # service after orchestrator; bind it so "chat operations" don't quietly
+    # sprawl the way the orchestrator facade did.
+    "victor/agent/services/chat_service.py": 1740,
 }
 
 

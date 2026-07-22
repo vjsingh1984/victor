@@ -87,6 +87,13 @@ class LiveDisplayRenderer:
         # of clobbering a single scalar slot.
         self._active_tools: dict[str, dict[str, Any]] = {}
         self._tool_seq = 0
+        # During-turn status footer: cached tool-call budget. Mirrors the
+        # between-turns ``bottom_toolbar`` (chat.py::_build_cli_runtime_segment)
+        # so the user can see Tools used/budget WHILE a turn runs, not only
+        # between turns. ``_tool_budget_resolved`` distinguishes "not yet read"
+        # from "read and unset".
+        self._tool_budget: int | None = None
+        self._tool_budget_resolved = False
         # Live tool-output streaming (progressive terminal block)
         self._tool_progress_lines: deque[str] = deque(maxlen=12)
         self._tool_progress_active = False
@@ -255,6 +262,39 @@ class LiveDisplayRenderer:
         except Exception:  # pragma: no cover - defensive; never break the stream
             logger.debug("on_tool_progress render failed", exc_info=True)
 
+    def _get_tool_budget(self) -> int | None:
+        """Resolve and cache the configured tool-call budget.
+
+        Read once (lazily, behind the first render) from settings so repeated
+        Live ticks don't re-load config. Returns None when unset/unavailable.
+        """
+        if not self._tool_budget_resolved:
+            self._tool_budget_resolved = True
+            try:
+                from victor.config.settings import load_settings
+
+                tools = getattr(load_settings(), "tools", None)
+                budget = getattr(tools, "tool_call_budget", None)
+                self._tool_budget = int(budget) if budget else None
+            except Exception:  # pragma: no cover - never break the stream over UI
+                logger.debug("tool budget resolution failed", exc_info=True)
+                self._tool_budget = None
+        return self._tool_budget
+
+    def _status_widget(self) -> Text | None:
+        """Persistent during-turn footer: ``Tools used/budget``.
+
+        Mirrors the between-turns ``bottom_toolbar`` so progress is visible
+        while a turn is running (the toolbar is suspended during a turn).
+        Returns None before any tool has run.
+        """
+        if self._tool_seq <= 0:
+            return None
+        budget = self._get_tool_budget()
+        if budget and budget > 0:
+            return Text.from_markup(f"[dim]Tools {self._tool_seq}/{budget}[/]")
+        return Text.from_markup(f"[dim]Tools {self._tool_seq}[/]")
+
     def _render_tool_progress(self) -> None:
         """Update the Live renderable to content + a live tool-output panel.
 
@@ -297,7 +337,13 @@ class LiveDisplayRenderer:
             expand=False,
             padding=(0, 1),
         )
-        self._live.update(Group(render_markdown_with_hooks(self._visible_content()), panel))
+        # Persistent during-turn status footer (Tools used/budget) so progress is
+        # visible while the turn runs — the between-turns toolbar is suspended here.
+        parts: list[Any] = [render_markdown_with_hooks(self._visible_content()), panel]
+        status = self._status_widget()
+        if status is not None:
+            parts.append(status)
+        self._live.update(Group(*parts))
 
     def _clear_tool_progress_panel(self) -> None:
         """Drop the live panel and reset progress state.

@@ -49,6 +49,7 @@ Usage:
     # Returns [(message_id, similarity), ...] - fetch full content from SQLite
 """
 
+import importlib.util
 import logging
 import sqlite3
 import time
@@ -57,13 +58,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
-try:
-    import lancedb
-    import pyarrow as pa  # noqa: F401 - Required by LanceDB
-
-    LANCEDB_AVAILABLE = True
-except ImportError:
-    LANCEDB_AVAILABLE = False
+# Availability WITHOUT importing: ``import lancedb`` at module scope eagerly
+# loads protobuf, lance_namespace_*, and pyarrow into the CLI cold-start path
+# (this module is reached transitively at container bootstrap). find_spec()
+# reports whether the packages are installed without executing their top-level
+# code; the real import is deferred to ``initialize()``.
+LANCEDB_AVAILABLE = (
+    importlib.util.find_spec("lancedb") is not None
+    and importlib.util.find_spec("pyarrow") is not None
+)
 
 if TYPE_CHECKING:
     from victor.storage.embeddings.service import EmbeddingService
@@ -170,6 +173,9 @@ class ConversationEmbeddingStore:
 
         # Connect to LanceDB
         logger.info(f"[ConversationEmbeddingStore] Connecting to LanceDB at {self._lancedb_path}")
+        import lancedb
+        import pyarrow as pa  # noqa: F401 - required by LanceDB at runtime
+
         self._db = lancedb.connect(str(self._lancedb_path))
 
         # Open or create table
