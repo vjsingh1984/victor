@@ -248,6 +248,11 @@ from victor_contracts.discovery import (
 )
 from victor_contracts.skills import SkillDefinition, SkillProvider
 
+# Runtime-evaluation feedback contract (shared by victor.evaluation producer
+# and victor.framework/victor.agent consumers; kept here so neither imports the
+# other at module scope).
+from victor_contracts.runtime_evaluation import RuntimeEvaluationFeedback
+
 # Phase 4 promotions: types heavily used by external verticals
 from victor_contracts.multi_agent import TeamFormation, TeamMemberSpec
 from victor_contracts.rl import RLOutcome, RLRecommendation
@@ -473,6 +478,8 @@ __all__ = [
     # Skills
     "SkillDefinition",
     "SkillProvider",
+    # Runtime-evaluation feedback contract
+    "RuntimeEvaluationFeedback",
     # Phase 4 promotions: types used by 6+ external verticals
     "TeamFormation",
     "TeamMemberSpec",

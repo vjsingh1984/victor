@@ -26,7 +26,7 @@ import pytest
 
 from victor.core.graph_rag.config import GraphIndexConfig
 from victor.core.graph_rag.indexing import GraphIndexingPipeline
-from victor.storage.graph.protocol import GraphNode
+from victor.storage.graph.protocol import GraphEdge, GraphNode
 from victor.storage.graph.sqlite_store import SqliteGraphStore
 
 
@@ -55,12 +55,11 @@ class TestIndexingPerformance:
         ]
         await store.upsert_nodes(nodes)
 
-        # Add some edges
+        # Add some edges (edges are GraphEdge, not GraphNode)
         for i in range(99):
             await store.upsert_edges(
                 [
-                    GraphNode(
-                        node_id=f"edge:{i}",
+                    GraphEdge(
                         src=f"existing:node:{i}",
                         dst=f"existing:node:{i+1}",
                         type="CALLS",

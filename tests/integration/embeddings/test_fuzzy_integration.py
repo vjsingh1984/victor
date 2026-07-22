@@ -25,6 +25,17 @@ from victor.storage.embeddings.task_classifier import TaskType, TaskTypeClassifi
 from victor.tools.semantic_selector import SemanticToolSelector
 from victor.storage.embeddings.intent_classifier import IntentClassifier, IntentType
 
+# "analyze"-style prompts legitimately resolve to any analysis-family task type.
+# Finer-grained members (ANALYSIS_DEEP, DATA_ANALYSIS) were added over time, so
+# these tests assert membership in the family rather than one exact enum value;
+# SEARCH stays an acceptable near-neighbour for such short prompts.
+ANALYSIS_TASK_TYPES = {
+    TaskType.ANALYZE,
+    TaskType.ANALYSIS_DEEP,
+    TaskType.DATA_ANALYSIS,
+    TaskType.SEARCH,
+}
+
 
 @pytest.mark.integration
 class TestTaskClassificationWithTypos:
@@ -44,8 +55,8 @@ class TestTaskClassificationWithTypos:
         # With typo: "analize framework structre"
         result = self.classifier.classify_sync("analize framework structre")
 
-        # Should still classify as ANALYZE (with fuzzy matching)
-        assert result.task_type in [TaskType.ANALYZE, TaskType.SEARCH]
+        # Should still classify into the analysis family (with fuzzy matching)
+        assert result.task_type in ANALYSIS_TASK_TYPES
         assert result.confidence > 0.3
 
     def test_refactor_with_typo(self):
@@ -85,8 +96,8 @@ class TestTaskClassificationWithTypos:
         """Verify exact matches still work correctly."""
         result = self.classifier.classify_sync("analyze the code structure")
 
-        # Should classify as ANALYZE with high confidence
-        assert result.task_type in [TaskType.ANALYZE, TaskType.SEARCH]
+        # Should classify into the analysis family with high confidence
+        assert result.task_type in ANALYSIS_TASK_TYPES
         assert result.confidence > 0.3
 
 

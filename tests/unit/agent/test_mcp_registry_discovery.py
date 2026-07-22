@@ -51,12 +51,17 @@ class TestMCPRegistryDiscovery:
     """Tests for MCPRegistry.discover_servers() method."""
 
     def test_discover_no_config_found(self):
-        """Test discovery when no config files exist."""
+        """Test discovery when no config files and no built-in executables exist."""
         with patch.dict("os.environ", {}, clear=True):
             with patch.object(Path, "exists", return_value=False):
-                registry = MCPRegistry.discover_servers()
-                assert isinstance(registry, MCPRegistry)
-                assert len(registry.list_servers()) == 0
+                # Isolate from ambient machine state: well-known MCP executables
+                # on PATH (e.g. anthropics_mcp-server-fetch via npx) are
+                # auto-discovered, so neutralise shutil.which to exercise the
+                # "no config" path only.
+                with patch("shutil.which", return_value=None):
+                    registry = MCPRegistry.discover_servers()
+                    assert isinstance(registry, MCPRegistry)
+                    assert len(registry.list_servers()) == 0
 
     def test_discover_from_env_variable(self):
         """Test discovery from VICTOR_MCP_CONFIG environment variable."""

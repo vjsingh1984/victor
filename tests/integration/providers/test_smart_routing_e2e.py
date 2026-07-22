@@ -43,6 +43,23 @@ from victor.providers.health import ProviderHealthChecker, ProviderHealthResult
 from victor.providers.base import Message
 
 
+def _seed_all_healthy(smart_provider, providers) -> None:
+    """Seed the health cache so every mocked provider scores as healthy.
+
+    Mock providers carry no real credentials, so the production health checker
+    marks cloud providers (anthropic/openai) unhealthy for a missing API key
+    (health score 0.0) — which makes them always lose to local ollama regardless
+    of performance history or the active profile. Seeding reflects that the mocks
+    are configured and healthy.
+    """
+    for provider in providers:
+        smart_provider.checker._provider_health[provider.name] = ProviderHealthResult(
+            healthy=True,
+            provider=provider.name,
+            model="test",
+        )
+
+
 @pytest.mark.integration
 class TestSmartRoutingE2E:
     """End-to-end tests for smart routing."""
@@ -84,7 +101,10 @@ class TestSmartRoutingE2E:
             config=config,
         )
 
-        # Mock Ollama as healthy initially
+        # Seed ONLY ollama healthy so the first request deterministically routes
+        # to the local provider. (With the cloud providers also healthy, the
+        # first-request score becomes resource/GPU-dependent and is not
+        # deterministic on a CI runner without a GPU.)
         smart_provider.checker._provider_health["ollama"] = ProviderHealthResult(
             healthy=True,
             provider="ollama",
@@ -113,6 +133,14 @@ class TestSmartRoutingE2E:
             model="test",
             issues=["Circuit breaker open"],
         )
+        # Anthropic is the intended fallback target: seed it healthy now (the
+        # mocked cloud provider has no API key, so the production health check
+        # would otherwise score it 0.0 and block the fallback).
+        smart_provider.checker._provider_health["anthropic"] = ProviderHealthResult(
+            healthy=True,
+            provider="anthropic",
+            model="test",
+        )
 
         # Make second request - should fallback to Anthropic
         response2 = await smart_provider.chat(messages, model="test-model", task_type="default")
@@ -127,6 +155,10 @@ class TestSmartRoutingE2E:
             providers=mock_providers,
             config=config,
         )
+
+        # Seed health for all mocked providers so performance history — not a
+        # missing-API-key health penalty — drives the decision.
+        _seed_all_healthy(smart_provider, mock_providers)
 
         # Simulate Ollama performing VERY poorly (high latency + some failures)
         for i in range(10):
@@ -364,6 +396,10 @@ class TestSmartRoutingScenarios:
             providers=providers,
             config=config,
         )
+
+        # Seed health for the mocked providers so the 'performance' profile's
+        # cloud-first ordering isn't overridden by a missing-API-key penalty.
+        _seed_all_healthy(smart_provider, providers)
 
         # Make routing decision
         decision = await smart_provider.engine.decide(task_type="default")
