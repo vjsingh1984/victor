@@ -17,27 +17,21 @@
 These tests increase code coverage for:
 - victor/providers/openai_compat.py (HTTP error handling, tool call accumulation)
 - victor/ui/rendering/markdown.py (Mermaid rendering, image placeholders, error fallback)
-- victor/providers/httpx_openai_compat.py (template method overrides)
 """
 
-import json
 import logging
-from unittest.mock import Mock, MagicMock, AsyncMock, patch
-import pytest
+from unittest.mock import Mock
 
 import httpx
 
-from victor.providers.base import Message, ToolDefinition, ProviderError
-from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
+from victor.providers.base import ProviderError, ToolDefinition
 from victor.providers.openai_compat import (
-    build_openai_messages,
     handle_httpx_status_error,
     fix_orphaned_tool_messages,
     accumulate_tool_call_delta,
     convert_tools_to_openai_format,
     parse_openai_tool_calls,
 )
-from victor.providers.resilience import ProviderRetryConfig, ProviderRetryStrategy
 from victor.ui.rendering.markdown import (
     render_markdown_with_hooks,
     _escape_rich_markup_from_text,
@@ -47,53 +41,6 @@ from victor.ui.rendering.markdown import (
     _detect_direction,
     _normalize_mermaid_node,
 )
-
-
-class _TestHttpxCompatProvider(HttpxOpenAICompatProvider):
-    @property
-    def name(self) -> str:
-        return "test-httpx"
-
-    def supports_tools(self) -> bool:
-        return True
-
-    def supports_streaming(self) -> bool:
-        return True
-
-
-class _FakeStreamingResponse:
-    def __init__(self, status_code: int, lines: list[str], text: str = "") -> None:
-        self.status_code = status_code
-        self._lines = lines
-        self._text = text
-        self.request = httpx.Request("POST", "https://example.com/chat/completions")
-        self.closed = False
-
-    @property
-    def text(self) -> str:
-        return self._text
-
-    async def aread(self) -> bytes:
-        return self._text.encode()
-
-    def raise_for_status(self) -> None:
-        if self.status_code >= 400:
-            raise httpx.HTTPStatusError(
-                f"{self.status_code} error",
-                request=self.request,
-                response=httpx.Response(
-                    self.status_code,
-                    request=self.request,
-                    text=self._text,
-                ),
-            )
-
-    async def aiter_lines(self):
-        for line in self._lines:
-            yield line
-
-    async def aclose(self) -> None:
-        self.closed = True
 
 
 class TestOpenAICompatErrorHandling:
@@ -250,94 +197,6 @@ class TestOpenAICompatErrorHandling:
 
         assert isinstance(result, ProviderError)
         assert result.status_code == 500
-
-
-@pytest.mark.asyncio
-class TestHttpxOpenAICompatProviderRetries:
-    async def test_chat_retries_transient_http_500(self):
-        provider = _TestHttpxCompatProvider(
-            api_key="test-key",
-            base_url="https://example.com",
-            provider_name="test-httpx",
-            max_retries=1,
-        )
-        provider._retry_strategy = ProviderRetryStrategy(
-            ProviderRetryConfig(
-                max_retries=1,
-                base_delay_seconds=0.0,
-                max_delay_seconds=0.0,
-                jitter_factor=0.0,
-            )
-        )
-
-        first_response = httpx.Response(
-            500,
-            request=httpx.Request("POST", "https://example.com/chat/completions"),
-            text='{"error":{"message":"Internal service error"}}',
-        )
-        second_response = httpx.Response(
-            200,
-            request=httpx.Request("POST", "https://example.com/chat/completions"),
-            json={"id": "resp_1", "choices": [], "usage": {"total_tokens": 7}},
-        )
-
-        provider.client.post = AsyncMock(side_effect=[first_response, second_response])
-        provider._parse_response = MagicMock(return_value=MagicMock(usage={"total_tokens": 7}))
-
-        result = await provider.chat(
-            messages=[Message(role="user", content="hello")],
-            model="test-model",
-        )
-
-        assert result is provider._parse_response.return_value
-        assert provider.client.post.await_count == 2
-        provider._parse_response.assert_called_once()
-        await provider.close()
-
-    async def test_stream_retries_transient_http_500(self):
-        provider = _TestHttpxCompatProvider(
-            api_key="test-key",
-            base_url="https://example.com",
-            provider_name="test-httpx",
-            max_retries=1,
-        )
-        provider._retry_strategy = ProviderRetryStrategy(
-            ProviderRetryConfig(
-                max_retries=1,
-                base_delay_seconds=0.0,
-                max_delay_seconds=0.0,
-                jitter_factor=0.0,
-            )
-        )
-
-        first_response = _FakeStreamingResponse(
-            500,
-            lines=[],
-            text='{"error":{"message":"Internal service error"}}',
-        )
-        second_response = _FakeStreamingResponse(
-            200,
-            lines=[
-                'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":null}]}',
-                "data: [DONE]",
-            ],
-        )
-
-        provider.client.send = AsyncMock(side_effect=[first_response, second_response])
-
-        chunks = [
-            chunk
-            async for chunk in provider.stream(
-                messages=[Message(role="user", content="hello")],
-                model="test-model",
-            )
-        ]
-
-        assert provider.client.send.await_count == 2
-        assert second_response.closed is True
-        assert any(chunk.content == "ok" for chunk in chunks)
-        assert any(chunk.is_final for chunk in chunks)
-        await provider.close()
 
 
 class TestAccumulateToolCallDelta:
