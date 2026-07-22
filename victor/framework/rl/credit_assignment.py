@@ -1276,16 +1276,15 @@ class LLMCriticCreditAssigner(BaseCreditAssigner[ActionMetadata]):
         if not self._provider_name:
             return None
         try:
-            if self._provider_name == "ollama":
-                from victor.providers.ollama_provider import OllamaProvider
+            from importlib import import_module
 
-                self._provider = OllamaProvider()
-            else:
-                from importlib import import_module
+            from victor.providers.sandhi_transport import resolve_transport_class
 
-                mod = import_module(f"victor.providers.{self._provider_name}_provider")
-                cls_name = f"{self._provider_name.title()}Provider"
-                self._provider = getattr(mod, cls_name)()
+            mod = import_module(f"victor.providers.{self._provider_name}_provider")
+            native_cls = getattr(mod, f"{self._provider_name.title()}Provider")
+            # Sandhi owns transport: resolve the typed variant so chat()/stream()
+            # run via the FFI binding rather than the (removed) raw wire path.
+            self._provider = resolve_transport_class(self._provider_name, native_cls, {})()
             return self._provider
         except Exception as e:
             logger.debug(

@@ -41,10 +41,7 @@ Recommended GGUF models for coding (Q4_K_M quantization):
 Download models from: https://huggingface.co/models?sort=trending&search=gguf
 """
 
-from victor.core.json_utils import json_loads
-from json import JSONDecodeError
-import re
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
 
@@ -53,22 +50,11 @@ from victor.providers.base import (
     CacheCostModel,
     CompletionResponse,
     Message,
-    ProviderAuthError,
     ProviderConnectionError,
-    ProviderError,
-    ProviderRateLimitError,
-    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
 from victor.providers.logging import ProviderLogger
-from victor.providers.openai_compat import (
-    extract_thinking_content as _extract_thinking_content,
-    extract_tool_calls_from_content as _extract_tool_calls_from_content,
-    convert_messages_to_openai_format,
-    convert_tools_to_openai_format,
-    parse_openai_tool_calls,
-)
 
 # Default llama.cpp server endpoints
 DEFAULT_LLAMACPP_URLS = [
@@ -331,164 +317,16 @@ class LlamaCppProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
-        """Send chat completion request to llama.cpp server.
+        """Chat transport is owned by the Sandhi typed variant.
 
-        Args:
-            messages: Conversation messages
-            model: Model name (usually "default" for llama.cpp)
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            tools: Available tools for function calling
-            **kwargs: Additional parameters (top_p, top_k, repeat_penalty, etc.)
-
-        Returns:
-            CompletionResponse with generated content
-
-        Raises:
-            ProviderAuthError: If authentication fails (for authenticated servers)
-            ProviderRateLimitError: If rate limit is exceeded
-            ProviderTimeoutError: If request times out
-            ProviderConnectionError: If connection fails
-            ProviderError: For other errors
+        This policy shell stays concrete for discovery/capability use; completion
+        transport is delegated to the Sandhi runtime. Obtain the typed provider
+        via ``resolve_transport_class()`` (e.g. ``SandhiLlamaCppProvider``).
         """
-        # Use loaded model if none specified
-        if model == "default" and self._loaded_model:
-            model = self._loaded_model
-
-        # Build request payload
-        payload: Dict[str, Any] = {
-            "model": model,
-            "messages": convert_messages_to_openai_format(messages),
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-
-        # Add optional parameters (llama.cpp specific)
-        if "top_p" in kwargs:
-            payload["top_p"] = kwargs["top_p"]
-        if "top_k" in kwargs:
-            payload["top_k"] = kwargs["top_k"]
-        if "repeat_penalty" in kwargs:
-            payload["repeat_penalty"] = kwargs["repeat_penalty"]
-        if "presence_penalty" in kwargs:
-            payload["presence_penalty"] = kwargs["presence_penalty"]
-        if "frequency_penalty" in kwargs:
-            payload["frequency_penalty"] = kwargs["frequency_penalty"]
-        if "stop" in kwargs:
-            payload["stop"] = kwargs["stop"]
-        if "seed" in kwargs:
-            payload["seed"] = kwargs["seed"]
-
-        # Add tools if provided
-        if tools and _model_supports_tools(model):
-            payload["tools"] = convert_tools_to_openai_format(tools)
-            payload["tool_choice"] = kwargs.get("tool_choice", "auto")
-
-        # Use structured logging context manager
-        with self._provider_logger.log_api_call(
-            endpoint="/chat/completions",
-            model=model,
-            operation="chat",
-            num_messages=len(messages),
-            has_tools=tools is not None,
-        ) as log_success:
-            try:
-                response = await self.client.post(
-                    f"{self.base_url}/v1/chat/completions",
-                    json=payload,
-                )
-
-                response.raise_for_status()
-
-                result = response.json()
-                parsed = self._parse_response(result, model)
-
-                # Log success with usage info
-                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                log_success(tokens=tokens)
-
-                return parsed
-
-            except httpx.HTTPStatusError as e:
-                # Convert HTTP errors to specific provider errors
-                status_code = e.response.status_code
-
-                # Check if already a ProviderError to avoid double-wrapping
-                if isinstance(e, ProviderError):
-                    raise
-
-                error_data = {}
-                try:
-                    error_data = e.response.json() if e.response.content else {}
-                except Exception:
-                    pass
-
-                error_msg = (
-                    error_data.get("error", {}).get("message")
-                    if isinstance(error_data, dict)
-                    else str(error_data)
-                )
-                if not error_msg:
-                    error_msg = e.response.text[:500] if e.response.text else "Unknown error"
-
-                if status_code in (401, 403):
-                    # Some llama.cpp servers may require authentication
-                    raise ProviderAuthError(
-                        message=f"Authentication failed: {error_msg}",
-                        provider="llamacpp",
-                        details={"status_code": status_code},
-                    ) from e
-                elif status_code == 429:
-                    raise ProviderRateLimitError(
-                        message=f"Rate limit exceeded: {error_msg}",
-                        provider="llamacpp",
-                        status_code=status_code,
-                    ) from e
-                else:
-                    raise ProviderError(
-                        message=f"llama.cpp API error: {error_msg}",
-                        provider="llamacpp",
-                        details={"status_code": status_code, "response": error_data},
-                    ) from e
-
-            except httpx.TimeoutException as e:
-                raise ProviderTimeoutError(
-                    message=f"llama.cpp request timed out after {self.timeout}s",
-                    provider="llamacpp",
-                    details={
-                        "model": model,
-                        "timeout": self.timeout,
-                        "suggestion": (
-                            "CPU inference can be slow. Try:\n"
-                            "  1. Use a smaller/more quantized model (Q4_K_M)\n"
-                            "  2. Reduce max_tokens\n"
-                            "  3. Increase timeout with --timeout flag"
-                        ),
-                    },
-                ) from e
-
-            except httpx.ConnectError as e:
-                raise ProviderConnectionError(
-                    message=f"Cannot connect to llama.cpp server at {self.base_url}",
-                    provider="llamacpp",
-                    details={
-                        "suggestion": (
-                            "Start llama.cpp server:\n" "  llama-server -m model.gguf --port 8080"
-                        )
-                    },
-                ) from e
-
-            except ProviderError:
-                # Re-raise ProviderError instances as-is
-                raise
-
-            except Exception as e:
-                # Wrap unexpected errors
-                raise ProviderError(
-                    message=f"llama.cpp request failed: {str(e)}",
-                    provider="llamacpp",
-                    raw_error=e,
-                ) from e
+        raise NotImplementedError(
+            f"{self.name} chat() is owned by the Sandhi typed variant; "
+            "use resolve_transport_class() to obtain the typed provider."
+        )
 
     async def stream(
         self,
@@ -500,266 +338,12 @@ class LlamaCppProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
-        """Stream chat completion from llama.cpp server.
-
-        Args:
-            messages: Conversation messages
-            model: Model name
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            tools: Available tools
-            **kwargs: Additional parameters
-
-        Yields:
-            StreamChunk with content or tool calls
-
-        Raises:
-            ProviderAuthError: If authentication fails (for authenticated servers)
-            ProviderRateLimitError: If rate limit is exceeded
-            ProviderTimeoutError: If request times out
-            ProviderConnectionError: If connection fails
-            ProviderError: For other errors
-        """
-        if model == "default" and self._loaded_model:
-            model = self._loaded_model
-
-        payload: Dict[str, Any] = {
-            "model": model,
-            "messages": convert_messages_to_openai_format(messages),
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": True,
-        }
-
-        if "top_p" in kwargs:
-            payload["top_p"] = kwargs["top_p"]
-
-        if tools and _model_supports_tools(model):
-            payload["tools"] = convert_tools_to_openai_format(tools)
-            payload["tool_choice"] = kwargs.get("tool_choice", "auto")
-
-        accumulated_content = ""
-        accumulated_tool_calls: List[Dict[str, Any]] = []
-
-        try:
-            async with self.client.stream(
-                "POST",
-                f"{self.base_url}/v1/chat/completions",
-                json=payload,
-            ) as response:
-                if response.status_code != 200:
-                    # Check for specific error codes
-                    status_code = response.status_code
-
-                    error_text = ""
-                    async for chunk in response.aiter_text():
-                        error_text += chunk
-
-                    if status_code in (401, 403):
-                        raise ProviderAuthError(
-                            message=f"Authentication failed: {error_text[:500]}",
-                            provider="llamacpp",
-                            details={"status_code": status_code},
-                        )
-                    elif status_code == 429:
-                        raise ProviderRateLimitError(
-                            message=f"Rate limit exceeded: {error_text[:500]}",
-                            provider="llamacpp",
-                            status_code=status_code,
-                        )
-                    else:
-                        raise ProviderError(
-                            message=f"llama.cpp streaming error: {error_text[:500]}",
-                            provider="llamacpp",
-                            details={"status_code": status_code},
-                        )
-
-                async for line in response.aiter_lines():
-                    if not line or line == "data: [DONE]":
-                        continue
-
-                    if line.startswith("data: "):
-                        try:
-                            data = json_loads(line[6:])
-                            choices = data.get("choices", [])
-                            if not choices:
-                                continue
-
-                            choice = choices[0]
-                            delta = choice.get("delta", {})
-                            finish_reason = choice.get("finish_reason")
-
-                            # Handle content
-                            content = delta.get("content")
-                            if content:
-                                accumulated_content += content
-                                yield StreamChunk(
-                                    content=content,
-                                    is_final=False,
-                                    role="assistant",
-                                    model=model,
-                                )
-
-                            # Handle tool calls
-                            tool_call_delta = delta.get("tool_calls")
-                            if tool_call_delta:
-                                for tc in tool_call_delta:
-                                    idx = tc.get("index", 0)
-                                    while len(accumulated_tool_calls) <= idx:
-                                        accumulated_tool_calls.append(
-                                            {"id": "", "name": "", "arguments": ""}
-                                        )
-                                    if "id" in tc:
-                                        accumulated_tool_calls[idx]["id"] = tc["id"]
-                                    func = tc.get("function", {})
-                                    if "name" in func:
-                                        accumulated_tool_calls[idx]["name"] = func["name"]
-                                    if "arguments" in func:
-                                        accumulated_tool_calls[idx]["arguments"] += func[
-                                            "arguments"
-                                        ]
-
-                            # Final chunk
-                            if finish_reason:
-                                # Check for thinking tags
-                                final_content = accumulated_content
-                                thinking, main_content = _extract_thinking_content(final_content)
-                                if thinking:
-                                    final_content = main_content
-
-                                # Parse accumulated tool calls
-                                parsed_tool_calls = None
-                                if accumulated_tool_calls:
-                                    parsed_tool_calls = []
-                                    for tc in accumulated_tool_calls:
-                                        try:
-                                            args = (
-                                                json_loads(tc["arguments"])
-                                                if tc["arguments"]
-                                                else {}
-                                            )
-                                        except JSONDecodeError:
-                                            args = {"raw": tc["arguments"]}
-                                        parsed_tool_calls.append(
-                                            {
-                                                "id": tc["id"],
-                                                "name": tc["name"],
-                                                "arguments": args,
-                                            }
-                                        )
-
-                                # Fallback: Extract tool calls from content
-                                if not parsed_tool_calls and final_content:
-                                    fallback_calls, remaining = _extract_tool_calls_from_content(
-                                        final_content
-                                    )
-                                    if fallback_calls:
-                                        parsed_tool_calls = fallback_calls
-                                        final_content = remaining
-                                        self._provider_logger.logger.debug(
-                                            f"llama.cpp stream: Extracted {len(fallback_calls)} "
-                                            "tool call(s) from content"
-                                        )
-
-                                yield StreamChunk(
-                                    content=final_content,
-                                    is_final=True,
-                                    role="assistant",
-                                    model=model,
-                                    tool_calls=parsed_tool_calls,
-                                    stop_reason=finish_reason,
-                                )
-
-                        except JSONDecodeError:
-                            self._provider_logger.logger.debug(
-                                f"Failed to parse streaming chunk: {line}"
-                            )
-                            continue
-
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"llama.cpp streaming timed out after {self.timeout}s",
-                provider="llamacpp",
-            ) from e
-
-        except httpx.ConnectError as e:
-            raise ProviderConnectionError(
-                message=f"Cannot connect to llama.cpp server at {self.base_url}",
-                provider="llamacpp",
-            ) from e
-
-        except ProviderError:
-            # Re-raise ProviderError instances as-is
-            raise
-
-        except Exception as e:
-            # Wrap unexpected errors
-            raise ProviderError(
-                message=f"llama.cpp stream error: {str(e)}",
-                provider="llamacpp",
-                raw_error=e,
-            ) from e
-
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
-        """Parse llama.cpp API response.
-
-        Args:
-            result: Raw API response
-            model: Model name
-
-        Returns:
-            Parsed CompletionResponse
-        """
-        choices = result.get("choices", [])
-        if not choices:
-            return CompletionResponse(
-                content="",
-                role="assistant",
-                model=model,
-            )
-
-        choice = choices[0]
-        message = choice.get("message", {})
-        content = message.get("content", "")
-        tool_calls_data = message.get("tool_calls")
-
-        # Extract thinking content if present
-        metadata = {}
-        if content:
-            thinking, main_content = _extract_thinking_content(content)
-            if thinking:
-                metadata["reasoning_content"] = thinking
-                content = main_content
-
-        # Parse tool calls (native or fallback)
-        tool_calls = parse_openai_tool_calls(tool_calls_data)
-
-        # Fallback: Extract tool calls from content if server didn't parse them
-        if not tool_calls and content:
-            fallback_calls, remaining_content = _extract_tool_calls_from_content(content)
-            if fallback_calls:
-                tool_calls = fallback_calls
-                content = remaining_content
-                self._provider_logger.logger.debug(
-                    f"llama.cpp: Extracted {len(tool_calls)} tool call(s) from content using fallback"
-                )
-
-        # Get usage info
-        usage_data = result.get("usage", {})
-        usage = {
-            "prompt_tokens": usage_data.get("prompt_tokens", 0),
-            "completion_tokens": usage_data.get("completion_tokens", 0),
-            "total_tokens": usage_data.get("total_tokens", 0),
-        }
-
-        return CompletionResponse(
-            content=content,
-            role="assistant",
-            model=model,
-            tool_calls=tool_calls,
-            stop_reason=choice.get("finish_reason"),
-            usage=usage,
-            metadata=metadata if metadata else None,
+        """Stream transport is owned by the Sandhi typed variant (see ``chat``)."""
+        if False:  # pragma: no cover - async-generator marker for typing
+            yield StreamChunk()
+        raise NotImplementedError(
+            f"{self.name} stream() is owned by the Sandhi typed variant; "
+            "use resolve_transport_class() to obtain the typed provider."
         )
 
     async def close(self) -> None:
