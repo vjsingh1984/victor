@@ -101,9 +101,15 @@ class TestSmartRoutingE2E:
             config=config,
         )
 
-        # Seed health for all mocked providers: the cloud mocks have no API key,
-        # so otherwise anthropic could never become the fallback target.
-        _seed_all_healthy(smart_provider, mock_providers)
+        # Seed ONLY ollama healthy so the first request deterministically routes
+        # to the local provider. (With the cloud providers also healthy, the
+        # first-request score becomes resource/GPU-dependent and is not
+        # deterministic on a CI runner without a GPU.)
+        smart_provider.checker._provider_health["ollama"] = ProviderHealthResult(
+            healthy=True,
+            provider="ollama",
+            model="test",
+        )
 
         # Make first request - should use Ollama (local first in balanced profile)
         messages = [Message(role="user", content="test")]
@@ -126,6 +132,14 @@ class TestSmartRoutingE2E:
             provider="ollama",
             model="test",
             issues=["Circuit breaker open"],
+        )
+        # Anthropic is the intended fallback target: seed it healthy now (the
+        # mocked cloud provider has no API key, so the production health check
+        # would otherwise score it 0.0 and block the fallback).
+        smart_provider.checker._provider_health["anthropic"] = ProviderHealthResult(
+            healthy=True,
+            provider="anthropic",
+            model="test",
         )
 
         # Make second request - should fallback to Anthropic
