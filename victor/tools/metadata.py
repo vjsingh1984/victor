@@ -86,6 +86,10 @@ class ToolMetadata:
     )  # e.g., ["path"] (excludes offset/limit)
     # NEW: Execution category for parallel execution
     execution_category: Optional["ExecutionCategory"] = None  # Default: READ_ONLY when None
+    # Per-argument semantic kind (FEP-0024): param-name -> ArgumentKind. Empty by default;
+    # when declared, drives per-argument correction gating (only EXECUTABLE_CODE is
+    # correctable; FILE_CONTENT is never auto-mutated).
+    argument_kinds: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         """Apply defaults for None values to support backward compatibility."""
@@ -195,6 +199,11 @@ class ToolMetadata:
             declared = getattr(contract, field_name, None)
             if declared:
                 setattr(base, field_name, list(declared))
+
+        # Per-argument kinds (FEP-0024): contract carries a tuple of (name, kind) pairs.
+        declared_kinds = getattr(contract, "argument_kinds", None)
+        if declared_kinds:
+            base.argument_kinds = dict(declared_kinds)
 
         return base
 

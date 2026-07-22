@@ -107,6 +107,19 @@ class CostTier(str, Enum):
     HIGH = "high"
 
 
+class ArgumentKind(str, Enum):
+    """Semantic kind of a tool argument (FEP-0024).
+
+    Drives per-argument behavior — notably, only ``EXECUTABLE_CODE`` arguments are
+    eligible for code correction; ``FILE_CONTENT`` is an authored document that is
+    never auto-mutated (validated read-only at most).
+    """
+
+    EXECUTABLE_CODE = "executable_code"
+    FILE_CONTENT = "file_content"
+    DATA = "data"
+
+
 @dataclass(frozen=True)
 class ToolContract:
     """Declarable, stable subset of a tool's metadata (the SDK boundary type).
@@ -130,6 +143,9 @@ class ToolContract:
     use_cases: tuple[str, ...] = ()
     task_types: tuple[str, ...] = ()
     stages: tuple[str, ...] = ()
+    # Per-argument semantic kind: sequence of (param-name, ArgumentKind) pairs. Frozen +
+    # hashable (not a dict). Empty by default — the tool-level access_mode gate applies.
+    argument_kinds: tuple[tuple[str, ArgumentKind], ...] = ()
 
     def category_value(self) -> str:
         """The category as a plain string (accepts either the enum or a raw str)."""

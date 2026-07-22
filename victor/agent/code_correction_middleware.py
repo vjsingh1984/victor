@@ -154,20 +154,42 @@ class CodeCorrectionMiddleware:
             )
         return self._corrector
 
+    # FEP-0024: ArgumentKind value that marks an argument as executable code.
+    _EXECUTABLE_CODE_KIND = "executable_code"
+
+    @staticmethod
+    def _argument_kinds_for(tool: Any) -> Dict[str, str]:
+        """Return a ``{param-name: kind}`` map declared on the tool, or empty.
+
+        Reads ``tool.argument_kinds`` — a tuple of ``(name, kind)`` pairs (the frozen,
+        hashable shape on ``ToolContract``) or a mapping — and normalizes kind values to
+        lowercase strings. Returns ``{}`` when the tool declares nothing, in which case
+        the tool-level ``access_mode`` gate applies.
+        """
+        raw = getattr(tool, "argument_kinds", None) if tool is not None else None
+        if not raw:
+            return {}
+        try:
+            pairs = raw.items() if hasattr(raw, "items") else raw
+            return {name: _trait_value(kind) for name, kind in pairs}
+        except Exception:
+            return {}
+
     def should_validate(self, tool_name: str, *, tool: Any = None) -> bool:
         """Check if this tool should have its code validated and auto-fixed.
 
-        Correction is gated on the tool's *semantic contract*, not a name list: only
-        executable-code tools qualify. A tool qualifies iff (a) its canonical name is in
-        ``executable_code_tools``, OR (b) its resolved contract declares
-        ``access_mode == EXECUTE`` / ``execution_category in {COMPUTE, EXECUTE}``. File
-        tools (``access_mode == WRITE``) and unknown tools never qualify (fail-safe).
+        Correction is gated on the tool's *semantic contract*, not a name list. A tool
+        qualifies iff any of: (a) its canonical name is in ``executable_code_tools``;
+        (b) its contract declares ``access_mode == EXECUTE`` /
+        ``execution_category in {COMPUTE, EXECUTE}``; or (c) it declares an
+        ``argument_kinds`` entry of ``EXECUTABLE_CODE`` (FEP-0024 per-argument kind).
+        File tools (``access_mode == WRITE``), tools declaring only ``FILE_CONTENT``/
+        ``DATA`` args, and unknown tools never qualify (fail-safe).
 
         Args:
             tool_name: Name of the tool (canonicalized; aliases resolve to canonical).
-            tool: Optional tool object whose ``access_mode``/``execution_category``
-                contract traits can be inspected. When omitted, only the name allowlist
-                decides.
+            tool: Optional tool object whose ``access_mode``/``execution_category``/
+                ``argument_kinds`` contract traits can be inspected.
 
         Returns:
             True if code correction should be applied to this tool's arguments.
@@ -177,6 +199,11 @@ class CodeCorrectionMiddleware:
         if get_canonical_name(tool_name) in self.config.executable_code_tools:
             return True
         if tool is not None:
+            if any(
+                kind == self._EXECUTABLE_CODE_KIND
+                for kind in self._argument_kinds_for(tool).values()
+            ):
+                return True
             access_mode = _trait_value(getattr(tool, "access_mode", None))
             execution_category = _trait_value(getattr(tool, "execution_category", None))
             if access_mode == "execute" or execution_category in ("compute", "execute"):
@@ -207,31 +234,89 @@ class CodeCorrectionMiddleware:
         """
         if not self.should_validate(tool_name, tool=tool):
             return arguments, None
+        code_arg = self.find_code_argument(arguments, tool=tool)
+        if not code_arg:
+            return arguments, None
+        arg_name, code = code_arg
         try:
-            result = self.validate_and_fix(tool_name, arguments)
+            fixed_code, validation = self._correct_code(tool_name, code)
         except (ValueError, TypeError, KeyError) as e:
             logger.warning("code-correction failed for %s: %s", tool_name, e)
             return arguments, None
-        if not result.was_corrected:
+        was_corrected = fixed_code != code
+        result = CorrectionResult(
+            code,
+            fixed_code,
+            validation,
+            was_corrected,
+            (
+                self.corrector.generate_feedback(code=code, validation=validation)
+                if not validation.valid
+                else None
+            ),
+        )
+        if not was_corrected:
             return arguments, result
-        new_arguments = self.apply_correction(arguments, result)
-        code_arg = self.find_code_argument(arguments)
+        new_arguments = dict(arguments)
+        new_arguments[arg_name] = fixed_code
         logger.info(
             "code-corrected tool=%s arg=%s lang=%s before=%d after=%d",
             tool_name,
-            code_arg[0] if code_arg else "?",
-            _trait_value(result.validation.language),
-            len(result.original_code),
-            len(result.corrected_code),
+            arg_name,
+            _trait_value(validation.language),
+            len(code),
+            len(fixed_code),
         )
         return new_arguments, result
 
-    def find_code_argument(self, arguments: Dict[str, Any]) -> Optional[Tuple[str, str]]:
-        """Find the code argument in tool arguments."""
+    def find_code_argument(
+        self, arguments: Dict[str, Any], *, tool: Any = None
+    ) -> Optional[Tuple[str, str]]:
+        """Find the correctable code argument in tool arguments.
+
+        When the tool declares ``argument_kinds`` (FEP-0024), only the argument marked
+        ``EXECUTABLE_CODE`` is correctable — ``FILE_CONTENT``/``DATA`` are skipped, and
+        the name allowlist is ignored so an executable arg can have any name. Without
+        declared kinds, the legacy name-allowlist match applies.
+        """
+        kinds = self._argument_kinds_for(tool)
+        if kinds:
+            for arg_name, kind in kinds.items():
+                if kind != self._EXECUTABLE_CODE_KIND:
+                    continue
+                value = arguments.get(arg_name)
+                if isinstance(value, str) and value.strip():
+                    return (arg_name, value)
+            return None
         for arg_name in self.config.code_argument_names:
             if (value := arguments.get(arg_name)) and isinstance(value, str) and value.strip():
                 return (arg_name, value)
         return None
+
+    def _correct_code(
+        self,
+        tool_name: str,
+        code: str,
+        language_hint: Optional[str] = None,
+    ) -> Tuple[str, CodeValidationResult]:
+        """Detect language, run the corrector, and record metrics.
+
+        Shared by :meth:`process` and :meth:`validate_and_fix` so language detection and
+        metrics stay in one place.
+        """
+        lang = (
+            detect_language(code, filename=f"code.{language_hint}")
+            if language_hint
+            else (
+                Language.PYTHON
+                if tool_name in {"code_executor", "execute_code", "run_code"}
+                else detect_language(code)
+            )
+        )
+        fixed_code, validation = self.corrector.validate_and_fix(code, language=lang)
+        if self.metrics_collector:
+            self.metrics_collector.record_validation(lang, validation)
+        return fixed_code, validation
 
     def validate_and_fix(
         self,
@@ -249,9 +334,8 @@ class CodeCorrectionMiddleware:
         Returns:
             CorrectionResult with validation status and corrected code
         """
-        # Find the code argument
+        # Find the code argument (name-allowlist path; prefer process() for kinds-aware gating)
         code_arg = self.find_code_argument(arguments)
-
         if not code_arg:
             return CorrectionResult(
                 "",
@@ -260,24 +344,8 @@ class CodeCorrectionMiddleware:
                 False,
             )
 
-        arg_name, code = code_arg
-
-        # Detect language
-        lang = (
-            detect_language(code, filename=f"code.{language_hint}")
-            if language_hint
-            else (
-                Language.PYTHON
-                if tool_name in {"code_executor", "execute_code", "run_code"}
-                else detect_language(code)
-            )
-        )
-
-        # Validate and fix
-        fixed_code, validation = self.corrector.validate_and_fix(code, language=lang)
-
-        if self.metrics_collector:
-            self.metrics_collector.record_validation(lang, validation)
+        _arg_name, code = code_arg
+        fixed_code, validation = self._correct_code(tool_name, code, language_hint)
 
         return CorrectionResult(
             code,
