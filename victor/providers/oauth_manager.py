@@ -84,6 +84,7 @@ def _chatgpt_account_id_from_tokens(tokens: Optional[SSOTokens]) -> Optional[str
             return claims["chatgpt_account_id"]
     return None
 
+
 # OAuth client ID environment variables (highest priority)
 OAUTH_CLIENT_ID_ENV_VARS = {
     "openai": "VICTOR_OPENAI_OAUTH_CLIENT_ID",

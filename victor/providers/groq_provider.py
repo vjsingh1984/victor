@@ -11,7 +11,6 @@ from victor.providers.openai_compat_model_policy import get_openai_compat_provid
 from victor.providers.payload_limiter import ProviderPayloadLimiter, TruncationStrategy
 from victor.providers.sandhi_openai_compat_policy import SandhiOpenAICompatPolicy
 
-
 _SPEC = get_openai_compat_provider_spec("groq")
 DEFAULT_BASE_URL = _SPEC.base_url
 GROQ_MODELS = {model: dict(metadata) for model, metadata in _SPEC.models.items()}
@@ -35,9 +34,7 @@ class GroqProvider(SandhiOpenAICompatPolicy):
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         return self._add_queue_time(super()._parse_response(result, model))
 
-    def _completion_from_typed(
-        self, response: Dict[str, Any], model: str
-    ) -> CompletionResponse:
+    def _completion_from_typed(self, response: Dict[str, Any], model: str) -> CompletionResponse:
         return self._add_queue_time(super()._completion_from_typed(response, model))
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

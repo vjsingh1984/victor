@@ -9,7 +9,6 @@ from typing import Any, Dict, Optional
 from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
 from victor.providers.sandhi_openai_compat_policy import SandhiOpenAICompatPolicy
 
-
 _SPEC = get_openai_compat_provider_spec("zai")
 ZAI_BASE_URLS = {name: f"{url}/" for name, url in _SPEC.endpoint_options.items()}
 ZAI_MODELS = {model: dict(metadata) for model, metadata in _SPEC.models.items()}
@@ -88,9 +87,7 @@ class ZAIProvider(SandhiOpenAICompatPolicy):
 
     def _extract_stream_metadata(self, delta: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         reasoning = delta.get("reasoning_content")
-        return (
-            {"reasoning_content": reasoning, "thinking_mode": True} if reasoning else None
-        )
+        return {"reasoning_content": reasoning, "thinking_mode": True} if reasoning else None
 
     def context_window(self, model: Optional[str] = None) -> int:
         return super().context_window(self._clean_model_name(model or ""))

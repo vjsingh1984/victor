@@ -17,7 +17,6 @@
 from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
 from victor.providers.sandhi_openai_compat_policy import SandhiOpenAICompatPolicy
 
-
 _SPEC = get_openai_compat_provider_spec("together")
 DEFAULT_BASE_URL = _SPEC.base_url
 TOGETHER_MODELS = {model: dict(metadata) for model, metadata in _SPEC.models.items()}

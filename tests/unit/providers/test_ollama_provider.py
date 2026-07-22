@@ -135,5 +135,3 @@ class TestEndpointDiscovery:
         )
         # Should fall back to default
         assert provider is not None
-
-

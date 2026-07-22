@@ -14,7 +14,6 @@ from victor.providers.base import CompletionResponse, Message, StreamChunk, Tool
 from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
 from victor.providers.sandhi_openai_compat_policy import SandhiOpenAICompatPolicy
 
-
 logger = logging.getLogger(__name__)
 _SPEC = get_openai_compat_provider_spec("deepseek")
 DEFAULT_BASE_URL = _SPEC.base_url
@@ -55,11 +54,11 @@ class DeepSeekProvider(SandhiOpenAICompatPolicy):
 
     _DSML_OPEN = re.compile(r"<｜{1,2}DSML｜{1,2}tool_calls\s*>", re.IGNORECASE)
     _DSML_INVOKE = re.compile(
-        r'<｜{1,2}DSML｜{1,2}invoke\s+name="([^"]+)"\s*>(.*?)</｜{0,2}DSML｜{0,2}invoke\s*>' ,
+        r'<｜{1,2}DSML｜{1,2}invoke\s+name="([^"]+)"\s*>(.*?)</｜{0,2}DSML｜{0,2}invoke\s*>',
         re.DOTALL | re.IGNORECASE,
     )
     _DSML_PARAM = re.compile(
-        r'<｜{1,2}DSML｜{1,2}parameter\s+name="([^"]+)"\s+string="(true|false)"\s*>(.*?)</｜{0,2}DSML｜{0,2}parameter\s*>' ,
+        r'<｜{1,2}DSML｜{1,2}parameter\s+name="([^"]+)"\s+string="(true|false)"\s*>(.*?)</｜{0,2}DSML｜{0,2}parameter\s*>',
         re.DOTALL | re.IGNORECASE,
     )
 
@@ -92,9 +91,7 @@ class DeepSeekProvider(SandhiOpenAICompatPolicy):
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         return self._repair_dsml(super()._parse_response(result, model))
 
-    def _completion_from_typed(
-        self, response: Dict[str, Any], model: str
-    ) -> CompletionResponse:
+    def _completion_from_typed(self, response: Dict[str, Any], model: str) -> CompletionResponse:
         return self._repair_dsml(super()._completion_from_typed(response, model))
 
     def _repair_dsml(self, response: CompletionResponse) -> CompletionResponse:
@@ -134,9 +131,7 @@ class DeepSeekProvider(SandhiOpenAICompatPolicy):
             return
         calls = self._parse_dsml_tool_calls("".join(chunk.content for chunk in buffered))
         if calls:
-            yield StreamChunk(
-                content="", tool_calls=calls, stop_reason="tool_calls", is_final=True
-            )
+            yield StreamChunk(content="", tool_calls=calls, stop_reason="tool_calls", is_final=True)
             return
         for chunk in buffered:
             yield chunk

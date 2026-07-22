@@ -113,6 +113,7 @@ def test_qwen_config_registry_keeps_host_auth_selection() -> None:
 
     config = QwenConfig()
     settings = MagicMock()
-    assert config.get_settings(settings, {"auth_mode": "oauth"})["base_url"] == QWEN_BASE_URLS[
-        "portal"
-    ]
+    assert (
+        config.get_settings(settings, {"auth_mode": "oauth"})["base_url"]
+        == QWEN_BASE_URLS["portal"]
+    )

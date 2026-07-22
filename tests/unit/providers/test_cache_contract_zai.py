@@ -74,6 +74,6 @@ class TestZAIPromptCachingFlag:
         ):
             func = dict(inspect.getmembers(ZAIProvider))[method_name]
             owner = func.__qualname__.split(".")[0]
-            assert owner == "SandhiOpenAICompatPolicy", (
-                f"{method_name} should resolve to shared model policy, but resolves to {owner}"
-            )
+            assert (
+                owner == "SandhiOpenAICompatPolicy"
+            ), f"{method_name} should resolve to shared model policy, but resolves to {owner}"

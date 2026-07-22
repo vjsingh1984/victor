@@ -26,7 +26,7 @@ class FakeAnthropicHandle:
                 "model": "claude-test",
                 "output": {
                     "content": "answer",
-                    "tool_calls": [{"id": "t1", "name": "lookup", "arguments": "{\"q\":1}"}],
+                    "tool_calls": [{"id": "t1", "name": "lookup", "arguments": '{"q":1}'}],
                 },
                 "finish_reason": "tool_calls",
                 "usage": {
@@ -92,8 +92,7 @@ def make_provider() -> st.SandhiAnthropicProvider:
 
 def test_resolver_uses_typed_anthropic(runtime):
     assert (
-        st.resolve_transport_class("anthropic", AnthropicProvider, {})
-        is st.SandhiAnthropicProvider
+        st.resolve_transport_class("anthropic", AnthropicProvider, {}) is st.SandhiAnthropicProvider
     )
 
 

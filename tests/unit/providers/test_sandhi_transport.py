@@ -42,9 +42,7 @@ class FakeTypedProvider:
                 "model": "deepseek-chat",
                 "output": {
                     "content": "hello",
-                    "tool_calls": [
-                        {"id": "c1", "name": "lookup", "arguments": "{\"q\":1}"}
-                    ],
+                    "tool_calls": [{"id": "c1", "name": "lookup", "arguments": '{"q":1}'}],
                 },
                 "finish_reason": "tool_calls",
                 "usage": {
@@ -77,7 +75,7 @@ class FakeTypedProvider:
                 {"event": "text_delta", "delta": "he"},
                 {"event": "reasoning_delta", "delta": "think"},
                 {"event": "tool_call_start", "index": 0, "id": "c1", "name": "lookup"},
-                {"event": "tool_call_arguments_delta", "index": 0, "delta": "{\"q\":"},
+                {"event": "tool_call_arguments_delta", "index": 0, "delta": '{"q":'},
                 {"event": "tool_call_arguments_delta", "index": 0, "delta": "1}"},
                 {"event": "tool_call_end", "index": 0},
                 {"event": "finish", "reason": "tool_calls"},
@@ -190,9 +188,7 @@ async def test_openai_oauth_explicitly_selects_responses_and_refreshes_before_ha
     assert json.loads(kwargs["headers_json"])["ChatGPT-Account-ID"] == "workspace_123"
     request = runtime.handle.requests[0]
     assert "temperature" not in request
-    assert request["extensions"] == {
-        "openai_responses": {"reasoning": {"effort": "high"}}
-    }
+    assert request["extensions"] == {"openai_responses": {"reasoning": {"effort": "high"}}}
 
 
 def test_resolver_fails_closed_when_binding_is_missing(monkeypatch):
@@ -273,9 +269,7 @@ async def test_stream_consumes_typed_events_without_sse_round_trip(monkeypatch):
     assert chunks[1].metadata == {"reasoning_content": "think"}
     assert chunks[-1].is_final
     assert chunks[-1].stop_reason == "tool_calls"
-    assert chunks[-1].tool_calls == [
-        {"id": "c1", "name": "lookup", "arguments": {"q": 1}}
-    ]
+    assert chunks[-1].tool_calls == [{"id": "c1", "name": "lookup", "arguments": {"q": 1}}]
     assert chunks[-1].usage == {
         "prompt_tokens": 10,
         "completion_tokens": 5,
@@ -328,6 +322,7 @@ def test_non_routine_usage_state_survives_victor_compatibility_mapping():
         "outcome": "success",
         "upstream_request_id": "up_1",
     }
-    assert st._usage_diagnostics(
-        {"attempts": 1, "completeness": "final", "outcome": "success"}
-    ) is None
+    assert (
+        st._usage_diagnostics({"attempts": 1, "completeness": "final", "outcome": "success"})
+        is None
+    )

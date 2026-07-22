@@ -12,7 +12,6 @@ from victor.providers.base import CompletionResponse, Message, StreamChunk, Tool
 from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
 from victor.providers.sandhi_openai_compat_policy import SandhiOpenAICompatPolicy
 
-
 _SPEC = get_openai_compat_provider_spec("cerebras")
 DEFAULT_BASE_URL = _SPEC.base_url
 CEREBRAS_MODELS = {model: dict(metadata) for model, metadata in _SPEC.models.items()}
@@ -115,9 +114,7 @@ class CerebrasProvider(SandhiOpenAICompatPolicy):
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         return _with_cerebras_metadata(super()._parse_response(result, model), model)
 
-    def _completion_from_typed(
-        self, response: Dict[str, Any], model: str
-    ) -> CompletionResponse:
+    def _completion_from_typed(self, response: Dict[str, Any], model: str) -> CompletionResponse:
         return _with_cerebras_metadata(super()._completion_from_typed(response, model), model)
 
     async def stream(

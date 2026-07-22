@@ -56,6 +56,7 @@ def _validate_openai_chat_role(role: Any, *, index: Optional[int] = None) -> str
         raise ValueError(f"{location} must be one of: {supported}; got {role!r}")
     return role
 
+
 # Last-computed stability fingerprints for the serialized tools arrays.
 # Exposed for observability/diagnostics so callers (or tests) can compare the
 # serialized payload across turns without re-serializing. A changed fingerprint

@@ -133,7 +133,9 @@ def map_sandhi_error(exc: BaseException, provider_name: str, timeout: float) -> 
     return ProviderError(
         detail,
         provider=provider_name,
-        status_code=int(status) if status is not None else (400 if code == "invalid_request" else None),
+        status_code=(
+            int(status) if status is not None else (400 if code == "invalid_request" else None)
+        ),
         raw_error=exc,
     )
 
@@ -269,10 +271,15 @@ def _usage_diagnostics(usage: Any) -> Optional[Dict[str, Any]]:
     attempts = int(usage.get("attempts", 1) or 1)
     completeness = usage.get("completeness")
     outcome = usage.get("outcome")
-    if attempts <= 1 and completeness not in {"partial", "unavailable"} and outcome not in {
-        "error",
-        "cancelled",
-    }:
+    if (
+        attempts <= 1
+        and completeness not in {"partial", "unavailable"}
+        and outcome
+        not in {
+            "error",
+            "cancelled",
+        }
+    ):
         return None
     return {
         "attempts": attempts,
@@ -324,7 +331,9 @@ class SandhiTypedProviderMixin:
             catalog_base = str(_sg.provider_spec(slug).get("base_url") or "")
         except Exception:
             catalog_base = ""
-        explicit_base_url = base_url if base_url and base_url.rstrip("/") != catalog_base.rstrip("/") else ""
+        explicit_base_url = (
+            base_url if base_url and base_url.rstrip("/") != catalog_base.rstrip("/") else ""
+        )
         api_key = str(getattr(self, "_api_key", None) or getattr(self, "api_key", "") or "")
         auth_scheme = str(getattr(self, "_sandhi_auth_scheme", "") or "")
         protocol = str(getattr(self, "_sandhi_protocol", "") or "")
@@ -371,12 +380,17 @@ class SandhiTypedProviderMixin:
             "chatgpt_responses",
         }:
             native = extensions.get("openai_responses")
-        if native is None and self._sandhi_slug() not in {"anthropic", "gemini", "cohere", "ollama"}:
+        if native is None and self._sandhi_slug() not in {
+            "anthropic",
+            "gemini",
+            "cohere",
+            "ollama",
+        }:
             native = extensions.get("openai")
         reasoning = extensions.get("reasoning")
         if reasoning is None and isinstance(native, dict):
-            reasoning = (native.get("choices") or [{}])[0].get("message", {}).get(
-                "reasoning_content"
+            reasoning = (
+                (native.get("choices") or [{}])[0].get("message", {}).get("reasoning_content")
             )
         usage = usage_dict_from_neutral(
             response.get("usage"),
@@ -417,9 +431,7 @@ class SandhiTypedProviderMixin:
                         content="", metadata={"reasoning_content": str(event.get("delta", ""))}
                     )
                 elif kind == "refusal_delta":
-                    yield StreamChunk(
-                        content="", metadata={"refusal": str(event.get("delta", ""))}
-                    )
+                    yield StreamChunk(content="", metadata={"refusal": str(event.get("delta", ""))})
                 elif kind == "tool_call_start":
                     calls[int(event.get("index", 0))] = {
                         "id": event.get("id"),
@@ -547,9 +559,7 @@ class SandhiNeutralProviderMixin(SandhiTypedProviderMixin):
         **kwargs: Any,
     ) -> CompletionResponse:
         await self._refresh_host_credentials()
-        request = self._neutral_request(
-            messages, model, temperature, max_tokens, tools, **kwargs
-        )
+        request = self._neutral_request(messages, model, temperature, max_tokens, tools, **kwargs)
         return self._completion_from_typed(await self._sandhi_complete(request), model)
 
     async def stream(
@@ -563,9 +573,7 @@ class SandhiNeutralProviderMixin(SandhiTypedProviderMixin):
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         await self._refresh_host_credentials()
-        request = self._neutral_request(
-            messages, model, temperature, max_tokens, tools, **kwargs
-        )
+        request = self._neutral_request(messages, model, temperature, max_tokens, tools, **kwargs)
         async for chunk in self._sandhi_stream(request):
             yield chunk
 
@@ -614,9 +622,7 @@ class SandhiAnthropicProvider(SandhiTypedProviderMixin, AnthropicProvider):
         **kwargs: Any,
     ) -> CompletionResponse:
         await self._ensure_valid_token()
-        request = self._anthropic_request(
-            messages, model, temperature, max_tokens, tools, **kwargs
-        )
+        request = self._anthropic_request(messages, model, temperature, max_tokens, tools, **kwargs)
         return self._completion_from_typed(await self._sandhi_complete(request), model)
 
     async def stream(
@@ -630,9 +636,7 @@ class SandhiAnthropicProvider(SandhiTypedProviderMixin, AnthropicProvider):
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         await self._ensure_valid_token()
-        request = self._anthropic_request(
-            messages, model, temperature, max_tokens, tools, **kwargs
-        )
+        request = self._anthropic_request(messages, model, temperature, max_tokens, tools, **kwargs)
         async for chunk in self._sandhi_stream(request):
             yield chunk
 

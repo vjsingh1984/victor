@@ -87,9 +87,7 @@ async def test_default_endpoint_is_omitted_from_ffi_for_sandhi_model_routing(mon
             (),
             {
                 "ProviderRuntime": Runtime,
-                "provider_spec": staticmethod(
-                    lambda _provider: {"base_url": DEFAULT_BASE_URL}
-                ),
+                "provider_spec": staticmethod(lambda _provider: {"base_url": DEFAULT_BASE_URL}),
             },
         ),
     )

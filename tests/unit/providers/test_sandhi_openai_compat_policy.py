@@ -28,7 +28,6 @@ from victor.providers.together_provider import TogetherProvider
 from victor.providers.xai_provider import XAIProvider
 from victor.providers.zai_provider import ZAIProvider
 
-
 CONFIGURED_CLASSES = (
     TogetherProvider,
     FireworksProvider,
