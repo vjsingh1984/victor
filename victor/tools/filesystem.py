@@ -2169,7 +2169,7 @@ async def write(
 
     if run_lsp:
         try:
-            from victor.tools.lsp_write_enhancer import write_with_lsp
+            from victor.tools.lsp_write_enhancer import DiagnosticSeverity, write_with_lsp
 
             result = await write_with_lsp(
                 path=str(file_path),
@@ -2196,8 +2196,15 @@ async def write(
             if result.formatted:
                 lsp_info.append(f"formatted with {result.formatter_used}")
             if result.validated:
-                error_count = sum(1 for d in result.diagnostics if d.severity == "error")
-                warning_count = sum(1 for d in result.diagnostics if d.severity == "warning")
+                # Diagnostic.severity is a DiagnosticSeverity Enum (not a str), so compare
+                # against the enum members — a string compare was always False and silently
+                # reported "validation passed" even for error-level diagnostics.
+                error_count = sum(
+                    1 for d in result.diagnostics if d.severity == DiagnosticSeverity.ERROR
+                )
+                warning_count = sum(
+                    1 for d in result.diagnostics if d.severity == DiagnosticSeverity.WARNING
+                )
                 if error_count or warning_count:
                     lsp_info.append(f"{error_count} errors, {warning_count} warnings")
                 else:

@@ -1754,14 +1754,15 @@ class TestToolExecutorCodeCorrection:
         registry.register(mock_tool)
 
         mock_middleware = MagicMock()
-        mock_middleware.should_validate.return_value = True
 
-        # Create correction result
+        # process() is the single entry: returns (possibly corrected args, result)
         mock_correction_result = MagicMock()
         mock_correction_result.was_corrected = True
         mock_correction_result.validation = MagicMock(valid=True, errors=[])
-        mock_middleware.validate_and_fix.return_value = mock_correction_result
-        mock_middleware.apply_correction.return_value = {"code": "fixed code"}
+        mock_middleware.process.return_value = (
+            {"code": "fixed code"},
+            mock_correction_result,
+        )
 
         executor = ToolExecutor(
             tool_registry=registry,
@@ -1772,9 +1773,7 @@ class TestToolExecutorCodeCorrection:
 
         await executor.execute("write_code", {"code": "bad code"})
 
-        mock_middleware.should_validate.assert_called_once_with("write_code")
-        mock_middleware.validate_and_fix.assert_called_once()
-        mock_middleware.apply_correction.assert_called_once()
+        mock_middleware.process.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_code_correction_not_applied_when_disabled(self):
@@ -1799,7 +1798,7 @@ class TestToolExecutorCodeCorrection:
 
         await executor.execute("write_code", {"code": "code"})
 
-        mock_middleware.should_validate.assert_not_called()
+        mock_middleware.process.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_code_correction_validation_errors_logged(self):
@@ -1814,13 +1813,15 @@ class TestToolExecutorCodeCorrection:
         registry.register(mock_tool)
 
         mock_middleware = MagicMock()
-        mock_middleware.should_validate.return_value = True
 
         # Correction result with validation errors but not corrected
         mock_correction_result = MagicMock()
         mock_correction_result.was_corrected = False
         mock_correction_result.validation = MagicMock(valid=False, errors=["Syntax error"])
-        mock_middleware.validate_and_fix.return_value = mock_correction_result
+        mock_middleware.process.return_value = (
+            {"code": "bad code"},
+            mock_correction_result,
+        )
 
         executor = ToolExecutor(
             tool_registry=registry,
@@ -1833,7 +1834,7 @@ class TestToolExecutorCodeCorrection:
 
         # Tool should still execute (validation errors are logged, not blocking)
         assert result.success is True
-        mock_middleware.apply_correction.assert_not_called()
+        mock_middleware.process.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_code_correction_middleware_exception(self):
@@ -1848,8 +1849,7 @@ class TestToolExecutorCodeCorrection:
         registry.register(mock_tool)
 
         mock_middleware = MagicMock()
-        mock_middleware.should_validate.return_value = True
-        mock_middleware.validate_and_fix.side_effect = RuntimeError("Middleware crashed")
+        mock_middleware.process.side_effect = RuntimeError("Middleware crashed")
 
         executor = ToolExecutor(
             tool_registry=registry,

@@ -117,6 +117,32 @@ class SelfCorrector:
             f"auto_fix={auto_fix}, validators={len(self._registry.all_validators)}"
         )
 
+    def validate(
+        self,
+        code: str,
+        language: Optional[Language] = None,
+        filename: Optional[str] = None,
+    ) -> CodeValidationResult:
+        """Read-only validation: return diagnostics WITHOUT mutating code or fixing.
+
+        Use for content that must be preserved verbatim (e.g. file bodies surfaced as
+        feedback). ``validate_and_fix`` is for executable-code tools where auto-fix is
+        appropriate. Preprocess (``clean_markdown``) is non-destructive, so a markdown
+        document is validated as-is and never truncated.
+
+        Args:
+            code: Code/document string to validate.
+            language: Optional language hint (auto-detected if not provided).
+            filename: Optional filename for language detection.
+
+        Returns:
+            CodeValidationResult with diagnostics; the input is never modified.
+        """
+        if language is None:
+            language = self._detector.detect(code, filename)
+        validator = self._registry.get_validator(language)
+        return validator.validate(validator.preprocess(code))
+
     def validate_and_fix(
         self,
         code: str,

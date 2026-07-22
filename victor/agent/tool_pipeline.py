@@ -87,7 +87,10 @@ if TYPE_CHECKING:
     from victor.agent.search_router import SearchRouter
     from victor.tools.registry import ToolRegistry
     from victor.storage.cache.tool_cache import ToolCache
-    from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
+    from victor.agent.code_correction_middleware import (
+        CodeCorrectionMiddleware,
+        CorrectionResult,
+    )
     from victor.agent.signature_store import SignatureStore
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.tool_result_cache import ToolResultCache
@@ -2959,31 +2962,28 @@ class ToolPipeline:
             if edited_path:
                 self._clear_read_tracking_for_file(edited_path)
 
-        # Code correction middleware - validate and fix code arguments
+        # Code correction middleware - validate and fix executable-code arguments.
+        # Gated on the tool's access_mode contract (executable code only); file content is
+        # never auto-corrected (destructive on documents). Single ``process()`` entry is
+        # shared with ToolExecutor so the two execution paths cannot drift.
         code_corrected = False
         code_validation_errors: Optional[List[str]] = None
 
-        if (
-            self.config.enable_code_correction
-            and self.code_correction_middleware is not None
-            and self.code_correction_middleware.should_validate(tool_name)
-        ):
+        if self.config.enable_code_correction and self.code_correction_middleware is not None:
+            correction_result: Optional["CorrectionResult"] = None
             try:
-                correction_result = self.code_correction_middleware.validate_and_fix(
-                    tool_name, normalized_args
+                normalized_args, correction_result = self.code_correction_middleware.process(
+                    tool_name,
+                    normalized_args,
+                    tool=self._resolve_tool_for_correction(tool_name),
                 )
+            except (ValueError, TypeError, KeyError) as e:
+                logger.warning(f"Code correction middleware failed (data error): {e}")
+            except AttributeError as e:
+                logger.debug(f"Code correction middleware not configured: {e}")
 
-                if correction_result.was_corrected:
-                    # Apply the correction
-                    normalized_args = self.code_correction_middleware.apply_correction(
-                        normalized_args, correction_result
-                    )
-                    code_corrected = True
-                    logger.info(
-                        f"Code auto-corrected for tool '{tool_name}': "
-                        f"{len(correction_result.validation.errors)} issues fixed"
-                    )
-
+            if correction_result is not None:
+                code_corrected = correction_result.was_corrected
                 if not correction_result.validation.valid:
                     # Collect validation errors for feedback
                     code_validation_errors = list(correction_result.validation.errors)
@@ -2991,10 +2991,6 @@ class ToolPipeline:
                         f"Code validation errors for tool '{tool_name}': "
                         f"{code_validation_errors}"
                     )
-            except (ValueError, TypeError, KeyError) as e:
-                logger.warning(f"Code correction middleware failed (data error): {e}")
-            except AttributeError as e:
-                logger.debug(f"Code correction middleware not configured: {e}")
 
         # Check for repeated failures
         if self.config.enable_failed_signature_tracking:
@@ -3543,6 +3539,21 @@ class ToolPipeline:
             "remaining": self.calls_remaining,
             "tools": dict(self._tool_stats),
         }
+
+    def _resolve_tool_for_correction(self, tool_name: str) -> Any:
+        """Resolve the tool object for contract-trait gating (access_mode), or None.
+
+        Used by the code-correction step to decide whether a tool is executable-code
+        (``access_mode == EXECUTE``). Returns None if the executor or tool is unavailable;
+        the middleware then falls back to its name allowlist.
+        """
+        try:
+            executor = getattr(self, "executor", None)
+            if executor is None:
+                return None
+            return executor.get_tool_function(tool_name)
+        except Exception:
+            return None
 
     def _get_tool_timeout(self, tool_name: str) -> float:
         """Get effective timeout for a tool, preferring per-tool override.

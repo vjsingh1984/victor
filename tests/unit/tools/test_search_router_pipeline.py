@@ -1586,14 +1586,18 @@ class TestToolPipelineCodeCorrection:
         correction_result.was_corrected = True
         correction_result.validation = validation_result
 
-        mock_correction_middleware.validate_and_fix.return_value = correction_result
+        # process() is the single entry: returns (possibly corrected args, result)
+        mock_correction_middleware.process.return_value = (
+            {"code": "fixed code"},
+            correction_result,
+        )
 
         tool_calls = [{"name": "write_code", "arguments": {"code": "bad code"}}]
         result = await pipeline_with_correction.execute_tool_calls(tool_calls, {})
 
         assert result.successful_calls == 1
-        # Verify apply_correction was called
-        mock_correction_middleware.apply_correction.assert_called()
+        # Verify process() was called (the unified correction entry)
+        mock_correction_middleware.process.assert_called()
 
     @pytest.mark.asyncio
     async def test_code_correction_validation_errors(
@@ -1609,7 +1613,10 @@ class TestToolPipelineCodeCorrection:
         correction_result.was_corrected = False
         correction_result.validation = validation_result
 
-        mock_correction_middleware.validate_and_fix.return_value = correction_result
+        mock_correction_middleware.process.return_value = (
+            {"code": "invalid"},
+            correction_result,
+        )
 
         tool_calls = [{"name": "write_code", "arguments": {"code": "invalid"}}]
         result = await pipeline_with_correction.execute_tool_calls(tool_calls, {})
@@ -1625,7 +1632,7 @@ class TestToolPipelineCodeCorrection:
     ):
         """Test that middleware exceptions are handled gracefully."""
         # Use ValueError since we now catch specific exception types
-        mock_correction_middleware.validate_and_fix.side_effect = ValueError("Middleware error")
+        mock_correction_middleware.process.side_effect = ValueError("Middleware error")
 
         tool_calls = [{"name": "write_code", "arguments": {"code": "test"}}]
         result = await pipeline_with_correction.execute_tool_calls(tool_calls, {})

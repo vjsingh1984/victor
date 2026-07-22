@@ -12,30 +12,23 @@ Design Pattern: Middleware/Interceptor Pattern
 - Provides feedback for failed validations
 
 Integration Points:
-- ToolPipeline: Called during argument processing
-- code_executor: Validates Python code before execution
-- file_editor: Validates code in file content
-- write: Validates code in file content
+- ToolPipeline / ToolExecutor: the single ``process()`` entry (argument processing)
+- code_executor / execute_code / run_code: validate + fix executable code before it runs
 
-Usage:
-    from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
-
-    middleware = CodeCorrectionMiddleware(enabled=True)
-
-    # In tool pipeline, before execution:
-    if middleware.should_validate(tool_name):
-        validated_args, validation = middleware.validate_and_fix(
-            tool_name, arguments
-        )
-        if not validation.valid and not middleware.auto_fix:
-            # Return feedback to LLM for retry
-            feedback = middleware.get_feedback(validation)
+Scope (important): correction (mutation) applies ONLY to executable-code tools — tools
+whose declared contract is ``access_mode == EXECUTE`` (code that runs immediately, where an
+auto-fix is useful). File-authoring tools (write/edit/file_editor, ``access_mode == WRITE``)
+are NEVER auto-corrected: their ``content``/``new_content`` is an authored document
+(markdown/prose/config/mixed-language), not a single code blob, and silently mutating it is
+destructive (it truncated markdown docs to one code block → agent rewrite loops). File
+content gets read-only LSP diagnostics via ``victor.tools.lsp_write_enhancer`` instead.
 
 Enterprise Integration Pattern: Intercepting Filter
 """
 
 from __future__ import annotations
 
+import enum
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Set, Tuple
@@ -49,9 +42,16 @@ from victor.evaluation.correction import (
     create_self_corrector,
     CorrectionMetricsCollector,
 )
-from victor.tools.tool_names import ToolNames, get_canonical_name
+from victor.tools.tool_names import get_canonical_name
 
 logger = logging.getLogger(__name__)
+
+
+def _trait_value(value: Any) -> str:
+    """Normalize a tool-trait value (Enum or str) to a comparable lowercase string."""
+    if isinstance(value, enum.Enum):
+        value = value.value
+    return str(value).lower() if value is not None else ""
 
 
 @dataclass
@@ -63,30 +63,31 @@ class CodeCorrectionConfig:
     max_iterations: int = 1
     collect_metrics: bool = True
 
-    # Use frozensets for better performance
-    code_tools: Set[str] = field(
+    # Tools that EXECUTE generated code immediately (their code argument runs right now),
+    # so an auto-fix is safe and useful. File-authoring tools (write/edit/file_editor) are
+    # deliberately ABSENT: their content is an authored document, not executable code, and
+    # auto-"correcting" it is destructive (see module docstring). New code-execution tools
+    # are also picked up automatically by the access_mode trait gate in ``should_validate``.
+    executable_code_tools: Set[str] = field(
         default_factory=lambda: frozenset(
             {
                 "code_executor",
                 "execute_code",
                 "run_code",
-                ToolNames.WRITE,
-                "file_editor",
-                ToolNames.EDIT,
             }
         )
     )
 
+    # Argument names that carry executable code (for execution tools only). File-content
+    # argument names (``content``/``new_content``/``file_content``) are intentionally
+    # excluded — they are never treated as correctable code.
     code_argument_names: Set[str] = field(
         default_factory=lambda: frozenset(
             {
                 "code",
                 "python_code",
-                "content",
                 "source",
                 "script",
-                "new_content",
-                "file_content",
             }
         )
     )
@@ -153,18 +154,77 @@ class CodeCorrectionMiddleware:
             )
         return self._corrector
 
-    def should_validate(self, tool_name: str) -> bool:
-        """Check if this tool should have its code validated.
+    def should_validate(self, tool_name: str, *, tool: Any = None) -> bool:
+        """Check if this tool should have its code validated and auto-fixed.
+
+        Correction is gated on the tool's *semantic contract*, not a name list: only
+        executable-code tools qualify. A tool qualifies iff (a) its canonical name is in
+        ``executable_code_tools``, OR (b) its resolved contract declares
+        ``access_mode == EXECUTE`` / ``execution_category in {COMPUTE, EXECUTE}``. File
+        tools (``access_mode == WRITE``) and unknown tools never qualify (fail-safe).
 
         Args:
-            tool_name: Name of the tool
+            tool_name: Name of the tool (canonicalized; aliases resolve to canonical).
+            tool: Optional tool object whose ``access_mode``/``execution_category``
+                contract traits can be inspected. When omitted, only the name allowlist
+                decides.
 
         Returns:
-            True if code validation should be applied
+            True if code correction should be applied to this tool's arguments.
         """
         if not self.config.enabled:
             return False
-        return get_canonical_name(tool_name) in self.config.code_tools
+        if get_canonical_name(tool_name) in self.config.executable_code_tools:
+            return True
+        if tool is not None:
+            access_mode = _trait_value(getattr(tool, "access_mode", None))
+            execution_category = _trait_value(getattr(tool, "execution_category", None))
+            if access_mode == "execute" or execution_category in ("compute", "execute"):
+                return True
+        return False
+
+    def process(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        *,
+        tool: Any = None,
+    ) -> Tuple[Dict[str, Any], Optional[CorrectionResult]]:
+        """Single pipeline entry: gate → validate_and_fix → apply_correction → audit.
+
+        Both tool-execution sites (ToolPipeline and ToolExecutor) call this so the logic
+        lives in one place and cannot drift. Returns the (possibly mutated) arguments and
+        the CorrectionResult (or ``None`` when correction did not apply). Callers map the
+        result onto ``ToolCallResult.code_corrected`` / ``code_validation_errors``.
+
+        Args:
+            tool_name: Name of the tool being executed.
+            arguments: Normalized tool arguments (not mutated; a copy is returned if changed).
+            tool: Optional tool object for contract-trait gating (see ``should_validate``).
+
+        Returns:
+            ``(arguments, correction_result)`` — arguments unchanged if not corrected.
+        """
+        if not self.should_validate(tool_name, tool=tool):
+            return arguments, None
+        try:
+            result = self.validate_and_fix(tool_name, arguments)
+        except (ValueError, TypeError, KeyError) as e:
+            logger.warning("code-correction failed for %s: %s", tool_name, e)
+            return arguments, None
+        if not result.was_corrected:
+            return arguments, result
+        new_arguments = self.apply_correction(arguments, result)
+        code_arg = self.find_code_argument(arguments)
+        logger.info(
+            "code-corrected tool=%s arg=%s lang=%s before=%d after=%d",
+            tool_name,
+            code_arg[0] if code_arg else "?",
+            _trait_value(result.validation.language),
+            len(result.original_code),
+            len(result.corrected_code),
+        )
+        return new_arguments, result
 
     def find_code_argument(self, arguments: Dict[str, Any]) -> Optional[Tuple[str, str]]:
         """Find the code argument in tool arguments."""
