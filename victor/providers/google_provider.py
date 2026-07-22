@@ -96,6 +96,9 @@ class GoogleProvider(BaseProvider):
         self._provider_logger = ProviderLogger("google", __name__)
         self._oauth_manager = None
         self._current_token = None
+        # Sandhi owns transport: pick the auth scheme the typed variant passes to the Gemini
+        # handle. OAuth/ADC → Authorization: Bearer; API key → x-goog-api-key.
+        self._sandhi_auth_scheme = "bearer" if auth_mode == "oauth" else "api_key"
 
         if auth_mode == "oauth":
             # OAuth mode: use Google subscription (AI Pro/Ultra) instead of API key
@@ -129,7 +132,9 @@ class GoogleProvider(BaseProvider):
             )
             self._google_credentials = creds
             self._current_token = access_token
-            self._api_key = "oauth"
+            # The access token (or a placeholder until _ensure_valid_token refreshes it) is what
+            # Sandhi sends as Authorization: Bearer via the typed Gemini handle.
+            self._api_key = access_token or "oauth-pending"
 
             self._provider_logger.log_provider_init(
                 model="gemini",
@@ -138,7 +143,7 @@ class GoogleProvider(BaseProvider):
                 config={"timeout": timeout, "safety_level": safety_level, **kwargs},
             )
 
-            super().__init__(api_key="oauth", timeout=timeout, **kwargs)
+            super().__init__(api_key=self._api_key, timeout=timeout, **kwargs)
         else:
             # Standard API key mode
             self._google_credentials = None
@@ -224,6 +229,8 @@ class GoogleProvider(BaseProvider):
                 client_secret="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",
             )
             self._current_token = token
+            # Keep _api_key in sync so the Sandhi Gemini handle receives the refreshed token.
+            self._api_key = token
 
     async def chat(
         self,
