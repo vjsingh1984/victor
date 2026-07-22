@@ -1,505 +1,732 @@
-"""Flag-gated in-process sandhi transport pilot (FEP-0020 Phase 4b / ADR-0047 D10 step 4).
+"""Sandhi-backed provider execution for Victor.
 
-Routes the WIRE layer of selected providers through the ``sandhi_gateway`` binding
-(Rust reqwest + decorator stack) while every keep-in-victor concern — prompt assembly,
-tool-format translation, SSE→StreamChunk parsing, usage parsing, resilience, logging —
-continues to run in the unmodified native adapter code. The sandhi variant of a provider
-is the native class with only its wire seams overridden: both seams for the OpenAI-compat
-pilot family, and (wave 2a) the NON-STREAMING seam only for Anthropic — Anthropic
-streaming stays fully native pending the wave 2b go/no-go.
-
-Default OFF and byte-identical when off: :func:`resolve_transport_class` returns the native
-class unless the provider is named in ``VICTOR_SANDHI_TRANSPORT_PROVIDERS`` (or the
-programmatic override) AND the binding is importable AND a variant exists for that class.
-It never raises.
-
-Resilience layering (cross-design contract, pinned by the no-double-request parity test):
-victor's ``ResilientProvider``/circuit breaker stay the only retry owner — the binding is
-always called with ``max_retries=0``; sandhi owns the socket-level timeouts
-(``timeout_secs``/``stream_idle_timeout_secs``). Sandhi's circuit-open maps to
-``ProviderConnectionError`` and is never a demotion cause.
+Sandhi is the provider/wire boundary. Victor constructs prompts and tools, submits the
+versioned neutral chat contract over the in-process binding, and consumes neutral responses
+and stream events directly. There is deliberately no raw provider-JSON FFI, SSE re-encoding,
+demotion state, or replay on a second transport.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-import logging
-import os
-import re
-from typing import Any, AsyncIterator, Dict, FrozenSet, Iterable, Optional, Tuple, Type
+from json import JSONDecodeError
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Type
 
 from victor.providers.anthropic_provider import AnthropicProvider
 from victor.providers.base import (
     BaseProvider,
+    CompletionResponse,
+    Message,
     ProviderAuthError,
     ProviderConnectionError,
     ProviderError,
     ProviderRateLimitError,
     ProviderTimeoutError,
+    StreamChunk,
+    ToolDefinition,
 )
-from victor.providers.deepseek_provider import DeepSeekProvider
 from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
-from victor.providers.xai_provider import XAIProvider
-from victor.providers.zai_provider import ZAIProvider
+from victor.providers.google_provider import GoogleProvider
+from victor.providers.llamacpp_provider import LlamaCppProvider
+from victor.providers.lmstudio_provider import LMStudioProvider
+from victor.providers.ollama_provider import OllamaProvider
+from victor.providers.openai_provider import OpenAIProvider
+from victor.providers.vllm_provider import VLLMProvider
+from victor.providers.openai_compat import build_openai_messages, convert_tools_to_openai_format
+from victor.providers.usage_parsing import usage_dict_from_neutral
 
-logger = logging.getLogger(__name__)
-
-try:  # optional dependency (victor[sandhi])
+try:
     import sandhi_gateway as _sg  # type: ignore[import-untyped]
-except Exception:  # pragma: no cover — absent without the extra
+except Exception:  # pragma: no cover - diagnosed at provider construction
     _sg = None
 
-_warned_binding_missing = False
-_enabled_override: Optional[FrozenSet[str]] = None
 
-_ENV_VAR = "VICTOR_SANDHI_TRANSPORT_PROVIDERS"
+# These are deliberately outside TD-0002's admitted typed set because they use a
+# different protocol or execution model. Keep the aliases synchronized with the
+# registry. Every other Victor-owned provider must resolve to a Sandhi transport.
+VICTOR_NATIVE_ONLY_PROVIDER_ALIASES = frozenset(
+    {
+        "applesilicon",
+        "aws",
+        "azure",
+        "azure-openai",
+        "bedrock",
+        "hf",
+        "huggingface",
+        "mlx",
+        "mlx-lm",
+        "replicate",
+        "vertex",
+        "vertexai",
+    }
+)
 
 
 def sandhi_transport_available() -> bool:
-    """True when the sandhi_gateway binding is importable."""
-    return _sg is not None
-
-
-def set_sandhi_transport_providers(names: Optional[Iterable[str]]) -> None:
-    """Programmatic override of the enabled set (``None`` falls back to the env var).
-
-    Called by settings-aware bootstrap code (e.g. the agent factory) so
-    ``Settings.sandhi_transport_providers`` wins over the raw environment.
-    """
-    global _enabled_override
-    _enabled_override = (
-        None
-        if names is None
-        else frozenset(str(n).strip().lower() for n in names if str(n).strip())
-    )
-
-
-def configure_from_settings(settings: Any) -> None:
-    """Bridge ``Settings.sandhi_transport_providers`` into the resolver (bootstrap seam).
-
-    Called by the agent factory so YAML/profile-configured values reach provider creation
-    (the resolver otherwise only sees the env var). An empty list means "not configured" —
-    the env fallback stays active. Never raises.
-    """
-    try:
-        names = getattr(settings, "sandhi_transport_providers", None) if settings else None
-        set_sandhi_transport_providers(names or None)
-    except Exception as exc:  # never let the pilot break bootstrap
-        logger.debug("sandhi transport settings bridge failed (ignored): %s", exc)
-
-
-def _enabled_providers() -> FrozenSet[str]:
-    if _enabled_override is not None:
-        return _enabled_override
-    raw = os.environ.get(_ENV_VAR, "")
-    return frozenset(part.strip().lower() for part in raw.split(",") if part.strip())
+    return _sg is not None and hasattr(_sg, "ProviderRuntime")
 
 
 def resolve_transport_class(
     name: str, native_cls: Type[BaseProvider], kwargs: Dict[str, Any]
 ) -> Type[BaseProvider]:
-    """The class ``registry.create`` should instantiate: sandhi variant or native.
+    """Return the Sandhi consumer for every admitted provider family.
 
-    Exception-free by contract: any internal failure logs at debug and returns the
-    native class. Alias names resolve through the registry alias map so e.g. ``grok``
-    enables the ``xai`` variant.
+    Providers outside the admitted migration set retain their existing implementation. A
+    migrated provider never silently falls back: a missing binding is an installation error,
+    because replaying after an FFI failure can duplicate a billed/tool-producing request.
     """
-    global _warned_binding_missing
-    try:
-        enabled = _enabled_providers()
-        if not enabled:
-            return native_cls
-        candidates = {name.strip().lower()}
-        try:
-            from victor.providers.registry import ProviderRegistry
-
-            candidates.add(ProviderRegistry.get_aliases().get(name, name).strip().lower())
-        except Exception:  # registry unavailable — match on the raw name only
-            pass
-        if not (candidates & enabled):
-            return native_cls
-        if _sg is None:
-            if not _warned_binding_missing:
-                _warned_binding_missing = True
-                logger.warning(
-                    "sandhi transport enabled for %s but the sandhi-gateway binding is not "
-                    "installed (pip install 'victor-ai[sandhi]'); using native transport",
-                    sorted(enabled),
-                )
-            return native_cls
-        if kwargs.get("auth_mode") == "oauth":
-            return native_cls  # binding sends x-api-key only — OAuth stays native
-        variant = _SANDHI_VARIANTS.get(native_cls)
-        return variant if variant is not None else native_cls
-    except Exception as exc:  # never let the pilot break provider creation
-        logger.debug("sandhi transport resolution failed (native fallback): %s", exc)
+    normalized_name = name.lower()
+    if normalized_name in VICTOR_NATIVE_ONLY_PROVIDER_ALIASES:
         return native_cls
+    if issubclass(native_cls, SandhiTypedProviderMixin):
+        variant = native_cls
+    else:
+        variant = _SANDHI_VARIANTS.get(native_cls)
+    if variant is None and issubclass(native_cls, HttpxOpenAICompatProvider):
+        variant = _dynamic_httpx_variant(native_cls)
+    if variant is None and native_cls.__module__.startswith("victor.providers."):
+        raise ProviderConnectionError(
+            f"Victor provider {name!r} is not classified as Sandhi-typed or native-only",
+            provider=name,
+        )
+    if variant is None:
+        return native_cls
+    if not sandhi_transport_available():
+        raise ProviderConnectionError(
+            "sandhi-gateway 0.1.2 is required for provider transport",
+            provider=name,
+        )
+    return variant
 
 
-class SandhiTransportUnavailable(Exception):
-    """Internal demotion marker: a binding-level failure (not an upstream-semantic error).
-
-    Never escapes the mixin — it triggers one-way demotion to the native wire path.
-    """
-
-
-_STATUS_RE = re.compile(r"upstream status (\d{3})")
+def _typed_error_payload(message: str) -> Optional[Dict[str, Any]]:
+    try:
+        value = json.loads(message)
+    except (TypeError, ValueError):
+        return None
+    return value if isinstance(value, dict) and isinstance(value.get("code"), str) else None
 
 
-def map_sandhi_error(
-    exc: BaseException, provider_name: str, timeout: float
-) -> Optional[ProviderError]:
-    """Map a binding error to victor's typed taxonomy; ``None`` means binding-internal.
-
-    The binding raises ``RuntimeError`` with deterministic ``Display`` prefixes, and (post
-    sandhi PR-S3) builtin ``TimeoutError`` for decorator timeouts.
-    """
-    if isinstance(exc, TimeoutError):
+def map_sandhi_error(exc: BaseException, provider_name: str, timeout: float) -> ProviderError:
+    """Map `ProviderErrorV1` from the FFI without changing retry ownership."""
+    if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
         return ProviderTimeoutError(
             f"sandhi transport timed out: {exc}", provider=provider_name, timeout=timeout
         )
-    if not isinstance(exc, RuntimeError):
-        return None
-    msg = str(exc)
-    if "rate limited (429)" in msg:
-        return ProviderRateLimitError(msg, provider=provider_name, status_code=429)
-    if "auth failed (401/403)" in msg:
-        return ProviderAuthError(msg, provider=provider_name, status_code=401)
-    if "timed out after" in msg:
-        return ProviderTimeoutError(msg, provider=provider_name, timeout=timeout)
-    if "circuit open" in msg:
-        # Sandhi's shared breaker opened: upstream failing. Connection-class error;
-        # explicitly NOT a demotion cause (the native path would be failing too).
-        return ProviderConnectionError(msg, provider=provider_name)
-    match = _STATUS_RE.search(msg)
-    if match:
-        status = int(match.group(1))
-        if status == 429:
-            return ProviderRateLimitError(msg, provider=provider_name, status_code=status)
-        if status in (401, 403):
-            return ProviderAuthError(msg, provider=provider_name, status_code=status)
-        return ProviderError(msg, provider=provider_name, status_code=status)
-    if "transport error:" in msg:
-        lowered = msg.lower()
-        if "timed out" in lowered or "timeout" in lowered:
-            return ProviderTimeoutError(msg, provider=provider_name, timeout=timeout)
-        return ProviderConnectionError(msg, provider=provider_name)
-    return None  # unknown shape — binding-internal, demotion path
+    typed = _typed_error_payload(str(exc))
+    if typed is None:
+        return ProviderConnectionError(
+            f"sandhi binding failure: {exc}", provider=provider_name, raw_error=exc
+        )
+    detail = str(typed.get("message") or exc)
+    code = typed["code"]
+    status = typed.get("http_status")
+    if code == "rate_limited":
+        return ProviderRateLimitError(detail, provider=provider_name, status_code=429)
+    if code == "authentication_error":
+        return ProviderAuthError(detail, provider=provider_name, status_code=int(status or 401))
+    if code == "timeout":
+        return ProviderTimeoutError(detail, provider=provider_name, timeout=timeout)
+    if code in {"circuit_open", "transport_error"}:
+        return ProviderConnectionError(detail, provider=provider_name, raw_error=exc)
+    return ProviderError(
+        detail,
+        provider=provider_name,
+        status_code=(
+            int(status) if status is not None else (400 if code == "invalid_request" else None)
+        ),
+        raw_error=exc,
+    )
 
 
-async def sse_lines(byte_items: AsyncIterator[Dict[str, Any]]) -> AsyncIterator[str]:
-    """Bridge the binding's raw-byte stream items to decoded SSE lines.
-
-    Chunk boundaries are arbitrary (NOT line- or UTF-8-aligned): buffer at the byte level,
-    split on ``\\n``, decode only complete lines, strip a trailing ``\\r``, and flush any
-    unterminated tail at end of stream.
-    """
-    buffer = b""
-    async for item in byte_items:
-        data = item.get("data") or b""
-        if not data:
+def _canonical_content(content: Any) -> Any:
+    if not isinstance(content, list):
+        return "" if content is None else content
+    parts: List[Dict[str, Any]] = []
+    for part in content:
+        if not isinstance(part, dict):
             continue
-        buffer += bytes(data)
-        while True:
-            newline_at = buffer.find(b"\n")
-            if newline_at < 0:
-                break
-            line, buffer = buffer[:newline_at], buffer[newline_at + 1 :]
-            yield line.rstrip(b"\r").decode("utf-8", errors="replace")
-    if buffer:
-        yield buffer.rstrip(b"\r").decode("utf-8", errors="replace")
+        kind = part.get("type")
+        if kind == "image_url" and isinstance(part.get("image_url"), dict):
+            image = part["image_url"]
+            value: Dict[str, Any] = {
+                "type": "image_url",
+                "image_url": image.get("url", ""),
+            }
+            if image.get("detail"):
+                value["detail"] = image["detail"]
+            parts.append(value)
+        elif kind == "input_audio" and isinstance(part.get("input_audio"), dict):
+            parts.append({"type": "input_audio", **part["input_audio"]})
+        elif kind == "file" and isinstance(part.get("file"), dict):
+            parts.append({"type": "file", **part["file"]})
+        else:
+            parts.append(dict(part))
+    return parts
 
 
-class SandhiSeamState:
-    """Shared demotion state + helpers for every sandhi transport variant.
+def _typed_request_from_openai_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Translate Victor's normalized prompt into `ChatRequestV1`."""
+    messages: List[Dict[str, Any]] = []
+    for source in payload.get("messages", []):
+        message = dict(source)
+        if message.get("role") == "assistant" and message.get("content") is None:
+            message.pop("content", None)
+        else:
+            message["content"] = _canonical_content(message.get("content"))
+        if message.get("role") == "assistant" and message.get("tool_calls"):
+            message["tool_calls"] = [
+                {
+                    "id": call.get("id", ""),
+                    "name": (call.get("function") or {}).get("name", ""),
+                    "arguments": (call.get("function") or {}).get("arguments", ""),
+                }
+                for call in message["tool_calls"]
+            ]
+        messages.append(message)
 
-    Mixed in ahead of the native provider class; defines only ``_sandhi_*``-prefixed
-    names and ``_demote`` so it never shadows native behavior.
-    """
+    request: Dict[str, Any] = {
+        "schema_version": "1",
+        "model": str(payload.get("model", "")),
+        "messages": messages,
+    }
+    tools = payload.get("tools")
+    if isinstance(tools, list):
+        request["tools"] = [
+            dict(tool.get("function") or {})
+            for tool in tools
+            if isinstance(tool, dict) and isinstance(tool.get("function"), dict)
+        ]
+    choice = payload.get("tool_choice")
+    if isinstance(choice, str):
+        request["tool_choice"] = choice
+    elif isinstance(choice, dict):
+        name = (choice.get("function") or {}).get("name")
+        if name:
+            request["tool_choice"] = {"name": name}
+    for source, target in (
+        ("temperature", "temperature"),
+        ("max_tokens", "max_output_tokens"),
+        ("max_completion_tokens", "max_output_tokens"),
+        ("response_format", "response_format"),
+        ("seed", "seed"),
+    ):
+        if source in payload:
+            request[target] = payload[source]
+    if "stop" in payload:
+        stop = payload["stop"]
+        request["stop"] = stop if isinstance(stop, list) else [stop]
+    reserved = {
+        "model",
+        "messages",
+        "tools",
+        "tool_choice",
+        "temperature",
+        "max_tokens",
+        "max_completion_tokens",
+        "response_format",
+        "seed",
+        "stop",
+        "stream",
+        "stream_options",
+    }
+    native = {key: value for key, value in payload.items() if key not in reserved}
+    if native:
+        request["extensions"] = {"openai": native}
+    return request
 
-    _sandhi_demoted: bool = False
 
-    # A small grace on top of sandhi's own socket-level timeout, as an FFI-hang backstop.
+def _text_content(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            str(part.get("text", ""))
+            for part in content
+            if isinstance(part, dict) and part.get("type") == "text"
+        )
+    return ""
+
+
+def _tool_calls(calls: Any) -> Optional[List[Dict[str, Any]]]:
+    if not isinstance(calls, list) or not calls:
+        return None
+    result: List[Dict[str, Any]] = []
+    for call in calls:
+        arguments = call.get("arguments", "{}")
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except JSONDecodeError:
+                pass
+        result.append({"id": call.get("id"), "name": call.get("name"), "arguments": arguments})
+    return result
+
+
+def _usage_diagnostics(usage: Any) -> Optional[Dict[str, Any]]:
+    """Preserve non-routine typed metering state without polluting legacy token keys."""
+    if not isinstance(usage, dict):
+        return None
+    attempts = int(usage.get("attempts", 1) or 1)
+    completeness = usage.get("completeness")
+    outcome = usage.get("outcome")
+    if (
+        attempts <= 1
+        and completeness not in {"partial", "unavailable"}
+        and outcome
+        not in {
+            "error",
+            "cancelled",
+        }
+    ):
+        return None
+    return {
+        "attempts": attempts,
+        "completeness": completeness,
+        "outcome": outcome,
+        "upstream_request_id": usage.get("upstream_request_id"),
+    }
+
+
+class SandhiTypedProviderMixin:
+    """Shared direct consumer of Sandhi's typed FFI contract."""
+
+    _sandhi_runtime: Any = None
+    _sandhi_typed_providers: Optional[Dict[Tuple[str, str, str, str, str, str], Any]] = None
     _SANDHI_WAIT_GRACE_SECS = 5.0
 
     def _sandhi_slug(self) -> str:
-        return str(getattr(self, "name", "openai"))
+        declared = str(getattr(self, "name", "openai"))
+        if _sg is not None and hasattr(_sg, "provider_descriptor_json"):
+            try:
+                descriptor = json.loads(_sg.provider_descriptor_json(declared))
+                return str(descriptor.get("slug") or declared)
+            except Exception:
+                pass
+        return declared
 
     def _sandhi_timeout(self) -> float:
-        timeout = getattr(self, "timeout", None)
         try:
-            return float(timeout) if timeout else 120.0
+            return float(getattr(self, "timeout", 120.0) or 120.0)
         except (TypeError, ValueError):
             return 120.0
 
-    def _demote(self, cause: BaseException) -> None:
-        if not self._sandhi_demoted:
-            self._sandhi_demoted = True
-            logger.warning(
-                "sandhi transport demoted to native for %s (%s: %s)",
-                self._sandhi_slug(),
-                type(cause).__name__,
-                cause,
+    def _typed_provider(self, model: str) -> Any:
+        if not sandhi_transport_available():
+            raise ProviderConnectionError(
+                "sandhi-gateway 0.1.2 typed runtime is unavailable",
+                provider=self._sandhi_slug(),
             )
-
-
-async def _binding_complete(
-    slug: str,
-    model: str,
-    base_url: str,
-    api_key: str,
-    body_json: str,
-    timeout: float,
-    wait_grace: float,
-) -> str:
-    """One non-streaming call through ``_sg.complete``; returns the raw body string.
-
-    Raises victor's typed errors for upstream-semantic failures (including the
-    FFI-hang backstop timeout) and :class:`SandhiTransportUnavailable` for
-    binding-internal ones (the caller's demotion trigger).
-    """
-    try:
-        out = await asyncio.wait_for(
-            _sg.complete(  # type: ignore[union-attr]
-                slug,
-                model,
-                base_url,
-                api_key,
-                body_json,
-                None,
-                timeout_secs=timeout,
-                max_retries=0,  # victor's ResilientProvider is the sole retry owner
-            ),
-            timeout=timeout + wait_grace,
-        )
-        return str(out["body"])
-    except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
-        raise
-    except asyncio.TimeoutError as exc:
-        raise ProviderTimeoutError(
-            f"sandhi transport FFI-level timeout after {timeout}s",
-            provider=slug,
-            timeout=timeout,
-        ) from exc
-    except BaseException as exc:  # noqa: BLE001 — pyo3 panics subclass BaseException
-        mapped = map_sandhi_error(exc, slug, timeout)
-        if mapped is not None:
-            raise mapped from exc
-        raise SandhiTransportUnavailable(str(exc)) from exc
-
-
-class SandhiHttpxTransportMixin(SandhiSeamState):
-    """Overrides the two wire seams of :class:`HttpxOpenAICompatProvider` with sandhi calls.
-
-    Everything else — payload build, SSE chunk parsing, tool translation, usage parsing,
-    victor-side resilience — is inherited native code. MRO puts this mixin first so its
-    seam overrides win and ``super()`` reaches the native implementation for fallback.
-
-    Failure semantics: upstream-semantic errors raise victor's typed errors (no fallback
-    re-execution — the native path would fail identically and re-executing would double-hit
-    the provider). Binding-internal failures demote this instance one-way to the native
-    wire path (transparently re-executing the current call), except mid-stream after the
-    first yielded chunk, where replay would duplicate content.
-    """
-
-    async def _sandhi_complete(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """One non-streaming wire call through the binding; returns the parsed body dict."""
-        timeout = self._sandhi_timeout()
-        body = await _binding_complete(
-            self._sandhi_slug(),
-            str(payload.get("model", "")),
-            str(getattr(self, "base_url", "")),
-            str(getattr(self, "_api_key", None) or getattr(self, "api_key", "") or ""),
-            json.dumps(payload),
-            timeout,
-            self._SANDHI_WAIT_GRACE_SECS,
-        )
+        if self._sandhi_runtime is None:
+            self._sandhi_runtime = _sg.ProviderRuntime()
+        if self._sandhi_typed_providers is None:
+            self._sandhi_typed_providers = {}
+        slug = self._sandhi_slug()
+        base_url = str(getattr(self, "base_url", "") or "")
+        # A catalog default is not an override. Omitting it lets Sandhi apply authoritative
+        # model-specific routing (notably Moonshot K3's .ai endpoint). Only a genuinely custom
+        # endpoint crosses the FFI.
         try:
-            return json.loads(body)
-        except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
-            raise
-        except BaseException as exc:  # noqa: BLE001 — malformed body is binding-internal
-            raise SandhiTransportUnavailable(str(exc)) from exc
+            catalog_base = str(_sg.provider_spec(slug).get("base_url") or "")
+        except Exception:
+            catalog_base = ""
+        explicit_base_url = (
+            base_url if base_url and base_url.rstrip("/") != catalog_base.rstrip("/") else ""
+        )
+        api_key = str(getattr(self, "_api_key", None) or getattr(self, "api_key", "") or "")
+        auth_scheme = str(getattr(self, "_sandhi_auth_scheme", "") or "")
+        protocol = str(getattr(self, "_sandhi_protocol", "") or "")
+        cache_key = (slug, model, explicit_base_url, api_key, auth_scheme, protocol)
+        if cache_key not in self._sandhi_typed_providers:
+            kwargs: Dict[str, Any] = {
+                "base_url": explicit_base_url or None,
+                "timeout_secs": self._sandhi_timeout(),
+                "stream_idle_timeout_secs": 90.0,
+                "max_retries": max(0, int(getattr(self, "max_retries", 0) or 0)),
+            }
+            wire_headers = getattr(self, "_wire_headers", None)
+            if wire_headers:
+                kwargs["headers_json"] = json.dumps(wire_headers)
+            if auth_scheme:
+                kwargs["auth_scheme"] = auth_scheme
+            if protocol:
+                kwargs["protocol"] = protocol
+            self._sandhi_typed_providers[cache_key] = self._sandhi_runtime.provider(
+                slug, model, api_key, **kwargs
+            )
+        return self._sandhi_typed_providers[cache_key]
 
-    async def _complete_raw(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        if self._sandhi_demoted or _sg is None:
-            return await super()._complete_raw(payload)  # type: ignore[misc]
-        try:
-            return await self._sandhi_complete(payload)
-        except SandhiTransportUnavailable as exc:
-            self._demote(exc)
-            return await super()._complete_raw(payload)  # type: ignore[misc]
-
-    async def _open_stream_lines(self, payload: Dict[str, Any]) -> Tuple[Any, AsyncIterator[str]]:
-        if self._sandhi_demoted or _sg is None:
-            return await super()._open_stream_lines(payload)  # type: ignore[misc]
+    async def _sandhi_complete(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        provider = self._typed_provider(str(request.get("model", "")))
         timeout = self._sandhi_timeout()
         try:
-            byte_iter = _sg.stream(  # type: ignore[union-attr]
-                self._sandhi_slug(),
-                str(payload.get("model", "")),
-                str(getattr(self, "base_url", "")),
-                str(getattr(self, "_api_key", None) or getattr(self, "api_key", "") or ""),
-                json.dumps(payload),
-                None,
-                timeout_secs=timeout,
-                stream_idle_timeout_secs=90.0,
-                max_retries=0,
+            value = await asyncio.wait_for(
+                provider.complete_json(json.dumps(request)),
+                timeout=timeout + self._SANDHI_WAIT_GRACE_SECS,
             )
+            return json.loads(str(value))
         except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
             raise
-        except BaseException as exc:  # noqa: BLE001
-            mapped = map_sandhi_error(exc, self._sandhi_slug(), timeout)
-            if mapped is not None:
-                raise mapped from exc
-            self._demote(exc)
-            return await super()._open_stream_lines(payload)  # type: ignore[misc]
+        except BaseException as exc:  # pyo3 panics may subclass BaseException
+            raise map_sandhi_error(exc, self._sandhi_slug(), timeout) from exc
 
-        provider_name = self._sandhi_slug()
-        demote = self._demote
-        native_open = super()._open_stream_lines  # type: ignore[misc]
+    def _completion_from_typed(self, response: Dict[str, Any], model: str) -> CompletionResponse:
+        output = response.get("output") or {}
+        extensions = response.get("extensions") or {}
+        native = extensions.get(self._sandhi_slug())
+        if native is None and getattr(self, "_sandhi_protocol", None) in {
+            "responses",
+            "chatgpt_responses",
+        }:
+            native = extensions.get("openai_responses")
+        if native is None and self._sandhi_slug() not in {
+            "anthropic",
+            "gemini",
+            "cohere",
+            "ollama",
+        }:
+            native = extensions.get("openai")
+        reasoning = extensions.get("reasoning")
+        if reasoning is None and isinstance(native, dict):
+            reasoning = (
+                (native.get("choices") or [{}])[0].get("message", {}).get("reasoning_content")
+            )
+        usage = usage_dict_from_neutral(
+            response.get("usage"),
+            native.get("usage") if isinstance(native, dict) else None,
+            slug="anthropic" if self._sandhi_slug() == "anthropic" else self._sandhi_slug(),
+        )
+        metadata: Dict[str, Any] = {}
+        if reasoning:
+            metadata["reasoning_content"] = reasoning
+        if diagnostics := _usage_diagnostics(response.get("usage")):
+            metadata["sandhi_usage"] = diagnostics
+        return CompletionResponse(
+            content=_text_content(output.get("content")),
+            role="assistant",
+            tool_calls=_tool_calls(output.get("tool_calls")),
+            stop_reason=response.get("finish_reason"),
+            usage=usage,
+            model=response.get("model") or model,
+            raw_response=native if isinstance(native, dict) else response,
+            metadata=metadata or None,
+        )
 
-        async def _lines() -> AsyncIterator[str]:
-            yielded = False
-            try:
-                async for line in sse_lines(_iterate(byte_iter)):
-                    yielded = True
-                    yield line
-            except (GeneratorExit, asyncio.CancelledError, KeyboardInterrupt, SystemExit):
-                # GeneratorExit = the consumer stopped early (e.g. on [DONE]) — clean close,
-                # never a transport failure, never a demotion cause.
-                raise
-            except BaseException as exc:  # noqa: BLE001
-                mapped = map_sandhi_error(exc, provider_name, timeout)
-                if not yielded:
-                    # Failure before any output: demote and replay natively.
-                    demote(exc)
-                    closer, native_lines = await native_open(payload)
-                    try:
-                        async for line in native_lines:
-                            yield line
-                    finally:
-                        await _maybe_call(closer)
-                    return
-                # After first output: no replay (would duplicate content) — typed raise.
-                demote(exc)
-                raise (
-                    mapped
-                    if mapped is not None
-                    else ProviderConnectionError(
-                        f"sandhi stream failed mid-stream: {exc}", provider=provider_name
+    async def _sandhi_stream(self, request: Dict[str, Any]) -> AsyncIterator[StreamChunk]:
+        provider = self._typed_provider(str(request.get("model", "")))
+        timeout = self._sandhi_timeout()
+        calls: Dict[int, Dict[str, Any]] = {}
+        finish_reason: Optional[str] = None
+        usage: Optional[Dict[str, int]] = None
+        usage_diagnostics: Optional[Dict[str, Any]] = None
+        try:
+            async for event_json in provider.stream_json(json.dumps(request)):
+                event = json.loads(str(event_json))
+                kind = event.get("event")
+                if kind == "text_delta":
+                    yield StreamChunk(content=str(event.get("delta", "")))
+                elif kind == "reasoning_delta":
+                    yield StreamChunk(
+                        content="", metadata={"reasoning_content": str(event.get("delta", ""))}
                     )
-                ) from exc
-
-        async def _closer() -> None:
-            aclose = getattr(byte_iter, "aclose", None)
-            if callable(aclose):
-                try:
-                    await aclose()
-                except Exception:  # best-effort
-                    pass
-
-        return _closer, _lines()
-
-
-async def _iterate(byte_iter: Any) -> AsyncIterator[Dict[str, Any]]:
-    """Adapt the binding's async iterator; StopAsyncIteration ends cleanly."""
-    async for item in byte_iter:
-        yield item
-
-
-async def _maybe_call(closer: Any) -> None:
-    if closer is None:
-        return
-    try:
-        result = closer()
-        if asyncio.iscoroutine(result):
-            await result
-    except Exception:  # best-effort cleanup
-        pass
-
-
-class SandhiDeepSeekProvider(SandhiHttpxTransportMixin, DeepSeekProvider):
-    """DeepSeek with the wire layer on sandhi transport (pilot)."""
-
-
-class SandhiXAIProvider(SandhiHttpxTransportMixin, XAIProvider):
-    """xAI/Grok with the wire layer on sandhi transport (pilot)."""
-
-
-class SandhiZAIProvider(SandhiHttpxTransportMixin, ZAIProvider):
-    """Z.AI with the wire layer on sandhi transport (pilot)."""
-
-
-class SandhiAnthropicProvider(SandhiSeamState, AnthropicProvider):
-    """Anthropic with the NON-STREAMING wire on sandhi transport (wave 2a).
-
-    Overrides exactly one seam — :meth:`AnthropicProvider._create_message_raw` — so
-    prompt assembly (``_build_request_params``), circuit breaker, response parsing
-    (``_parse_response``), usage routing, and error taxonomy all stay native. The
-    binding POSTs ``{base_url}/v1/messages`` with ``x-api-key`` +
-    ``anthropic-version`` for slug ``anthropic``; the validated body feeds the SDK
-    ``Message`` model so ``_parse_response`` runs unchanged.
-
-    Scope: streaming stays 100% native (wave 2b is a separate go/no-go). OAuth-mode
-    instances never reach this class — the resolver excludes ``auth_mode="oauth"``
-    (the binding sends ``x-api-key`` only, not ``Authorization: Bearer``).
-
-    Failure semantics mirror the httpx mixin: upstream-semantic errors raise victor's
-    typed errors (no re-execution); binding-internal failures demote this instance
-    one-way to the native wire, transparently re-executing the current call.
-    """
-
-    _SANDHI_DEFAULT_BASE_URL = "https://api.anthropic.com"
-
-    async def _create_message_raw(self, **request_params: Any) -> Any:
-        if self._sandhi_demoted or _sg is None:
-            return await super()._create_message_raw(**request_params)
-        timeout = self._sandhi_timeout()
-        try:
-            body = await _binding_complete(
-                "anthropic",
-                str(request_params.get("model", "")),
-                str(getattr(self, "base_url", None) or self._SANDHI_DEFAULT_BASE_URL),
-                str(getattr(self, "_api_key", None) or getattr(self, "api_key", "") or ""),
-                json.dumps(request_params),
-                timeout,
-                self._SANDHI_WAIT_GRACE_SECS,
+                elif kind == "refusal_delta":
+                    yield StreamChunk(content="", metadata={"refusal": str(event.get("delta", ""))})
+                elif kind == "tool_call_start":
+                    calls[int(event.get("index", 0))] = {
+                        "id": event.get("id"),
+                        "name": event.get("name"),
+                        "arguments": "",
+                    }
+                elif kind == "tool_call_arguments_delta":
+                    index = int(event.get("index", 0))
+                    calls.setdefault(index, {"id": None, "name": "", "arguments": ""})
+                    calls[index]["arguments"] += str(event.get("delta", ""))
+                elif kind == "finish":
+                    finish_reason = str(event.get("reason", "unknown"))
+                elif kind == "usage":
+                    usage = usage_dict_from_neutral(
+                        event.get("usage"), None, slug=self._sandhi_slug()
+                    )
+                    usage_diagnostics = _usage_diagnostics(event.get("usage"))
+            yield StreamChunk(
+                content="",
+                tool_calls=_tool_calls([calls[index] for index in sorted(calls)]),
+                stop_reason=finish_reason or "stop",
+                is_final=True,
+                usage=usage,
+                metadata={"sandhi_usage": usage_diagnostics} if usage_diagnostics else None,
             )
-        except SandhiTransportUnavailable as exc:
-            self._demote(exc)
-            return await super()._create_message_raw(**request_params)
-        try:
-            from anthropic.types import Message as AnthropicMessage
-
-            return AnthropicMessage.model_validate(json.loads(body))
         except (asyncio.CancelledError, KeyboardInterrupt, SystemExit):
             raise
-        except BaseException as exc:  # noqa: BLE001 — malformed body is binding-internal
-            self._demote(exc)
-            return await super()._create_message_raw(**request_params)
+        except ProviderError:
+            raise
+        except BaseException as exc:
+            raise map_sandhi_error(exc, self._sandhi_slug(), timeout) from exc
+
+
+class SandhiHttpxTransportMixin(SandhiTypedProviderMixin):
+    """OpenAI-compatible Victor policy hooks backed by Sandhi typed execution."""
+
+    async def _refresh_host_credentials(self) -> None:
+        refresh = getattr(self, "_ensure_valid_token", None)
+        if callable(refresh):
+            await refresh()
+
+    async def chat(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> CompletionResponse:
+        await self._refresh_host_credentials()
+        cleaner = getattr(self, "_clean_model_name", None)
+        model = cleaner(model) if callable(cleaner) else model
+        payload = self._build_request_payload(
+            messages, model, temperature, max_tokens, tools, False, **kwargs
+        )
+        response = await self._sandhi_complete(_typed_request_from_openai_payload(payload))
+        return self._completion_from_typed(response, model)
+
+    async def stream(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]:
+        await self._refresh_host_credentials()
+        cleaner = getattr(self, "_clean_model_name", None)
+        model = cleaner(model) if callable(cleaner) else model
+        payload = self._build_request_payload(
+            messages, model, temperature, max_tokens, tools, True, **kwargs
+        )
+        async for chunk in self._sandhi_stream(_typed_request_from_openai_payload(payload)):
+            yield chunk
+
+
+class SandhiNeutralProviderMixin(SandhiTypedProviderMixin):
+    """Build the neutral contract directly for providers with no reusable Victor wire policy."""
+
+    async def _refresh_host_credentials(self) -> None:
+        refresh = getattr(self, "_ensure_valid_token", None)
+        if callable(refresh):
+            await refresh()
+
+    def _neutral_request(
+        self,
+        messages: List[Message],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        tools: Optional[List[ToolDefinition]],
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "model": model,
+            "messages": build_openai_messages(messages),
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            **kwargs,
+        }
+        if tools:
+            payload["tools"] = convert_tools_to_openai_format(tools)
+            payload.setdefault("tool_choice", "auto")
+        request = _typed_request_from_openai_payload(payload)
+        slug = self._sandhi_slug()
+        if slug not in {"openai"}:
+            extensions = request.pop("extensions", {})
+            native = extensions.get("openai") if isinstance(extensions, dict) else None
+            if native:
+                request["extensions"] = {slug: native}
+        return request
+
+    async def chat(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> CompletionResponse:
+        await self._refresh_host_credentials()
+        request = self._neutral_request(messages, model, temperature, max_tokens, tools, **kwargs)
+        return self._completion_from_typed(await self._sandhi_complete(request), model)
+
+    async def stream(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]:
+        await self._refresh_host_credentials()
+        request = self._neutral_request(messages, model, temperature, max_tokens, tools, **kwargs)
+        async for chunk in self._sandhi_stream(request):
+            yield chunk
+
+
+class SandhiAnthropicProvider(SandhiTypedProviderMixin, AnthropicProvider):
+    """Anthropic prompt policy backed by Sandhi's typed Messages codec and transport."""
+
+    def _anthropic_request(
+        self,
+        messages: List[Message],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        tools: Optional[List[ToolDefinition]],
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        native = self._build_request_params(
+            messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=tools,
+            **kwargs,
+        )
+        openai_payload: Dict[str, Any] = {
+            "model": model,
+            "messages": build_openai_messages(messages),
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if tools:
+            openai_payload["tools"] = convert_tools_to_openai_format(tools)
+            openai_payload["tool_choice"] = "auto"
+        request = _typed_request_from_openai_payload(openai_payload)
+        request["extensions"] = {"anthropic": native}
+        return request
+
+    async def chat(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> CompletionResponse:
+        await self._ensure_valid_token()
+        request = self._anthropic_request(messages, model, temperature, max_tokens, tools, **kwargs)
+        return self._completion_from_typed(await self._sandhi_complete(request), model)
+
+    async def stream(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]:
+        await self._ensure_valid_token()
+        request = self._anthropic_request(messages, model, temperature, max_tokens, tools, **kwargs)
+        async for chunk in self._sandhi_stream(request):
+            yield chunk
+
+
+class SandhiOpenAIProvider(SandhiNeutralProviderMixin, OpenAIProvider):
+    """OpenAI prompt policy with explicit Chat Completions vs Responses selection."""
+
+    def _neutral_request(
+        self,
+        messages: List[Message],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        tools: Optional[List[ToolDefinition]],
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        request = super()._neutral_request(
+            messages, model, temperature, max_tokens, tools, **kwargs
+        )
+        if self._is_o_series_model(model):
+            request.pop("temperature", None)
+        if getattr(self, "_sandhi_protocol", None) in {"responses", "chatgpt_responses"}:
+            extensions = request.setdefault("extensions", {})
+            native = extensions.pop("openai", {})
+            if not isinstance(native, dict):
+                native = {}
+            effort = native.pop("reasoning_effort", None)
+            if effort is not None:
+                native["reasoning"] = {"effort": effort}
+            extensions["openai_responses"] = native
+        return request
+
+
+class SandhiGoogleProvider(SandhiNeutralProviderMixin, GoogleProvider):
+    pass
+
+
+class SandhiOllamaProvider(SandhiNeutralProviderMixin, OllamaProvider):
+    pass
+
+
+class SandhiLMStudioProvider(SandhiNeutralProviderMixin, LMStudioProvider):
+    pass
+
+
+class SandhiVLLMProvider(SandhiNeutralProviderMixin, VLLMProvider):
+    pass
+
+
+class SandhiLlamaCppProvider(SandhiNeutralProviderMixin, LlamaCppProvider):
+    pass
 
 
 _SANDHI_VARIANTS: Dict[Type[BaseProvider], Type[BaseProvider]] = {
-    DeepSeekProvider: SandhiDeepSeekProvider,
-    XAIProvider: SandhiXAIProvider,
-    ZAIProvider: SandhiZAIProvider,
     AnthropicProvider: SandhiAnthropicProvider,
+    OpenAIProvider: SandhiOpenAIProvider,
+    GoogleProvider: SandhiGoogleProvider,
+    OllamaProvider: SandhiOllamaProvider,
+    LMStudioProvider: SandhiLMStudioProvider,
+    VLLMProvider: SandhiVLLMProvider,
+    LlamaCppProvider: SandhiLlamaCppProvider,
 }
+_DYNAMIC_HTTPX_VARIANTS: Dict[Type[BaseProvider], Type[BaseProvider]] = {}
+
+
+def _dynamic_httpx_variant(native_cls: Type[BaseProvider]) -> Type[BaseProvider]:
+    variant = _DYNAMIC_HTTPX_VARIANTS.get(native_cls)
+    if variant is None:
+        variant = type(
+            f"Sandhi{native_cls.__name__}",
+            (SandhiHttpxTransportMixin, native_cls),
+            {"__module__": __name__},
+        )
+        _DYNAMIC_HTTPX_VARIANTS[native_cls] = variant
+    return variant
+
 
 __all__ = [
     "SandhiAnthropicProvider",
-    "SandhiDeepSeekProvider",
     "SandhiHttpxTransportMixin",
-    "SandhiSeamState",
-    "SandhiTransportUnavailable",
-    "SandhiXAIProvider",
-    "SandhiZAIProvider",
+    "SandhiNeutralProviderMixin",
+    "SandhiOpenAIProvider",
+    "SandhiGoogleProvider",
+    "SandhiOllamaProvider",
+    "SandhiLMStudioProvider",
+    "SandhiVLLMProvider",
+    "SandhiLlamaCppProvider",
+    "SandhiTypedProviderMixin",
+    "VICTOR_NATIVE_ONLY_PROVIDER_ALIASES",
     "map_sandhi_error",
-    "configure_from_settings",
     "resolve_transport_class",
     "sandhi_transport_available",
-    "set_sandhi_transport_providers",
-    "sse_lines",
 ]

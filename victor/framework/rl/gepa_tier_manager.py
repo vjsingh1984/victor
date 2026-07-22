@@ -176,9 +176,11 @@ class GEPATierManager:
 
         try:
             from victor.providers.registry import ProviderRegistry
+            from victor.providers.sandhi_transport import resolve_transport_class
 
             provider_cls = ProviderRegistry.get(provider_name)
-            provider = provider_cls(base_url=base_url) if base_url else provider_cls()
+            typed_cls = resolve_transport_class(provider_name, provider_cls, {})
+            provider = typed_cls(base_url=base_url) if base_url else typed_cls()
         except Exception as e:
             logger.warning(
                 "Failed to create %s provider for GEPA %s tier: %s. " "Falling back to Ollama.",
@@ -188,8 +190,9 @@ class GEPATierManager:
             )
             try:
                 from victor.providers.ollama_provider import OllamaProvider
+                from victor.providers.sandhi_transport import resolve_transport_class as _resolve
 
-                provider = OllamaProvider()
+                provider = _resolve("ollama", OllamaProvider, {})()
                 model = "qwen3:8b"
             except Exception:
                 raise RuntimeError(f"Cannot create any provider for GEPA {tier} tier") from e

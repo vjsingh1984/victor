@@ -70,9 +70,14 @@ from victor.providers.openai_compat import (
     parse_openai_tool_calls,
 )
 from victor.providers.logging import ProviderLogger
-from victor.providers.usage_parsing import parse_usage_dict
+from victor.providers.usage_parsing import parse_usage_dict, usage_dict_from_neutral
 
 logger = logging.getLogger(__name__)
+
+# Private envelope key used only across Victor's wire seam. Sandhi has already
+# parsed these neutral counts at the source; the key is stripped before the raw
+# provider response is exposed to callers.
+TRANSPORT_NEUTRAL_USAGE_KEY = "__victor_transport_neutral_usage__"
 
 
 class HttpxOpenAICompatProvider(BaseProvider):
@@ -100,6 +105,8 @@ class HttpxOpenAICompatProvider(BaseProvider):
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = 3,
         provider_name: str = "",
+        default_headers: Optional[Dict[str, str]] = None,
+        initialize_http_client: bool = True,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -111,14 +118,18 @@ class HttpxOpenAICompatProvider(BaseProvider):
         )
         self._api_key = api_key
         self._provider_logger = ProviderLogger(provider_name or self.name, __name__)
-        self.client = httpx.AsyncClient(
-            base_url=base_url,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            timeout=httpx.Timeout(timeout),
-        )
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        if default_headers:
+            headers.update(default_headers)
+        if initialize_http_client:
+            self.client = httpx.AsyncClient(
+                base_url=base_url,
+                headers=headers,
+                timeout=httpx.Timeout(timeout),
+            )
 
     # ── Abstract interface ────────────────────────────────────────────────────
 
@@ -382,6 +393,10 @@ class HttpxOpenAICompatProvider(BaseProvider):
 
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         """Parse a non-streaming /v1/chat/completions response dict."""
+        neutral_usage = result.get(TRANSPORT_NEUTRAL_USAGE_KEY)
+        if neutral_usage is not None:
+            result = dict(result)
+            result.pop(TRANSPORT_NEUTRAL_USAGE_KEY, None)
         choices = result.get("choices", [])
         if not choices:
             return CompletionResponse(
@@ -398,11 +413,15 @@ class HttpxOpenAICompatProvider(BaseProvider):
         usage = None
         usage_data = result.get("usage")
         if usage_data:
-            usage = parse_usage_dict("openai", usage_data) or {
-                "prompt_tokens": usage_data.get("prompt_tokens", 0),
-                "completion_tokens": usage_data.get("completion_tokens", 0),
-                "total_tokens": usage_data.get("total_tokens", 0),
-            }
+            usage = (
+                usage_dict_from_neutral(neutral_usage, usage_data, slug="openai")
+                or parse_usage_dict("openai", usage_data)
+                or {
+                    "prompt_tokens": usage_data.get("prompt_tokens", 0),
+                    "completion_tokens": usage_data.get("completion_tokens", 0),
+                    "total_tokens": usage_data.get("total_tokens", 0),
+                }
+            )
 
         metadata = self._extract_response_metadata(message)
 
@@ -539,6 +558,20 @@ class HttpxOpenAICompatProvider(BaseProvider):
             try:
                 accumulated_tool_calls: List[Dict[str, Any]] = []
                 has_sent_final = False
+                pending_final: Optional[StreamChunk] = None
+                pending_raw_usage: Optional[Dict[str, Any]] = None
+                transport_neutral_usage: Optional[Dict[str, Any]] = None
+
+                def _terminal_usage() -> Optional[Dict[str, int]]:
+                    if transport_neutral_usage is not None:
+                        return usage_dict_from_neutral(
+                            transport_neutral_usage,
+                            pending_raw_usage,
+                            slug="openai",
+                        )
+                    if pending_raw_usage is not None:
+                        return parse_usage_dict("openai", pending_raw_usage)
+                    return None
 
                 async for line in lines:
                     if not line.strip():
@@ -548,28 +581,49 @@ class HttpxOpenAICompatProvider(BaseProvider):
 
                     data_str = line[6:]
                     if data_str.strip() == "[DONE]":
-                        if not has_sent_final or accumulated_tool_calls:
+                        terminal_usage = _terminal_usage()
+                        if pending_final is not None:
+                            if terminal_usage is not None:
+                                pending_final.usage = terminal_usage
+                            yield pending_final
+                            has_sent_final = True
+                        elif not has_sent_final or accumulated_tool_calls or terminal_usage:
                             yield StreamChunk(
                                 content="",
                                 tool_calls=(accumulated_tool_calls or None),
                                 stop_reason="stop",
                                 is_final=True,
+                                usage=terminal_usage,
                             )
+                            has_sent_final = True
                         break
 
                     try:
                         chunk_data = json_loads(data_str)
+                        neutral_usage = chunk_data.get(TRANSPORT_NEUTRAL_USAGE_KEY)
+                        if isinstance(neutral_usage, dict):
+                            transport_neutral_usage = neutral_usage
+                            continue
+                        raw_usage = chunk_data.get("usage")
+                        if isinstance(raw_usage, dict):
+                            pending_raw_usage = raw_usage
                         chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
                         if chunk:
                             if chunk.is_final:
-                                has_sent_final = True
-                            yield chunk
+                                pending_final = chunk
+                            else:
+                                yield chunk
                     except JSONDecodeError:
                         self._provider_logger.logger.warning(
                             "%s JSON decode error on SSE line: %s",
                             self.name,
                             line[:100],
                         )
+                if pending_final is not None and not has_sent_final:
+                    terminal_usage = _terminal_usage()
+                    if terminal_usage is not None:
+                        pending_final.usage = terminal_usage
+                    yield pending_final
             finally:
                 # Close the wire seam here — lexically paired with the open in
                 # _open_stream_lines, in whatever task drives this generator.

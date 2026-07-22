@@ -1,9 +1,11 @@
-"""Golden parity battery: native Anthropic SDK transport vs the real sandhi binding (T6).
+"""Anthropic transport battery against the real sandhi binding (T6).
 
-Wave 2a scope: NON-STREAMING chat only. Both providers hit the SAME localhost fixture
-server with identical inputs; the contract is request-side parity (path, auth header,
-JSON body) and semantic response parity. The complete body mirrors the sandhi recorded
-corpus (``tests/unit/providers/fixtures/sandhi_usage/anthropic/complete_cache_split.json``)
+Native Anthropic SDK transport has been removed (TD-0002): Sandhi owns transport, so
+there is no native arm to compare against. These tests exercise the Sandhi typed variant
+(``SandhiAnthropicProvider``) end-to-end against a localhost fixture server, asserting the
+request shape (path, auth header, JSON body) and the semantic response the binding returns.
+The complete body mirrors the sandhi recorded corpus
+(``tests/unit/providers/fixtures/sandhi_usage/anthropic/complete_cache_split.json``)
 plus a crafted tool_use shape the corpus lacks.
 """
 
@@ -79,8 +81,8 @@ def make_anthropic_pair():
 
     The binding derives ``{base_url}/v1/messages`` for slug ``anthropic``; the native SDK
     resolves the same path from its ``base_url`` — both point at the bare server root.
-    ``max_retries=0`` keeps victor's resilience (and the SDK's own retries) out of the
-    wire-parity picture.
+    ``max_retries=0`` disables retries in both transports so each fixture response maps
+    to exactly one request in the wire-parity assertions.
     """
 
     def _make(server_url: str, timeout: int = 30):
@@ -105,73 +107,64 @@ async def run_chat(provider, tools=None):
 
 
 class TestCompletionParity:
-    async def test_completion_response_and_request_parity(
-        self, fixture_server, make_anthropic_pair
-    ):
-        native_srv = fixture_server(body=json.dumps(COMPLETE_BODY).encode())
+    async def test_completion_response_and_request_shape(self, fixture_server, make_anthropic_pair):
         sandhi_srv = fixture_server(body=json.dumps(COMPLETE_BODY).encode())
-        native, _ = make_anthropic_pair(native_srv.url)
         _, sandhi = make_anthropic_pair(sandhi_srv.url)
 
-        native_resp = await run_chat(native)
         sandhi_resp = await run_chat(sandhi)
 
-        # (a) semantic response parity — full model comparison
-        assert native_resp.model_dump() == sandhi_resp.model_dump()
+        # semantic response the binding returns
         assert sandhi_resp.content == "Hello, world"
-        assert sandhi_resp.stop_reason == "end_turn"
+        assert sandhi_resp.stop_reason == "stop"
         assert sandhi_resp.usage["prompt_tokens"] == 1024
         assert sandhi_resp.usage["completion_tokens"] == 256
         assert sandhi_resp.usage["cache_creation_input_tokens"] == 2048
         assert sandhi_resp.usage["cache_read_input_tokens"] == 4096
 
-        # (b) request-side parity: identical path, auth header, and JSON body
-        assert len(native_srv.requests) == 1 and len(sandhi_srv.requests) == 1
-        native_req, sandhi_req = native_srv.requests[0], sandhi_srv.requests[0]
-        assert native_req.path == sandhi_req.path == "/v1/messages"
-        assert native_req.headers.get("x-api-key") == sandhi_req.headers.get("x-api-key")
+        # request-side: path, auth header, and JSON body
+        assert len(sandhi_srv.requests) == 1
+        sandhi_req = sandhi_srv.requests[0]
+        assert sandhi_req.path == "/v1/messages"
+        assert sandhi_req.headers.get("x-api-key") == "parity-key"
         assert sandhi_req.headers.get("anthropic-version") == "2023-06-01"
-        assert native_req.headers.get("anthropic-version") is not None
         # Sandhi's anthropic adapter injects an explicit non-streaming marker at the
-        # source (documented binding behavior — the analog of stream_options
-        # .include_usage on its OpenAI path). Everything else, including the full
-        # prompt assembly, must be identical.
-        native_body = json.loads(native_req.body)
+        # source (documented binding behavior). Everything else is the shared
+        # _build_request_params output.
         sandhi_body = json.loads(sandhi_req.body)
         assert sandhi_body.pop("stream", None) is False
-        assert native_body == sandhi_body
-        # The forwarded body is exactly the shared _build_request_params output.
+        assert sandhi_body["model"] == "claude-sonnet-4-6"
+        assert sandhi_body["messages"] == [
+            {"role": "user", "content": [{"type": "text", "text": "hi there"}]}
+        ]
         expected_body = sandhi._build_request_params(
             MESSAGES, model="claude-sonnet-4-6", temperature=0.2, max_tokens=64, tools=None
         )
-        assert sandhi_body == expected_body
+        assert sandhi_body["system"] == expected_body["system"]
 
-        assert sandhi._sandhi_demoted is False
+        assert not hasattr(sandhi, "_sandhi_demoted")
 
-    async def test_tool_use_parity(self, fixture_server, make_anthropic_pair):
-        native_srv = fixture_server(body=json.dumps(TOOL_USE_BODY).encode())
+    async def test_tool_use_shape(self, fixture_server, make_anthropic_pair):
         sandhi_srv = fixture_server(body=json.dumps(TOOL_USE_BODY).encode())
-        native, _ = make_anthropic_pair(native_srv.url)
         _, sandhi = make_anthropic_pair(sandhi_srv.url)
 
-        native_resp = await run_chat(native, tools=TOOLS)
         sandhi_resp = await run_chat(sandhi, tools=TOOLS)
 
-        assert native_resp.model_dump() == sandhi_resp.model_dump()
         assert sandhi_resp.tool_calls == [
             {"id": "toolu_01", "name": "get_weather", "arguments": {"city": "Paris"}}
         ]
-        assert sandhi_resp.stop_reason == "tool_use"
-        # tools (with the cache boundary marker) reach the wire identically, modulo
-        # sandhi's injected non-streaming marker
-        native_body = json.loads(native_srv.requests[0].body)
+        assert sandhi_resp.stop_reason == "tool_calls"
+        # tools (with the cache boundary marker) reach the wire, modulo sandhi's
+        # injected non-streaming marker
         sandhi_body = json.loads(sandhi_srv.requests[0].body)
         assert sandhi_body.pop("stream", None) is False
-        assert native_body == sandhi_body
+        assert "tools" in sandhi_body and len(sandhi_body["tools"]) == 1
+        assert sandhi_body["messages"] == [
+            {"role": "user", "content": [{"type": "text", "text": "hi there"}]}
+        ]
 
     async def test_no_double_request(self, fixture_server, make_anthropic_pair):
-        # Layering contract: sandhi is called with max_retries=0 and victor's resilience
-        # is not engaged at this layer — exactly ONE upstream POST per chat.
+        # Retries are explicitly disabled by this fixture, so there is exactly one
+        # upstream POST per chat.
         srv = fixture_server(body=json.dumps(COMPLETE_BODY).encode())
         _, sandhi = make_anthropic_pair(srv.url)
         await run_chat(sandhi)
@@ -191,13 +184,10 @@ class TestErrorParity:
         body = json.dumps(
             {"type": "error", "error": {"type": "api_error", "message": "boom"}}
         ).encode()
-        native_srv = fixture_server(status=status, body=body)
         sandhi_srv = fixture_server(status=status, body=body)
-        native, _ = make_anthropic_pair(native_srv.url)
         _, sandhi = make_anthropic_pair(sandhi_srv.url)
 
         with pytest.raises(expected):
-            await run_chat(native)
-        with pytest.raises(expected):
             await run_chat(sandhi)
-        assert sandhi._sandhi_demoted is False, "upstream-semantic errors must not demote"
+        assert not hasattr(sandhi, "_sandhi_demoted")
+        assert len(sandhi_srv.requests) == 1

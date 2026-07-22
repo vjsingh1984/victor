@@ -66,6 +66,19 @@ DEFAULT_PROVIDER_MODELS = {
 LOCAL_ENDPOINT_PROVIDERS = frozenset({"ollama", "lmstudio", "vllm", "mlx", "llama.cpp"})
 
 
+def _default_model_for_provider(provider: str) -> Optional[str]:
+    """Resolve Victor-owned model policy without duplicating configured defaults."""
+    default = DEFAULT_PROVIDER_MODELS.get(provider)
+    if default is not None:
+        return default
+    try:
+        from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
+
+        return get_openai_compat_provider_spec(provider).default_model
+    except KeyError:
+        return None
+
+
 @dataclass(frozen=True)
 class CompactionConfig:
     """Compaction threshold overrides for a session.
@@ -163,7 +176,7 @@ class ProviderOverrideConfig:
             raise ValueError("--provider-timeout must be greater than 0.")
 
         if normalized_provider and not normalized_model:
-            normalized_model = DEFAULT_PROVIDER_MODELS.get(normalized_provider)
+            normalized_model = _default_model_for_provider(normalized_provider)
             if normalized_model is None:
                 raise ValueError(
                     f"No default model known for provider '{normalized_provider}'. "

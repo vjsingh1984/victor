@@ -217,7 +217,7 @@ class OpenAIConfig(ProviderConfigStrategy):
         if auth_mode == "oauth":
             # OAuth mode: use ChatGPT subscription
             result["auth_mode"] = "oauth"
-            result.setdefault("base_url", "https://chatgpt.com/backend-api/codex/v1")
+            result.setdefault("base_url", "https://chatgpt.com/backend-api/codex")
         else:
             # API key mode
             raw_key = settings.provider.openai_api_key
@@ -322,7 +322,9 @@ class QwenConfig(ProviderConfigStrategy):
 
     @property
     def aliases(self) -> List[str]:
-        return ["alibaba", "dashscope"]
+        from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
+
+        return list(get_openai_compat_provider_spec("qwen").aliases)
 
     def get_settings(
         self,
@@ -330,17 +332,19 @@ class QwenConfig(ProviderConfigStrategy):
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
         from victor.config.api_keys import get_api_key
+        from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
 
         result = dict(base_settings)
+        spec = get_openai_compat_provider_spec("qwen")
         auth_mode = base_settings.get("auth_mode", "api_key")
         if auth_mode == "oauth":
             result["auth_mode"] = "oauth"
-            result.setdefault("base_url", "https://portal.qwen.ai/v1/")
+            result.setdefault("base_url", spec.endpoint_options["portal"])
         else:
             api_key = get_api_key("qwen")
             if api_key:
                 result["api_key"] = api_key
-            result.setdefault("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1/")
+            result.setdefault("base_url", spec.endpoint_options["standard"])
         return result
 
 
@@ -357,7 +361,9 @@ class ZAIConfig(ProviderConfigStrategy):
 
     @property
     def aliases(self) -> List[str]:
-        return ["zhipu"]
+        from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
+
+        return list(get_openai_compat_provider_spec("zai").aliases)
 
     def get_settings(
         self,
@@ -365,8 +371,10 @@ class ZAIConfig(ProviderConfigStrategy):
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
         from victor.config.api_keys import get_api_key
+        from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
 
         result = dict(base_settings)
+        spec = get_openai_compat_provider_spec("zai")
 
         # Resolve API key
         api_key = get_api_key("zai")
@@ -376,10 +384,10 @@ class ZAIConfig(ProviderConfigStrategy):
         # Coding plan uses a dedicated endpoint
         coding_plan = result.pop("coding_plan", False)
         if coding_plan:
-            result.setdefault("base_url", "https://api.z.ai/api/coding/paas/v4/")
+            result.setdefault("base_url", spec.endpoint_options["coding"])
             result["coding_plan"] = True
         else:
-            result.setdefault("base_url", "https://api.z.ai/api/paas/v4/")
+            result.setdefault("base_url", spec.endpoint_options["standard"])
 
         return result
 

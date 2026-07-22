@@ -39,11 +39,8 @@ Top tool-enabled coding models for vLLM (fp16/q8):
     5. mistralai/Codestral-22B-v0.1 (44GB fp16)
 """
 
-from victor.core.json_utils import json_loads
-from json import JSONDecodeError
 import logging
-import re
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
 
@@ -52,23 +49,11 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderAuthError,
     ProviderConnectionError,
-    ProviderError,
-    ProviderRateLimitError,
-    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
 from victor.providers.logging import ProviderLogger
-from victor.providers.usage_parsing import parse_usage_dict
-from victor.providers.openai_compat import (
-    extract_thinking_content as _extract_thinking_content,
-    extract_tool_calls_from_content as _extract_tool_calls_from_content,
-    convert_messages_to_openai_format,
-    convert_tools_to_openai_format,
-    parse_openai_tool_calls,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -321,140 +306,16 @@ class VLLMProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
-        """Send chat completion request to vLLM server.
+        """Chat transport is owned by the Sandhi typed variant.
 
-        Args:
-            messages: Conversation messages
-            model: Model name (e.g., "Qwen/Qwen2.5-Coder-7B-Instruct")
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            tools: Available tools for function calling
-            **kwargs: Additional vLLM parameters (top_p, top_k, etc.)
-
-        Returns:
-            CompletionResponse with generated content
-
-        Raises:
-            ProviderError: If request fails
+        This policy shell stays concrete for discovery/capability use; completion
+        transport is delegated to the Sandhi runtime. Obtain the typed provider
+        via ``resolve_transport_class()`` (e.g. ``SandhiVLLMProvider``).
         """
-        # Use available model if none specified
-        if not model and self._available_model:
-            model = self._available_model
-
-        # Use structured logging context manager
-        with self._provider_logger.log_api_call(
-            endpoint="/v1/chat/completions",
-            model=model,
-            operation="chat",
-            num_messages=len(messages),
-            has_tools=tools is not None,
-        ) as log_success:
-            # Build request payload
-            payload: Dict[str, Any] = {
-                "model": model,
-                "messages": convert_messages_to_openai_format(messages),
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            }
-
-            # Add optional parameters
-            if "top_p" in kwargs:
-                payload["top_p"] = kwargs["top_p"]
-            if "top_k" in kwargs:
-                payload["top_k"] = kwargs["top_k"]
-            if "repetition_penalty" in kwargs:
-                payload["repetition_penalty"] = kwargs["repetition_penalty"]
-            if "stop" in kwargs:
-                payload["stop"] = kwargs["stop"]
-
-            # Add tools if provided and model supports them
-            if tools and _model_supports_tools(model):
-                payload["tools"] = convert_tools_to_openai_format(tools)
-                payload["tool_choice"] = kwargs.get("tool_choice", "auto")
-
-            try:
-                response = await self._execute_with_circuit_breaker(
-                    self.client.post,
-                    f"{self.base_url}/v1/chat/completions",
-                    json=payload,
-                )
-
-                if response.status_code != 200:
-                    error_data = response.json() if response.content else {}
-                    error_msg = (
-                        error_data.get("detail") or error_data.get("message") or response.text
-                    )
-                    raise ProviderError(
-                        message=f"vLLM API error: {error_msg}",
-                        provider="vllm",
-                        details={
-                            "status_code": response.status_code,
-                            "response": error_data,
-                        },
-                    )
-
-                result = response.json()
-                parsed = self._parse_response(result, model)
-
-                # Log success with usage info
-                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                log_success(tokens=tokens)
-
-                return parsed
-
-            except httpx.HTTPStatusError as e:
-                # Convert specific HTTP errors to provider error types
-                if e.response.status_code in (401, 403):
-                    raise ProviderAuthError(
-                        message=f"vLLM authentication failed: {e.response.text}",
-                        provider="vllm",
-                    ) from e
-                elif e.response.status_code == 429:
-                    raise ProviderRateLimitError(
-                        message=f"vLLM rate limit exceeded: {e.response.text}",
-                        provider="vllm",
-                    ) from e
-                elif isinstance(e, ProviderError):
-                    # Already wrapped, re-raise as-is
-                    raise
-                else:
-                    raise ProviderError(
-                        message=f"vLLM HTTP error {e.response.status_code}: {e.response.text}",
-                        provider="vllm",
-                    ) from e
-
-            except httpx.TimeoutException as e:
-                raise ProviderTimeoutError(
-                    message=f"vLLM request timed out after {self.timeout}s",
-                    provider="vllm",
-                    details={
-                        "model": model,
-                        "timeout": self.timeout,
-                        "suggestion": (
-                            "Try:\n"
-                            "  1. Increase timeout with --timeout flag\n"
-                            "  2. Use a smaller model\n"
-                            "  3. Reduce max_tokens"
-                        ),
-                    },
-                ) from e
-
-            except httpx.ConnectError as e:
-                raise ProviderConnectionError(
-                    message=f"Cannot connect to vLLM server at {self.base_url}",
-                    provider="vllm",
-                    details={
-                        "suggestion": (
-                            "Ensure vLLM server is running:\n"
-                            "  python -m vllm.entrypoints.openai.api_server \\\n"
-                            "    --model YOUR_MODEL --port 8000"
-                        )
-                    },
-                ) from e
-
-            except ProviderError:
-                # Already a provider error, re-raise as-is
-                raise
+        raise NotImplementedError(
+            f"{self.name} chat() is owned by the Sandhi typed variant; "
+            "use resolve_transport_class() to obtain the typed provider."
+        )
 
     async def stream(
         self,
@@ -466,249 +327,12 @@ class VLLMProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
-        """Stream chat completion from vLLM server.
-
-        Args:
-            messages: Conversation messages
-            model: Model name
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            tools: Available tools
-            **kwargs: Additional parameters
-
-        Yields:
-            StreamChunk with content or tool calls
-        """
-        if not model and self._available_model:
-            model = self._available_model
-
-        payload: Dict[str, Any] = {
-            "model": model,
-            "messages": convert_messages_to_openai_format(messages),
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": True,
-        }
-
-        if "top_p" in kwargs:
-            payload["top_p"] = kwargs["top_p"]
-
-        if tools and _model_supports_tools(model):
-            payload["tools"] = convert_tools_to_openai_format(tools)
-            payload["tool_choice"] = kwargs.get("tool_choice", "auto")
-
-        accumulated_content = ""
-        accumulated_tool_calls: List[Dict[str, Any]] = []
-        uses_thinking_tags = _model_uses_thinking_tags(model)
-
-        try:
-            async with self.client.stream(
-                "POST",
-                f"{self.base_url}/v1/chat/completions",
-                json=payload,
-            ) as response:
-                if response.status_code != 200:
-                    error_text = ""
-                    async for chunk in response.aiter_text():
-                        error_text += chunk
-                    raise ProviderError(
-                        message=f"vLLM streaming error: {error_text}",
-                        provider="vllm",
-                        details={"status_code": response.status_code},
-                    )
-
-                async for line in response.aiter_lines():
-                    if not line or line == "data: [DONE]":
-                        continue
-
-                    if line.startswith("data: "):
-                        try:
-                            data = json_loads(line[6:])
-                            choices = data.get("choices", [])
-                            if not choices:
-                                continue
-
-                            choice = choices[0]
-                            delta = choice.get("delta", {})
-                            finish_reason = choice.get("finish_reason")
-
-                            # Handle content
-                            content = delta.get("content")
-                            if content:
-                                accumulated_content += content
-                                yield StreamChunk(
-                                    content=content,
-                                    is_final=False,
-                                    role="assistant",
-                                    model=model,
-                                )
-
-                            # Handle tool calls
-                            tool_call_delta = delta.get("tool_calls")
-                            if tool_call_delta:
-                                for tc in tool_call_delta:
-                                    idx = tc.get("index", 0)
-                                    while len(accumulated_tool_calls) <= idx:
-                                        accumulated_tool_calls.append(
-                                            {"id": "", "name": "", "arguments": ""}
-                                        )
-                                    if "id" in tc:
-                                        accumulated_tool_calls[idx]["id"] = tc["id"]
-                                    func = tc.get("function", {})
-                                    if "name" in func:
-                                        accumulated_tool_calls[idx]["name"] = func["name"]
-                                    if "arguments" in func:
-                                        accumulated_tool_calls[idx]["arguments"] += func[
-                                            "arguments"
-                                        ]
-
-                            # Final chunk
-                            if finish_reason:
-                                final_content = accumulated_content
-                                if uses_thinking_tags and final_content:
-                                    _, final_content = _extract_thinking_content(final_content)
-
-                                # Parse accumulated tool calls
-                                parsed_tool_calls = None
-                                if accumulated_tool_calls:
-                                    parsed_tool_calls = []
-                                    for tc in accumulated_tool_calls:
-                                        try:
-                                            args = (
-                                                json_loads(tc["arguments"])
-                                                if tc["arguments"]
-                                                else {}
-                                            )
-                                        except JSONDecodeError:
-                                            args = {"raw": tc["arguments"]}
-                                        parsed_tool_calls.append(
-                                            {
-                                                "id": tc["id"],
-                                                "name": tc["name"],
-                                                "arguments": args,
-                                            }
-                                        )
-
-                                # Fallback: Extract tool calls from content
-                                if not parsed_tool_calls and final_content:
-                                    fallback_calls, remaining = _extract_tool_calls_from_content(
-                                        final_content
-                                    )
-                                    if fallback_calls:
-                                        parsed_tool_calls = fallback_calls
-                                        final_content = remaining
-                                        self._provider_logger.logger.debug(
-                                            f"vLLM stream: Extracted {len(fallback_calls)} tool call(s) "
-                                            "from content using fallback parser"
-                                        )
-
-                                yield StreamChunk(
-                                    content=final_content,
-                                    is_final=True,
-                                    role="assistant",
-                                    model=model,
-                                    tool_calls=parsed_tool_calls,
-                                    stop_reason=finish_reason,
-                                )
-
-                        except JSONDecodeError:
-                            self._provider_logger.logger.debug(
-                                f"Failed to parse streaming chunk: {line}"
-                            )
-                            continue
-
-        except httpx.HTTPStatusError as e:
-            # Convert specific HTTP errors to provider error types
-            if e.response.status_code in (401, 403):
-                raise ProviderAuthError(
-                    message=f"vLLM authentication failed: {e.response.text}",
-                    provider="vllm",
-                ) from e
-            elif e.response.status_code == 429:
-                raise ProviderRateLimitError(
-                    message=f"vLLM rate limit exceeded: {e.response.text}",
-                    provider="vllm",
-                ) from e
-            elif isinstance(e, ProviderError):
-                # Already wrapped, re-raise as-is
-                raise
-            else:
-                raise ProviderError(
-                    message=f"vLLM streaming HTTP error {e.response.status_code}: {e.response.text}",
-                    provider="vllm",
-                ) from e
-
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"vLLM streaming timed out after {self.timeout}s",
-                provider="vllm",
-            ) from e
-
-        except ProviderError:
-            # Already a provider error, re-raise as-is
-            raise
-
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
-        """Parse vLLM API response.
-
-        Args:
-            result: Raw API response
-            model: Model name
-
-        Returns:
-            Parsed CompletionResponse
-        """
-        choices = result.get("choices", [])
-        if not choices:
-            return CompletionResponse(
-                content="",
-                role="assistant",
-                model=model,
-            )
-
-        choice = choices[0]
-        message = choice.get("message", {})
-        content = message.get("content", "")
-        tool_calls_data = message.get("tool_calls")
-
-        # Extract thinking content if present
-        metadata = {}
-        if _model_uses_thinking_tags(model) and content:
-            thinking, content = _extract_thinking_content(content)
-            if thinking:
-                metadata["reasoning_content"] = thinking
-
-        # Parse tool calls (native or fallback)
-        tool_calls = parse_openai_tool_calls(tool_calls_data)
-
-        # Fallback: Extract tool calls from content if server didn't parse them
-        # This happens when vLLM wasn't started with --enable-auto-tool-choice
-        if not tool_calls and content:
-            fallback_calls, remaining_content = _extract_tool_calls_from_content(content)
-            if fallback_calls:
-                tool_calls = fallback_calls
-                content = remaining_content
-                self._provider_logger.logger.debug(
-                    f"vLLM: Extracted {len(tool_calls)} tool call(s) from content using fallback parser"
-                )
-
-        # Get usage info — routed through sandhi's single-sourced parser (also recovers
-        # prompt_tokens_details.cached_tokens); native dict is the fallback.
-        usage_data = result.get("usage", {})
-        usage = (parse_usage_dict("openai", usage_data) if usage_data else None) or {
-            "prompt_tokens": usage_data.get("prompt_tokens", 0),
-            "completion_tokens": usage_data.get("completion_tokens", 0),
-            "total_tokens": usage_data.get("total_tokens", 0),
-        }
-
-        return CompletionResponse(
-            content=content,
-            role="assistant",
-            model=model,
-            tool_calls=tool_calls,
-            stop_reason=choice.get("finish_reason"),
-            usage=usage,
-            metadata=metadata if metadata else None,
+        """Stream transport is owned by the Sandhi typed variant (see ``chat``)."""
+        if False:  # pragma: no cover - async-generator marker for typing
+            yield StreamChunk()
+        raise NotImplementedError(
+            f"{self.name} stream() is owned by the Sandhi typed variant; "
+            "use resolve_transport_class() to obtain the typed provider."
         )
 
     async def close(self) -> None:

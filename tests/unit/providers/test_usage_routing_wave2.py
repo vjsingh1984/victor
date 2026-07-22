@@ -134,18 +134,6 @@ def _mistral() -> Any:
     return MistralProvider(api_key="test-key")
 
 
-def _vllm() -> Any:
-    from victor.providers.vllm_provider import VLLMProvider
-
-    return VLLMProvider(base_url="http://localhost:8000")
-
-
-def _lmstudio() -> Any:
-    from victor.providers.lmstudio_provider import LMStudioProvider
-
-    return LMStudioProvider(_skip_discovery=True)
-
-
 OPENAI_SHAPE_ADAPTERS: list = [
     pytest.param(_azure, id="azure_openai"),
     pytest.param(_openrouter, id="openrouter"),
@@ -155,8 +143,6 @@ OPENAI_SHAPE_ADAPTERS: list = [
     pytest.param(_moonshot, id="moonshot"),
     pytest.param(_cerebras, id="cerebras"),
     pytest.param(_mistral, id="mistral"),
-    pytest.param(_vllm, id="vllm"),
-    pytest.param(_lmstudio, id="lmstudio"),
 ]
 
 
@@ -227,119 +213,3 @@ class TestCerebrasTimingAugmentation:
         monkeypatch.setattr(up, "_sg", None)
         parsed = _cerebras()._parse_response(self._result(), "test-model")
         assert parsed.usage == {**LEGACY_USAGE, "total_time_ms": 1500}
-
-
-# ---------------------------------------------------------------------------
-# Qwen (slug "openai"): SDK pydantic usage object inside chat()
-# ---------------------------------------------------------------------------
-
-
-def _qwen_provider_with_fake_client(usage_obj: Any) -> Any:
-    from victor.providers.qwen_provider import QwenProvider
-
-    provider = QwenProvider(api_key="test-key")
-    message = SimpleNamespace(content="hello", tool_calls=None)
-    choice = SimpleNamespace(message=message, finish_reason="stop")
-    response = SimpleNamespace(
-        choices=[choice], usage=usage_obj, model_dump=lambda: {"mocked": True}
-    )
-
-    async def create(**kwargs: Any) -> Any:
-        return response
-
-    provider.client = SimpleNamespace(
-        chat=SimpleNamespace(completions=SimpleNamespace(create=create))
-    )
-    return provider
-
-
-def _fake_sdk_usage(raw_block: Dict[str, Any]) -> SimpleNamespace:
-    return SimpleNamespace(
-        model_dump=lambda: dict(raw_block),
-        prompt_tokens=raw_block.get("prompt_tokens", 0),
-        completion_tokens=raw_block.get("completion_tokens", 0),
-        total_tokens=raw_block.get("total_tokens", 0),
-    )
-
-
-class TestQwen:
-    async def test_routed_path_gains_cached_split(self, monkeypatch):
-        monkeypatch.setattr(up, "_sg", fake_sg(NEUTRAL))
-        provider = _qwen_provider_with_fake_client(_fake_sdk_usage(RAW_BLOCK))
-        response = await provider.chat(messages=[], model="qwen-test")
-        assert response.usage == ROUTED_USAGE
-
-    async def test_fallback_without_binding(self, monkeypatch):
-        monkeypatch.setattr(up, "_sg", None)
-        provider = _qwen_provider_with_fake_client(_fake_sdk_usage(RAW_BLOCK))
-        response = await provider.chat(messages=[], model="qwen-test")
-        assert response.usage == LEGACY_USAGE
-
-
-# ---------------------------------------------------------------------------
-# Ollama (slug "ollama"): top-level eval counts, no {"usage": ...} envelope
-# ---------------------------------------------------------------------------
-
-OLLAMA_RESULT = {
-    "message": {"content": "hello"},
-    "done": True,
-    "done_reason": "stop",
-    "prompt_eval_count": 512,
-    "eval_count": 128,
-}
-
-# Canned neutral values deliberately differ from the raw eval counts so the
-# routed path is distinguishable from the native fallback.
-OLLAMA_NEUTRAL = {
-    "tokens_in": 500,
-    "tokens_out": 100,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-}
-
-OLLAMA_ROUTED_USAGE = {"prompt_tokens": 500, "completion_tokens": 100, "total_tokens": 600}
-OLLAMA_LEGACY_USAGE = {"prompt_tokens": 512, "completion_tokens": 128, "total_tokens": 640}
-
-
-def _ollama() -> Any:
-    from victor.providers.ollama_provider import OllamaProvider
-
-    return OllamaProvider(_skip_discovery=True)
-
-
-class TestOllamaNonStreaming:
-    def test_routed_path(self, monkeypatch):
-        monkeypatch.setattr(up, "_sg", fake_sg(OLLAMA_NEUTRAL))
-        parsed = _ollama()._parse_response(dict(OLLAMA_RESULT), "test-model")
-        assert parsed.usage == OLLAMA_ROUTED_USAGE
-
-    def test_fallback_without_binding(self, monkeypatch):
-        monkeypatch.setattr(up, "_sg", None)
-        parsed = _ollama()._parse_response(dict(OLLAMA_RESULT), "test-model")
-        assert parsed.usage == OLLAMA_LEGACY_USAGE
-
-    def test_no_eval_counts_stays_none(self, monkeypatch):
-        monkeypatch.setattr(up, "_sg", fake_sg(OLLAMA_NEUTRAL))
-        result = {"message": {"content": "hello"}, "done": True, "done_reason": "stop"}
-        parsed = _ollama()._parse_response(result, "test-model")
-        assert parsed.usage is None
-
-
-class TestOllamaStreamingFinalChunk:
-    def test_routed_path(self, monkeypatch):
-        monkeypatch.setattr(up, "_sg", fake_sg(OLLAMA_NEUTRAL))
-        chunk = _ollama()._parse_stream_chunk(dict(OLLAMA_RESULT))
-        assert chunk.is_final
-        assert chunk.usage == OLLAMA_ROUTED_USAGE
-
-    def test_fallback_without_binding(self, monkeypatch):
-        monkeypatch.setattr(up, "_sg", None)
-        chunk = _ollama()._parse_stream_chunk(dict(OLLAMA_RESULT))
-        assert chunk.is_final
-        assert chunk.usage == OLLAMA_LEGACY_USAGE
-
-    def test_non_final_chunk_has_no_usage(self, monkeypatch):
-        monkeypatch.setattr(up, "_sg", fake_sg(OLLAMA_NEUTRAL))
-        chunk = _ollama()._parse_stream_chunk({"message": {"content": "hi"}, "done": False})
-        assert not chunk.is_final
-        assert chunk.usage is None

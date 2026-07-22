@@ -1,372 +1,172 @@
-"""Unit tests for sandhi transport wave 2a: Anthropic NON-STREAMING chat (FEP-0020 Phase 4 T6).
-
-All tests run without the real binding by monkeypatching the module seam ``_sg`` (both in
-``sandhi_transport`` and, for deterministic cache-split assertions, ``usage_parsing``).
-
-Scope contract pinned here:
-- only the non-streaming wire seam (``_create_message_raw``) is overridden;
-- streaming stays 100% native (wave 2b is a separate go/no-go);
-- OAuth-mode providers are excluded at the resolver (binding sends ``x-api-key`` only).
-"""
+"""Anthropic coverage for the direct typed Sandhi path."""
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 import victor.providers.sandhi_transport as st
-import victor.providers.usage_parsing as up
 from victor.providers.anthropic_provider import AnthropicProvider
-from victor.providers.base import (
-    Message,
-    ProviderAuthError,
-    ProviderRateLimitError,
-    ToolDefinition,
-)
-
-CORPUS = json.loads(
-    (
-        Path(__file__).parent
-        / "fixtures"
-        / "sandhi_usage"
-        / "anthropic"
-        / "complete_cache_split.json"
-    ).read_text()
-)
+from victor.providers.base import Message, ToolDefinition
 
 
-@pytest.fixture(autouse=True)
-def _reset_transport_state(monkeypatch):
-    monkeypatch.delenv("VICTOR_SANDHI_TRANSPORT_PROVIDERS", raising=False)
-    st.set_sandhi_transport_providers(None)
-    st._warned_binding_missing = False
-    yield
-    st.set_sandhi_transport_providers(None)
-    st._warned_binding_missing = False
+class FakeAnthropicHandle:
+    def __init__(self) -> None:
+        self.requests: list[dict] = []
 
-
-@pytest.fixture(autouse=True)
-def _deterministic_usage_parser(monkeypatch):
-    """Stub the usage-parsing binding so cache-split assertions hold without victor[sandhi]."""
-
-    def fake_parse_usage(slug: str, payload_json: str):
-        block = json.loads(payload_json)["usage"]
-        return {
-            "tokens_in": block.get("input_tokens", 0),
-            "tokens_out": block.get("output_tokens", 0),
-            "cache_creation_tokens": block.get("cache_creation_input_tokens", 0) or 0,
-            "cache_read_tokens": block.get("cache_read_input_tokens", 0) or 0,
-        }
-
-    monkeypatch.setattr(up, "_sg", SimpleNamespace(parse_usage=fake_parse_usage))
-
-
-def stub_complete(result=None, exc: BaseException | None = None, calls: list | None = None):
-    async def _complete(*args, **kwargs):
-        if calls is not None:
-            calls.append((args, kwargs))
-        if exc is not None:
-            raise exc
-        return result
-
-    return _complete
-
-
-def make_native(**overrides) -> AnthropicProvider:
-    kwargs = {"api_key": "test-key", "max_retries": 0}
-    kwargs.update(overrides)
-    return AnthropicProvider(**kwargs)
-
-
-def make_sandhi(**overrides) -> "st.SandhiAnthropicProvider":
-    kwargs = {"api_key": "test-key", "max_retries": 0}
-    kwargs.update(overrides)
-    return st.SandhiAnthropicProvider(**kwargs)
-
-
-def corpus_message():
-    from anthropic.types import Message as AnthropicMessage
-
-    return AnthropicMessage.model_validate(CORPUS)
-
-
-# ---------------------------------------------------------------------------
-# Golden pin for the _build_request_params extraction (behavior-preserving)
-# ---------------------------------------------------------------------------
-
-GOLDEN_MESSAGES = [
-    Message(role="system", content="You are terse."),
-    Message(role="user", content="What is 2+2?"),
-    Message(role="assistant", content="4"),
-    Message(role="user", content="And 3+3?"),
-]
-
-GOLDEN_TOOLS = [
-    ToolDefinition(
-        name="read_file",
-        description="Read a file",
-        parameters={
-            "type": "object",
-            "properties": {"path": {"type": "string"}},
-            "required": ["path"],
-        },
-    ),
-    ToolDefinition(
-        name="grep",
-        description="Search for a pattern",
-        parameters={
-            "type": "object",
-            "properties": {"pattern": {"type": "string"}},
-            "required": ["pattern"],
-        },
-        schema_level="stub",
-    ),
-]
-
-# The exact request params the CURRENT inline chat() block produces for the scenario
-# above (system w/ cache_control, multi-message, tools w/ cache boundary before the
-# first stub tool). Pinned pre-refactor by capturing messages.create kwargs.
-GOLDEN_PARAMS = {
-    "model": "claude-sonnet-4-6",
-    "messages": [
-        {"role": "user", "content": "What is 2+2?"},
-        {"role": "assistant", "content": "4"},
-        {"role": "user", "content": "And 3+3?"},
-    ],
-    "max_tokens": 512,
-    "temperature": 0.2,
-    "system": [
-        {
-            "type": "text",
-            "text": "You are terse.",
-            "cache_control": {"type": "ephemeral"},
-        }
-    ],
-    "tools": [
-        {
-            "name": "read_file",
-            "description": "Read a file",
-            "input_schema": {
-                "type": "object",
-                "properties": {"path": {"type": "string"}},
-                "required": ["path"],
-            },
-            "cache_control": {"type": "ephemeral"},
-        },
-        {
-            "name": "grep",
-            "description": "Search for a pattern",
-            "input_schema": {
-                "type": "object",
-                "properties": {"pattern": {"type": "string"}},
-                "required": ["pattern"],
-            },
-        },
-    ],
-}
-
-
-class _EmptyStream:
-    """Async CM mimicking client.messages.stream(...) yielding no events."""
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        return False
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        raise StopAsyncIteration
-
-
-class TestBuildRequestParamsGolden:
-    async def test_chat_call_site_matches_golden(self):
-        """Pins the CURRENT inline behavior: chat() must send exactly GOLDEN_PARAMS."""
-        provider = make_native()
-        create = AsyncMock(return_value=corpus_message())
-        provider.client = SimpleNamespace(messages=SimpleNamespace(create=create))
-
-        await provider.chat(
-            GOLDEN_MESSAGES,
-            model="claude-sonnet-4-6",
-            temperature=0.2,
-            max_tokens=512,
-            tools=GOLDEN_TOOLS,
+    async def complete_json(self, request_json: str) -> str:
+        self.requests.append(json.loads(request_json))
+        return json.dumps(
+            {
+                "schema_version": "1",
+                "id": "msg_1",
+                "model": "claude-test",
+                "output": {
+                    "content": "answer",
+                    "tool_calls": [{"id": "t1", "name": "lookup", "arguments": '{"q":1}'}],
+                },
+                "finish_reason": "tool_calls",
+                "usage": {
+                    "tokens_in": 10,
+                    "tokens_out": 5,
+                    "cache_creation_tokens": 3,
+                    "cache_read_tokens": 7,
+                    "completeness": "final",
+                    "attempts": 1,
+                },
+                "extensions": {
+                    "reasoning": "considered",
+                    "anthropic": {"id": "msg_1", "usage": {"input_tokens": 10}},
+                },
+            }
         )
 
-        assert create.call_args.kwargs == GOLDEN_PARAMS
+    def stream_json(self, request_json: str):
+        self.requests.append(json.loads(request_json))
 
-    async def test_stream_call_site_matches_golden(self):
-        provider = make_native()
-        captured: dict = {}
+        async def events():
+            yield json.dumps({"event": "response_start", "id": "msg_2", "model": "claude-test"})
+            yield json.dumps({"event": "reasoning_delta", "delta": "think"})
+            yield json.dumps({"event": "text_delta", "delta": "answer"})
+            yield json.dumps({"event": "finish", "reason": "stop"})
+            yield json.dumps(
+                {
+                    "event": "usage",
+                    "usage": {
+                        "tokens_in": 10,
+                        "tokens_out": 5,
+                        "cache_creation_tokens": 3,
+                        "cache_read_tokens": 7,
+                    },
+                }
+            )
 
-        def fake_stream(**kwargs):
-            captured.update(kwargs)
-            return _EmptyStream()
-
-        provider.client = SimpleNamespace(messages=SimpleNamespace(stream=fake_stream))
-        async for _ in provider.stream(
-            GOLDEN_MESSAGES,
-            model="claude-sonnet-4-6",
-            temperature=0.2,
-            max_tokens=512,
-            tools=GOLDEN_TOOLS,
-        ):
-            pass
-
-        assert captured == GOLDEN_PARAMS
-
-    def test_build_request_params_golden(self):
-        provider = make_native()
-        params = provider._build_request_params(
-            GOLDEN_MESSAGES,
-            model="claude-sonnet-4-6",
-            temperature=0.2,
-            max_tokens=512,
-            tools=GOLDEN_TOOLS,
-        )
-        assert params == GOLDEN_PARAMS
+        return events()
 
 
-# ---------------------------------------------------------------------------
-# Resolver gating
-# ---------------------------------------------------------------------------
+class FakeRuntime:
+    def __init__(self) -> None:
+        self.handle = FakeAnthropicHandle()
+        self.calls: list[tuple] = []
+
+    def provider(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+        return self.handle
 
 
-class TestResolverAnthropic:
-    def test_resolver_returns_sandhi_variant_when_enabled(self, monkeypatch):
-        monkeypatch.setattr(st, "_sg", SimpleNamespace())
-        st.set_sandhi_transport_providers(["anthropic"])
-        resolved = st.resolve_transport_class("anthropic", AnthropicProvider, {})
-        assert resolved is st.SandhiAnthropicProvider
-        assert issubclass(resolved, AnthropicProvider)
-
-    def test_oauth_stays_native_even_when_enabled(self, monkeypatch):
-        """The binding sends x-api-key only — OAuth-mode providers must stay native."""
-        monkeypatch.setattr(st, "_sg", SimpleNamespace())
-        st.set_sandhi_transport_providers(["anthropic"])
-        resolved = st.resolve_transport_class(
-            "anthropic", AnthropicProvider, {"auth_mode": "oauth"}
-        )
-        assert resolved is AnthropicProvider
-
-    def test_resolver_off_by_default(self):
-        assert st.resolve_transport_class("anthropic", AnthropicProvider, {}) is AnthropicProvider
+@pytest.fixture
+def runtime(monkeypatch) -> FakeRuntime:
+    value = FakeRuntime()
+    monkeypatch.setattr(st, "_sg", SimpleNamespace(ProviderRuntime=lambda: value))
+    return value
 
 
-# ---------------------------------------------------------------------------
-# Non-streaming wire seam through the (stubbed) binding
-# ---------------------------------------------------------------------------
-
-
-class TestSandhiAnthropicChat:
-    async def test_chat_via_sandhi_parses_identically(self, monkeypatch):
-        calls: list = []
-        result = {"status": 200, "body": json.dumps(CORPUS), "usage": {}}
-        monkeypatch.setattr(st, "_sg", SimpleNamespace(complete=stub_complete(result, calls=calls)))
-        provider = make_sandhi()
-        native_create = AsyncMock()
-        provider.client = SimpleNamespace(messages=SimpleNamespace(create=native_create))
-
-        response = await provider.chat(
-            [Message(role="user", content="hi")], model="claude-sonnet-4-6"
-        )
-
-        assert response.content == "Hello, world"
-        assert response.stop_reason == "end_turn"
-        assert response.usage == {
-            "prompt_tokens": 1024,
-            "completion_tokens": 256,
-            "total_tokens": 1280,
-            "cache_creation_input_tokens": 2048,
-            "cache_read_input_tokens": 4096,
-        }
-        native_create.assert_not_awaited()
-
-        args, kwargs = calls[0]
-        slug, model, base_url, api_key, body_json, session = args
-        assert slug == "anthropic"
-        assert model == "claude-sonnet-4-6"
-        assert base_url == "https://api.anthropic.com"
-        assert api_key == "test-key"
-        assert session is None
-        assert kwargs["max_retries"] == 0, "victor's resilience is the sole retry owner"
-        assert kwargs["timeout_secs"] > 0
-        # The forwarded body is exactly the params _build_request_params produced.
-        expected = provider._build_request_params(
-            [Message(role="user", content="hi")],
-            model="claude-sonnet-4-6",
-            temperature=0.7,
-            max_tokens=4096,
-            tools=None,
-        )
-        assert json.loads(body_json) == expected
-
-    async def test_explicit_base_url_forwarded(self, monkeypatch):
-        calls: list = []
-        result = {"status": 200, "body": json.dumps(CORPUS), "usage": {}}
-        monkeypatch.setattr(st, "_sg", SimpleNamespace(complete=stub_complete(result, calls=calls)))
-        provider = make_sandhi(base_url="http://127.0.0.1:9999")
-        await provider.chat([Message(role="user", content="hi")], model="claude-sonnet-4-6")
-        assert calls[0][0][2] == "http://127.0.0.1:9999"
-
-    @pytest.mark.parametrize(
-        "raised,expected",
-        [
-            (RuntimeError("sandhi transport: rate limited (429)"), ProviderRateLimitError),
-            (RuntimeError("sandhi transport: auth failed (401/403)"), ProviderAuthError),
-        ],
+def make_provider() -> st.SandhiAnthropicProvider:
+    return st.SandhiAnthropicProvider(
+        api_key="k", base_url="https://api.anthropic.test", max_retries=2
     )
-    async def test_error_mapping(self, monkeypatch, raised, expected):
-        monkeypatch.setattr(st, "_sg", SimpleNamespace(complete=stub_complete(exc=raised)))
-        provider = make_sandhi()
-        with pytest.raises(expected):
-            await provider.chat([Message(role="user", content="hi")], model="claude-sonnet-4-6")
-        assert provider._sandhi_demoted is False, "upstream-semantic errors must not demote"
 
-    async def test_binding_internal_error_demotes_once_and_falls_back_native(self, monkeypatch):
-        calls: list = []
-        monkeypatch.setattr(
-            st,
-            "_sg",
-            SimpleNamespace(complete=stub_complete(exc=TypeError("bad FFI shape"), calls=calls)),
+
+def test_resolver_uses_typed_anthropic(runtime):
+    assert (
+        st.resolve_transport_class("anthropic", AnthropicProvider, {}) is st.SandhiAnthropicProvider
+    )
+
+
+@pytest.mark.asyncio
+async def test_complete_preserves_anthropic_policy_and_consumes_typed_response(runtime):
+    provider = make_provider()
+    tools = [
+        ToolDefinition(
+            name="lookup",
+            description="Lookup",
+            parameters={"type": "object"},
+            schema_level="full",
         )
-        provider = make_sandhi()
-        provider.client = SimpleNamespace(
-            messages=SimpleNamespace(create=AsyncMock(return_value=corpus_message()))
+    ]
+    response = await provider.chat(
+        [Message(role="system", content="policy"), Message(role="user", content="hello")],
+        model="claude-test",
+        tools=tools,
+    )
+
+    assert response.content == "answer"
+    assert response.metadata == {"reasoning_content": "considered"}
+    assert response.tool_calls == [{"id": "t1", "name": "lookup", "arguments": {"q": 1}}]
+    assert response.usage == {
+        "prompt_tokens": 10,
+        "completion_tokens": 5,
+        "total_tokens": 15,
+        "cache_creation_input_tokens": 3,
+        "cache_read_input_tokens": 7,
+    }
+
+    request = runtime.handle.requests[0]
+    assert request["messages"][0] == {"role": "system", "content": "policy"}
+    native = request["extensions"]["anthropic"]
+    assert native["system"][0]["cache_control"] == {"type": "ephemeral"}
+    assert native["tools"][0]["cache_control"] == {"type": "ephemeral"}
+    assert runtime.calls[0][1]["base_url"] == "https://api.anthropic.test"
+    assert runtime.calls[0][1]["auth_scheme"] == "api_key"
+
+
+@pytest.mark.asyncio
+async def test_oauth_selects_bearer_auth_before_constructing_handle(runtime):
+    with patch("victor.providers.anthropic_provider.OAuthTokenManager") as manager_cls:
+        manager = MagicMock()
+        manager._load_cached.return_value = SimpleNamespace(
+            access_token="cached-oauth", is_expired=False
         )
+        manager.get_valid_token = AsyncMock(return_value="fresh-oauth")
+        manager_cls.return_value = manager
+        provider = st.SandhiAnthropicProvider(auth_mode="oauth")
 
-        r1 = await provider.chat([Message(role="user", content="hi")], model="claude-sonnet-4-6")
-        assert r1.content == "Hello, world", "the demoting call itself must transparently succeed"
-        assert provider._sandhi_demoted is True
+    await provider.chat([Message(role="user", content="hello")], model="claude-test")
 
-        r2 = await provider.chat([Message(role="user", content="hi")], model="claude-sonnet-4-6")
-        assert r2.content == "Hello, world"
-        assert len(calls) == 1, "after demotion the binding must never be touched again"
+    args, kwargs = runtime.calls[0]
+    assert args[:3] == ("anthropic", "claude-test", "fresh-oauth")
+    assert kwargs["auth_scheme"] == "bearer"
 
-    async def test_unparseable_body_demotes_and_falls_back_native(self, monkeypatch):
-        result = {"status": 200, "body": "not-json", "usage": {}}
-        monkeypatch.setattr(st, "_sg", SimpleNamespace(complete=stub_complete(result)))
-        provider = make_sandhi()
-        provider.client = SimpleNamespace(
-            messages=SimpleNamespace(create=AsyncMock(return_value=corpus_message()))
+
+@pytest.mark.asyncio
+async def test_stream_uses_typed_anthropic_events(runtime):
+    provider = make_provider()
+    chunks = [
+        chunk
+        async for chunk in provider.stream(
+            [Message(role="user", content="hello")], model="claude-test"
         )
-        response = await provider.chat(
-            [Message(role="user", content="hi")], model="claude-sonnet-4-6"
-        )
-        assert response.content == "Hello, world"
-        assert provider._sandhi_demoted is True
-
-
-class TestStreamingStaysNative:
-    def test_stream_not_overridden(self):
-        """Wave 2a is chat-only: the streaming entrypoint must be the native one."""
-        assert st.SandhiAnthropicProvider.stream is AnthropicProvider.stream
-        assert "stream" not in st.SandhiAnthropicProvider.__dict__
+    ]
+    assert chunks[0].metadata == {"reasoning_content": "think"}
+    assert chunks[1].content == "answer"
+    assert chunks[-1].is_final and chunks[-1].stop_reason == "stop"
+    assert chunks[-1].usage == {
+        "prompt_tokens": 10,
+        "completion_tokens": 5,
+        "total_tokens": 15,
+        "cache_creation_input_tokens": 3,
+        "cache_read_input_tokens": 7,
+    }

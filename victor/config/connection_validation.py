@@ -424,7 +424,7 @@ class ConnectionValidator:
         """
         if account.auth.method == "oauth":
             oauth_endpoints = {
-                "openai": "https://chatgpt.com/backend-api/codex/v1/models",
+                "openai": "https://chatgpt.com/backend-api/codex/models",
                 "qwen": "https://portal.qwen.ai/v1/models",
             }
             return oauth_endpoints.get(account.provider)

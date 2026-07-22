@@ -61,6 +61,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
+      - uses: ./.github/actions/install-sandhi
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -155,6 +157,8 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
+
+      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies
         run: |

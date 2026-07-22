@@ -1,186 +1,23 @@
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
+"""Z.AI model and endpoint-selection policy over Sandhi's typed runtime."""
 
-"""z.ai (ZhipuAI/智谱AI) provider implementation.
+from __future__ import annotations
 
-z.ai provides an OpenAI-compatible API with support for:
-- Chat completions with streaming
-- Native function/tool calling
-- Thinking mode (reasoning_content) for GLM-4.6/4.5/4.5-Air
-- Multiple GLM models (glm-4.7, glm-4.6, glm-4.5, glm-4.5-air)
+from typing import Any, Dict, Optional
 
-References:
-- https://docs.z.ai/
-- https://docs.z.ai/guides/develop/openai/python
-- https://docs.z.ai/guides/develop/http/introduction
-"""
+from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
+from victor.providers.sandhi_openai_compat_policy import SandhiOpenAICompatPolicy
 
-from victor.core.json_utils import json_loads
-from json import JSONDecodeError
-from typing import Any, Dict, List, Optional
-
-from victor.providers.base import CacheCostModel, CompletionResponse, ProviderError
-from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
-from victor.providers.resolution import (
-    UnifiedApiKeyResolver,
-    APIKeyNotFoundError,
-)
-
-# Z.AI endpoint URLs for different access tiers
-# Reference: https://docs.z.ai/api-reference/introduction
-ZAI_BASE_URLS = {
-    "standard": "https://api.z.ai/api/paas/v4/",
-    # Coding Plan keys require the /coding/ endpoint (standard endpoint returns 429)
-    "coding": "https://api.z.ai/api/coding/paas/v4/",
-    "china": "https://open.bigmodel.cn/api/paas/v4/",
-    "china-coding": "https://open.bigmodel.cn/api/coding/paas/v4/",
-    "anthropic": "https://api.z.ai/api/anthropic/v1/",
-}
-
-# Available zhipuAI GLM models
-# Reference: https://open.bigmodel.cn/dev/api
-ZAI_MODELS = {
-    # Paid flagship models (context windows from docs.z.ai and OpenRouter)
-    # GLM-5.2 (2026-06-16): 753B MoE (~40B active), 1M context window.
-    # MUST be listed here so get_context_window() matches it EXACTLY — otherwise
-    # the prefix fallback mis-resolves it to the glm-5 family's 200K and the
-    # base-class context_window() falls back to 8192 (see context_window() below).
-    "glm-5.2": {
-        "description": "GLM-5.2 - Latest SOTA model (753B MoE), 1M context",
-        "context_window": 1000000,
-        "max_output": 65535,
-        "supports_tools": True,
-        "supports_thinking": True,
-    },
-    "glm-5.1": {
-        "description": "GLM-5.1 - Latest SOTA model, rivals Claude Opus 4.6",
-        "context_window": 200000,
-        "max_output": 65535,
-        "supports_tools": True,
-        "supports_thinking": True,
-    },
-    "glm-5": {
-        "description": "GLM-5 - SOTA flagship model with agentic capabilities",
-        "context_window": 200000,
-        "max_output": 65535,
-        "supports_tools": True,
-        "supports_thinking": True,
-    },
-    "glm-5-turbo": {
-        "description": "GLM-5-Turbo - Fast flagship model for coding",
-        "context_window": 200000,
-        "max_output": 16384,
-        "supports_tools": True,
-        "supports_thinking": True,
-    },
-    "glm-5-code": {
-        "description": "GLM-5-Code - Specialized coding model",
-        "context_window": 200000,
-        "max_output": 65535,
-        "supports_tools": True,
-        "supports_thinking": True,
-    },
-    "glm-4.7": {
-        "description": "GLM-4.7 - Flagship model with 200K context",
-        "context_window": 200000,
-        "max_output": 8192,
-        "supports_tools": True,
-        "supports_thinking": True,
-    },
-    "glm-4.6": {
-        "description": "GLM-4.6 - Advanced agentic, reasoning, and coding",
-        "context_window": 128000,
-        "max_output": 8192,
-        "supports_tools": True,
-        "supports_thinking": True,
-    },
-    "glm-4.5": {
-        "description": "GLM-4.5 - 355B total, 32B active parameters",
-        "context_window": 128000,
-        "max_output": 4096,
-        "supports_tools": True,
-        "supports_thinking": True,
-    },
-    "glm-4.5-air": {
-        "description": "GLM-4.5-Air - Lightweight variant",
-        "context_window": 128000,
-        "max_output": 4096,
-        "supports_tools": True,
-        "supports_thinking": True,
-    },
-    # FREE models (unlimited use, no API credits required)
-    "glm-4.7-flash": {
-        "description": "GLM-4.7-Flash - Free model with 200K context",
-        "context_window": 200000,
-        "max_output": 4096,
-        "supports_tools": True,
-        "supports_thinking": False,
-    },
-    "glm-4.6v-flash": {
-        "description": "GLM-4.6V-Flash - Free multimodal model (vision + text)",
-        "context_window": 128000,
-        "max_output": 4096,
-        "supports_tools": True,
-        "supports_thinking": False,
-    },
-    # Paid Flash/FlashX models (lower cost)
-    "glm-4.7-flashx": {
-        "description": "GLM-4.7-FlashX - Fast, low-cost model",
-        "context_window": 200000,
-        "max_output": 4096,
-        "supports_tools": True,
-        "supports_thinking": False,
-    },
-    "glm-4.6v-flashx": {
-        "description": "GLM-4.6V-FlashX - Fast multimodal model",
-        "context_window": 128000,
-        "max_output": 4096,
-        "supports_tools": True,
-        "supports_thinking": False,
-    },
-    "glm-4.6v": {
-        "description": "GLM-4.6V - Multimodal model (vision + text)",
-        "context_window": 128000,
-        "max_output": 4096,
-        "supports_tools": True,
-        "supports_thinking": False,
-    },
-    "glm-4.5v": {
-        "description": "GLM-4.5V - Multimodal model (vision + text)",
-        "context_window": 128000,
-        "max_output": 4096,
-        "supports_tools": True,
-        "supports_thinking": False,
-    },
-}
+_SPEC = get_openai_compat_provider_spec("zai")
+ZAI_BASE_URLS = {name: f"{url}/" for name, url in _SPEC.endpoint_options.items()}
+ZAI_MODELS = {model: dict(metadata) for model, metadata in _SPEC.models.items()}
 
 
-class ZAIProvider(HttpxOpenAICompatProvider):
-    """Provider for z.ai GLM models (OpenAI-compatible API).
+class ZAIProvider(SandhiOpenAICompatPolicy):
+    """Victor selects a declared Z.AI plan/region; Sandhi owns those endpoint facts."""
 
-    Extends ``HttpxOpenAICompatProvider`` with ZAI-specific behaviour:
-    - Multi-endpoint routing (standard / coding-plan / china / anthropic)
-    - Model suffix notation: "glm-5.1:coding" routes to the coding endpoint
-    - Thinking mode (``thinking=True``) for GLM-4.6/4.5/4.5-Air
-    - Larger default timeout (300 s) for complex multi-tool tasks
-
-    Example:
-        provider = ZAIProvider(api_key="...", model="glm-5.1:coding")
-        response = await provider.chat(messages=[...], model="glm-5")
-    """
-
-    # GLM models can take 200-400 s for complex multi-tool tasks.
+    CONFIG_KEY = "zai"
     DEFAULT_TIMEOUT = 300
 
     def __init__(
@@ -194,143 +31,41 @@ class ZAIProvider(HttpxOpenAICompatProvider):
         endpoint: Optional[str] = None,
         model: Optional[str] = None,
         **kwargs: Any,
-    ):
-        """Initialize ZhipuAI provider.
-
-        Args:
-            api_key: ZhipuAI API key (or set ZAI_API_KEY env var, or use keyring)
-            base_url: ZhipuAI API base URL (overrides endpoint/coding_plan/model suffix)
-            timeout: Request timeout in seconds
-            max_retries: Maximum retry attempts
-            non_interactive: Force non-interactive mode (None = auto-detect)
-            coding_plan: Use GLM Coding Plan endpoint (shortcut for endpoint="coding")
-            endpoint: Named endpoint — "standard", "coding", "china", "anthropic"
-            model: Model name (can include endpoint suffix, e.g., "glm-4.6:coding")
-            **kwargs: Additional configuration
-
-        Model Suffix Format:
-            "glm-4.6:coding"   → coding endpoint
-            "glm-4.6:standard" → standard endpoint
-            "glm-4.6:china"    → china endpoint
-        """
-        # Strip model suffix for endpoint routing
-        self._model_suffix_stripped = None
-        model_endpoint = None
+    ) -> None:
+        suffix_endpoint: Optional[str] = None
         if model and ":" in model:
-            model_name, endpoint_variant = model.rsplit(":", 1)
-            if endpoint_variant in ZAI_BASE_URLS:
-                model_endpoint = endpoint_variant
-                self._model_suffix_stripped = model
-                model = model_name
-        self._clean_model_init = model
-
-        # Resolve base URL (priority: explicit > endpoint param > coding_plan > model suffix > default)
-        if base_url is None:
-            if endpoint is not None:
-                base_url = ZAI_BASE_URLS.get(endpoint, ZAI_BASE_URLS["standard"])
-            elif coding_plan:
-                base_url = ZAI_BASE_URLS["coding"]
-            elif model_endpoint is not None:
-                base_url = ZAI_BASE_URLS[model_endpoint]
-            else:
-                base_url = ZAI_BASE_URLS["standard"]
-
-        # Resolve API key
-        from victor.providers.logging import ProviderLogger as _PL
-
-        _logger = _PL("zai", __name__)
-        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
-        key_result = resolver.get_api_key("zai", explicit_key=api_key)
-        _logger.log_api_key_resolution(key_result)
-        if key_result.key is None:
-            raise APIKeyNotFoundError(
-                provider="zai",
-                sources_attempted=key_result.sources_attempted,
-                non_interactive=key_result.non_interactive,
+            candidate = model.rsplit(":", 1)[1]
+            if candidate == "anthropic":
+                raise ValueError(
+                    "Z.AI's Anthropic endpoint is a different protocol and is not admitted "
+                    "through the OpenAI-compatible provider"
+                )
+            if candidate in self.provider_spec().endpoint_options:
+                suffix_endpoint = candidate
+        selected = endpoint or ("coding" if coding_plan else None) or suffix_endpoint or "standard"
+        if selected == "anthropic":
+            raise ValueError(
+                "Z.AI's Anthropic endpoint is a different protocol and is not admitted "
+                "through the OpenAI-compatible provider"
             )
-        resolved_key = key_result.key
-        _logger.log_provider_init(
-            model="zai",
-            key_source=key_result.source_detail,
-            non_interactive=key_result.non_interactive,
-            config={"base_url": base_url, "timeout": timeout, **kwargs},
-        )
-
+        if selected not in self.provider_spec().endpoint_options:
+            available = ", ".join(sorted(self.provider_spec().endpoint_options))
+            raise ValueError(f"unknown Z.AI endpoint {selected!r}; expected one of {available}")
+        resolved_base = base_url or self.provider_spec().endpoint_options[selected]
         super().__init__(
-            api_key=resolved_key,
-            base_url=base_url,
+            api_key=api_key,
+            base_url=resolved_base,
             timeout=timeout,
             max_retries=max_retries,
-            provider_name="zai",
+            non_interactive=non_interactive,
             **kwargs,
         )
 
-    # ── BaseProvider identity ─────────────────────────────────────────────────
-
-    @property
-    def name(self) -> str:
-        return "zai"
-
-    def supports_tools(self) -> bool:
-        return True
-
-    def supports_streaming(self) -> bool:
-        return True
-
-    def supports_prompt_caching(self) -> bool:
-        """Z.AI GLM API-level context caching (~50% discount on cached tokens).
-
-        Z.AI provides automatic, implicit context caching for GLM-5 / GLM-4.7 /
-        GLM-4.6 / GLM-4.5 series models. The cache key is the repeated prefix
-        content (system prompt +, when stable, the tool definitions), so keeping
-        the system prompt and tools[] byte-stable across turns maximizes the
-        cached-token share and the resulting billing discount.
-
-        Evidence (Z.AI official docs, ``docs.z.ai/guides/capabilities/cache.md``):
-        - "Automatic Cache Recognition: Implicit caching that intelligently
-          identifies repeated context content without manual configuration"
-        - "Cached tokens are billed at discounted prices (usually 50% of
-          standard price)"
-        - Cache status is reported via ``usage.prompt_tokens_details.cached_tokens``.
-        - No explicit ``cache_control`` marker is required (unlike Anthropic).
-
-        ``HttpxOpenAICompatProvider`` does NOT override this; before this override
-        the inherited ``BaseProvider.supports_prompt_caching()`` returned
-        ``False``, so the framework treated ZAI like a non-caching provider and
-        never attempted prefix-stable tool selection.
-        """
-        return True
-
-    def supports_kv_prefix_caching(self) -> bool:
-        """Z.AI reuses computed KV state for matching prompt prefixes.
-
-        Same automatic prefix-similarity mechanism as the billing cache: when
-        consecutive requests share an identical leading prefix (system prompt +
-        tools), the inference engine reuses the precomputed key-value state,
-        reducing time-to-first-token. Declaring this enables the framework's
-        ``_kv_optimization_enabled`` gate chain (see
-        ``victor/agent/services/prompt_builder_runtime.py``) which in turn
-        activates:
-
-        - ``_apply_kv_tool_strategy()`` -- freezes the turn-1 tool set for the
-          session under the ``session_stable`` / ``additive`` strategies.
-        - ``_sort_tools_for_kv_stability()`` -- deterministic name-ordering so the
-          serialized ``tools[]`` hashes identically across turns.
-
-        The context cache has a bounded TTL (Z.AI notes "reasonable time limits")
-        and is invalidated by any prefix mutation, hence the need for stable
-        ordering and a frozen selection.
-        """
-        return True
-
-    # ── Template Method overrides ─────────────────────────────────────────────
-
     def _clean_model_name(self, model: str) -> str:
-        """Strip Z.AI endpoint suffix (e.g., "glm-5.1:coding" → "glm-5.1")."""
         if model and ":" in model:
-            parts = model.rsplit(":", 1)
-            if parts[1] in ZAI_BASE_URLS:
-                return parts[0]
+            name, suffix = model.rsplit(":", 1)
+            if suffix in self.provider_spec().endpoint_options:
+                return name
         return model
 
     def _get_provider_params(
@@ -341,174 +76,24 @@ class ZAIProvider(HttpxOpenAICompatProvider):
         thinking: bool = False,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """Standard params + optional thinking mode for GLM reasoning models."""
         params: Dict[str, Any] = {"temperature": temperature, "max_tokens": max_tokens}
         if thinking:
             params["thinking"] = {"type": "enabled"}
         return params
 
     def _extract_response_metadata(self, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Capture reasoning_content from thinking-mode responses."""
-        if "reasoning_content" in message:
-            return {"reasoning_content": message.get("reasoning_content")}
-        return None
+        reasoning = message.get("reasoning_content")
+        return {"reasoning_content": reasoning} if reasoning else None
 
     def _extract_stream_metadata(self, delta: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Capture reasoning_content from thinking-mode streaming deltas."""
-        rc = delta.get("reasoning_content")
-        if rc:
-            return {"reasoning_content": rc, "thinking_mode": True}
-        return None
+        reasoning = delta.get("reasoning_content")
+        return {"reasoning_content": reasoning, "thinking_mode": True} if reasoning else None
 
-    def _normalize_tool_calls(
-        self, tool_calls: Optional[List[Dict[str, Any]]]
-    ) -> Optional[List[Dict[str, Any]]]:
-        """Normalize tool calls into Victor's provider-neutral shape.
-
-        ``ZAIProvider`` now inherits the shared OpenAI-compatible transport and
-        parsing stack, but several repo-local call sites and tests still reach
-        this helper directly. Keep the provider surface stable and coerce
-        malformed JSON arguments to ``{}``, which matches the existing runtime
-        behavior of the neighboring provider implementations.
-        """
-        if not tool_calls:
-            return None
-
-        normalized: List[Dict[str, Any]] = []
-        for call in tool_calls:
-            if isinstance(call, dict) and "function" in call:
-                function = call.get("function", {})
-                name = function.get("name")
-                arguments = function.get("arguments", "{}")
-
-                if isinstance(arguments, str):
-                    try:
-                        arguments = json_loads(arguments)
-                    except JSONDecodeError:
-                        arguments = {}
-
-                if name:
-                    normalized.append(
-                        {
-                            "id": call.get("id", ""),
-                            "name": name,
-                            "arguments": arguments,
-                        }
-                    )
-            elif isinstance(call, dict) and "name" in call:
-                normalized.append(call)
-
-        return normalized if normalized else None
-
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
-        """Parse a non-streaming chat completion response.
-
-        The base compat provider already handles most of this flow, but ZAI
-        keeps its own tool-call normalizer so invalid JSON arguments degrade to
-        an empty object instead of propagating raw strings into tool execution.
-        """
-        choices = result.get("choices", [])
-        if not choices:
-            return CompletionResponse(
-                content="", role="assistant", model=model, raw_response=result
-            )
-
-        choice = choices[0]
-        message = choice.get("message", {})
-        content = message.get("content", "") or ""
-        tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
-
-        usage = None
-        usage_data = result.get("usage")
-        if usage_data:
-            usage = {
-                "prompt_tokens": usage_data.get("prompt_tokens", 0),
-                "completion_tokens": usage_data.get("completion_tokens", 0),
-                "total_tokens": usage_data.get("total_tokens", 0),
-            }
-
-        metadata = self._extract_response_metadata(message)
-
-        return CompletionResponse(
-            content=content,
-            role="assistant",
-            tool_calls=tool_calls,
-            stop_reason=choice.get("finish_reason"),
-            usage=usage,
-            model=model,
-            raw_response=result,
-            metadata=metadata,
-        )
-
-    # ── ZAI-specific helpers ──────────────────────────────────────────────────
-
-    def cache_cost_model(self) -> CacheCostModel:
-        """Characterized API caching (FEP-0011): ~50% discount on cached tokens."""
-        return CacheCostModel(
-            supported=True,
-            read_discount=0.5,
-            write_overhead=1.0,
-            min_prefix_tokens=0,
-            prefix_granularity="token",
-        )
-
-    def context_window(self, model: str) -> int:
-        """Context window in tokens — the method the runtime actually calls.
-
-        Resolution order (all config-driven, no code edit needed for new models):
-          1. provider_context_limits.yaml  (BaseProvider.context_window() — see base.py)
-          2. ZAI_MODELS registry            (see get_context_window() below)
-          3. 128000 safe default
-        To register a new GLM model, add a pattern to the `models:` block of
-        victor/config/provider_context_limits.yaml — it takes precedence over
-        the hardcoded ZAI_MODELS table.
-        """
-        return self.get_context_window(model)
+    def context_window(self, model: Optional[str] = None) -> int:
+        return super().context_window(self._clean_model_name(model or ""))
 
     def get_context_window(self, model: str) -> int:
-        """Get context window size for a GLM model.
+        return self.context_window(model)
 
-        Resolution order:
-          1. provider_context_limits.yaml (explicit provider/model match)
-          2. ZAI_MODELS registry (exact name, then prefix match)
-          3. 128000 safe default
 
-        Args:
-            model: Model name (e.g., "glm-5.2", "glm-4.7", "glm-4.6")
-
-        Returns:
-            Context window size in tokens (default 128K for unknown models)
-        """
-        # 1. Config-driven override: consult provider_context_limits.yaml.
-        # Reuses BaseProvider's YAML-first logic so registration stays a YAML
-        # edit (no code change). Falls back to ZAI_MODELS below if no entry.
-        try:
-            from victor.providers.base import BaseProvider
-
-            yaml_cw = BaseProvider.context_window(self, model)
-            if yaml_cw:
-                return yaml_cw
-        except Exception:
-            pass
-
-        # 2. Hardcoded registry (legacy / offline fallback)
-        if model in ZAI_MODELS:
-            return ZAI_MODELS[model]["context_window"]
-        for prefix, info in ZAI_MODELS.items():
-            if model.startswith(prefix):
-                return info["context_window"]
-        # 3. Safe default
-        return 128000
-
-    async def list_models(self) -> List[Dict[str, Any]]:
-        """List available z.ai GLM models."""
-        try:
-            response = await self.client.get("/models")
-            response.raise_for_status()
-            return response.json().get("data", [])
-        except Exception as e:
-            raise ProviderError(
-                message=f"z.ai failed to list models: {e}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
+__all__ = ["ZAI_BASE_URLS", "ZAI_MODELS", "ZAIProvider"]
