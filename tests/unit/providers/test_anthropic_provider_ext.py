@@ -146,12 +146,45 @@ async def test_close_is_safe_without_generation_client(anthropic_provider):
 
 
 @pytest.mark.asyncio
-async def test_list_models_uses_live_sdk_discovery():
-    """list_models() queries the anthropic SDK /v1/models when reachable.
+async def test_list_models_uses_sandhi_catalog(monkeypatch):
+    """When the Sandhi catalog is available, list_models() uses it (Victor shapes the facts)."""
+    provider = AnthropicProvider(api_key="test-key")
+    monkeypatch.setattr(
+        provider,
+        "_models_from_sandhi",
+        lambda: [
+            {
+                "id": "claude-fable-5",
+                "name": "Claude Fable 5",
+                "context_window": 1_000_000,
+                "max_output_tokens": 131_072,
+            }
+        ],
+    )
+    # The SDK must NOT be consulted when the catalog is present.
+    with patch(
+        "anthropic.AsyncAnthropic", side_effect=AssertionError("SDK unused when catalog present")
+    ):
+        models = await provider.list_models()
+
+    assert models == [
+        {
+            "id": "claude-fable-5",
+            "name": "Claude Fable 5",
+            "context_window": 1_000_000,
+            "max_output_tokens": 131_072,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_list_models_uses_live_sdk_when_catalog_absent(monkeypatch):
+    """When the Sandhi catalog is unavailable, list_models() falls back to the SDK /v1/models.
 
     The SDK client is discovery-only (transient); transport stays Sandhi-owned.
     """
     provider = AnthropicProvider(api_key="test-key")
+    monkeypatch.setattr(provider, "_models_from_sandhi", lambda: None)
     fake_model = SimpleNamespace(
         id="claude-future-9",
         display_name="Claude Future 9",
@@ -180,14 +213,15 @@ async def test_list_models_uses_live_sdk_discovery():
 
 
 @pytest.mark.asyncio
-async def test_list_models_falls_back_to_current_static_list():
-    """On discovery failure, list_models() returns the curated static fallback."""
+async def test_list_models_falls_back_to_current_static_list(monkeypatch):
+    """When catalog + SDK both fail, list_models() returns the curated static fallback."""
     provider = AnthropicProvider(api_key="test-key")
+    monkeypatch.setattr(provider, "_models_from_sandhi", lambda: None)
     with patch("anthropic.AsyncAnthropic", side_effect=RuntimeError("offline")):
         models = await provider.list_models()
 
     ids = [m["id"] for m in models]
-    # Current Claude lineup (web-sourced 2026-07): live discovery down -> static.
+    # Current Claude lineup (web-sourced 2026-07): catalog + live discovery down -> static.
     assert "claude-fable-5" in ids
     assert "claude-opus-4-8" in ids
     assert "claude-sonnet-5" in ids
@@ -195,3 +229,26 @@ async def test_list_models_falls_back_to_current_static_list():
     # Retired/ancient models must not be advertised in the fallback.
     assert "claude-sonnet-4-20250514" not in ids
     assert "claude-3-5-sonnet-20241022" not in ids
+
+
+@pytest.mark.asyncio
+async def test_models_from_sandhi_reads_real_catalog_when_available():
+    """Integration: _models_from_sandhi reads the real Sandhi catalog when the binding exposes it.
+
+    Skips cleanly when the installed Sandhi predates the catalog surface (TD-0004 Phase A),
+    so it is not CI-flaky.
+    """
+    try:
+        import sandhi_gateway as sg
+    except Exception:  # pragma: no cover - sandhi absent
+        pytest.skip("sandhi-gateway not installed")
+    if not hasattr(sg, "provider_models_json"):
+        pytest.skip("installed sandhi predates the catalog surface (TD-0004 Phase A)")
+
+    provider = AnthropicProvider(api_key="test-key")
+    models = provider._models_from_sandhi()
+    assert models is not None
+    ids = [m["id"] for m in models]
+    # The curated Anthropic lineup admitted in sandhi-providers catalog.rs.
+    assert "claude-fable-5" in ids
+    assert "claude-opus-4-8" in ids

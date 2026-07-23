@@ -244,9 +244,11 @@ this FEP remains authoritative for Victor rollout and support-boundary policy.
   those stable wire roles and the required `tool_call_id`/legacy function `name` linkage before
   HTTP. Provider/model-specific support or role downgrade policy remains in Victor; Sandhi does
   not silently rewrite roles.
-- Sandhi's provider catalog contains only stable wire facts (canonical slug, aliases, base URL,
-  model-specific endpoint routes). It is deliberately **not** a second model catalog. Victor
-  retains volatile model metadata and agent-facing capability policy.
+- Per TD-0004, Sandhi's provider catalog contains stable wire facts (canonical slug, aliases,
+  base URL, model-specific endpoint routes) **and curated model data** (id, context window, max
+  output, wire capabilities; no pricing) exposed via `provider_models_json`. Victor retains model
+  **policy** — which models to expose/select and the discovery UX. (Previously the catalog held wire
+  facts only; revised 2026-07-23 by TD-0004.)
 - A Python adapter may be removed only after request, response, tool-call, streaming, error,
   header, and usage parity tests pass for its Sandhi route. Provider-specific behavior must
   first become an explicit Sandhi extension point; it must not be hidden in a nominally generic
