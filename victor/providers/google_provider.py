@@ -22,7 +22,7 @@ the deprecated google-generativeai package.
 
 import logging
 import warnings
-from typing import Any, AsyncIterator, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,23 @@ from victor.providers.resolution import (
     APIKeyNotFoundError,
 )
 from victor.providers.logging import ProviderLogger
+
+# Curated offline fallback (mirrors the Sandhi catalog lineup): used when the
+# installed sandhi-gateway predates the TD-0004 catalog surface.
+_GOOGLE_STATIC_MODELS: List[Dict[str, Any]] = [
+    {
+        "id": "gemini-3-pro",
+        "name": "Gemini 3 Pro",
+        "context_window": 1_048_576,
+        "max_output_tokens": 65_536,
+    },
+    {
+        "id": "gemini-3-flash",
+        "name": "Gemini 3 Flash",
+        "context_window": 1_048_576,
+        "max_output_tokens": 65_536,
+    },
+]
 
 
 class GoogleProvider(BaseProvider):
@@ -208,6 +225,36 @@ class GoogleProvider(BaseProvider):
 
         target = model or getattr(self, "_current_model", None)
         return lookup(GOOGLE, target, GOOGLE_DEFAULT)
+
+    async def list_models(self) -> List[Dict[str, Any]]:
+        """List available Google Gemini models.
+
+        Resolution order -- Sandhi owns the catalog **data** (TD-0004 Phase A); Victor
+        owns the catalog **policy**:
+
+        1. **Sandhi catalog** -- curated model data via
+           ``sandhi_gateway.provider_models_json``, when the installed binding exposes it.
+        2. **Curated static list** (``_GOOGLE_STATIC_MODELS``) -- offline fallback
+           mirroring the catalog lineup.
+
+        Returns:
+            List of available models with metadata
+        """
+        catalog = self._models_from_sandhi()
+        if catalog is not None:
+            return catalog
+        return [dict(model) for model in _GOOGLE_STATIC_MODELS]
+
+    def _models_from_sandhi(self) -> Optional[List[Dict[str, Any]]]:
+        """Victor-shaped models from the Sandhi catalog, or ``None`` to fall back.
+
+        Shared catalog policy lives in ``victor.providers.sandhi_catalog``; ``None``
+        means the installed Sandhi binding predates the catalog surface (or has no
+        Gemini data), so ``list_models`` falls through to the static list.
+        """
+        from victor.providers.sandhi_catalog import models_from_sandhi
+
+        return models_from_sandhi(self.name)
 
     async def _ensure_valid_token(self) -> None:
         """Ensure OAuth token is valid, refreshing if needed."""

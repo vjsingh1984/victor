@@ -100,3 +100,63 @@ def test_raw_chat_stream_are_guard_stubs(google_provider):
     """The policy shell is concrete but transport is delegated to the Sandhi variant."""
     with pytest.raises(NotImplementedError):
         asyncio.run(google_provider.chat(messages=[], model="gemini"))
+
+
+def test_list_models_uses_sandhi_catalog(monkeypatch, google_provider):
+    """When the Sandhi catalog is available, list_models() uses it (Victor shapes the facts)."""
+    monkeypatch.setattr(
+        google_provider,
+        "_models_from_sandhi",
+        lambda: [
+            {
+                "id": "gemini-3-pro",
+                "name": "Gemini 3 Pro",
+                "context_window": 1_048_576,
+                "max_output_tokens": 65_536,
+            }
+        ],
+    )
+
+    models = asyncio.run(google_provider.list_models())
+
+    assert models == [
+        {
+            "id": "gemini-3-pro",
+            "name": "Gemini 3 Pro",
+            "context_window": 1_048_576,
+            "max_output_tokens": 65_536,
+        }
+    ]
+
+
+def test_list_models_falls_back_to_static_list(monkeypatch, google_provider):
+    """When the Sandhi catalog is unavailable, list_models() returns the curated static list."""
+    monkeypatch.setattr(google_provider, "_models_from_sandhi", lambda: None)
+
+    models = asyncio.run(google_provider.list_models())
+
+    ids = [m["id"] for m in models]
+    assert "gemini-3-pro" in ids
+    assert "gemini-3-flash" in ids
+    # Retired lineups must not be advertised in the fallback.
+    assert "gemini-1.5-pro" not in ids
+
+
+def test_models_from_sandhi_reads_real_catalog_when_available(google_provider):
+    """Integration: the shared catalog reader returns the curated Gemini lineup.
+
+    Skips cleanly when the installed Sandhi predates the catalog surface (TD-0004
+    Phase A), so it is not CI-flaky.
+    """
+    try:
+        import sandhi_gateway as sg
+    except Exception:  # pragma: no cover - sandhi absent
+        pytest.skip("sandhi-gateway not installed")
+    if not hasattr(sg, "provider_models_json"):
+        pytest.skip("installed sandhi predates the catalog surface (TD-0004 Phase A)")
+
+    models = google_provider._models_from_sandhi()
+    assert models is not None
+    ids = [m["id"] for m in models]
+    assert "gemini-3-pro" in ids
+    assert "gemini-3-flash" in ids

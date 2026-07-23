@@ -266,14 +266,23 @@ class OpenAIProvider(BaseProvider):
     async def list_models(self) -> List[Dict[str, Any]]:
         """List available OpenAI models.
 
-        Queries the OpenAI API to get available models, filtered to chat-capable models.
+        Resolution order -- Sandhi owns the catalog **data** (TD-0004 Phase A); Victor
+        owns the catalog **policy**:
+
+        1. **Sandhi catalog** -- curated model data via
+           ``sandhi_gateway.provider_models_json``, when the installed binding exposes it.
+        2. **Live SDK discovery** -- the OpenAI API's model list, filtered to
+           chat-capable models (fallback when the Sandhi catalog is absent).
 
         Returns:
             List of available models with metadata
 
         Raises:
-            ProviderError: If request fails
+            ProviderError: If the catalog is absent and the API request fails
         """
+        catalog = self._models_from_sandhi()
+        if catalog is not None:
+            return catalog
         try:
             response = await self.client.models.list()
             # Filter to GPT models and format consistently
@@ -301,6 +310,17 @@ class OpenAIProvider(BaseProvider):
                 provider=self.name,
                 raw_error=e,
             ) from e
+
+    def _models_from_sandhi(self) -> Optional[List[Dict[str, Any]]]:
+        """Victor-shaped models from the Sandhi catalog, or ``None`` to fall back.
+
+        Shared catalog policy lives in ``victor.providers.sandhi_catalog``; ``None``
+        means the installed Sandhi binding predates the catalog surface (or has no
+        OpenAI data), so ``list_models`` falls through to live SDK discovery.
+        """
+        from victor.providers.sandhi_catalog import models_from_sandhi
+
+        return models_from_sandhi(self.name)
 
     async def chat(
         self,
