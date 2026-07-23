@@ -1,8 +1,11 @@
 import argparse
+import asyncio
+import os
 from pathlib import Path
 import shlex
 import sys
 from io import StringIO
+from typing import Optional
 
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
@@ -58,6 +61,147 @@ async def analyze_metrics(path: str):
     return {"files": len(files), "loc": loc, "functions": functions, "classes": classes}
 
 
+# Wall-clock budget for literal scans so a pathological tree can never stall a
+# turn for minutes (env-overridable, mirroring the semantic path's
+# VICTOR_TIMEOUT_* convention).
+_LITERAL_SEARCH_TIMEOUT_ENV = "VICTOR_TIMEOUT_LITERAL_SEARCH"
+_LITERAL_SEARCH_TIMEOUT_DEFAULT = 30.0
+
+
+def _literal_search_timeout() -> float:
+    raw = os.environ.get(_LITERAL_SEARCH_TIMEOUT_ENV, "")
+    try:
+        return float(raw) if raw else _LITERAL_SEARCH_TIMEOUT_DEFAULT
+    except ValueError:
+        return _LITERAL_SEARCH_TIMEOUT_DEFAULT
+
+
+async def _timed_grep_search(
+    query: str,
+    path: str,
+    regex: bool = False,
+    case_sensitive: bool = False,
+    include_glob: Optional[str] = None,
+):
+    """Run :func:`grep_search` under the literal-search wall-clock budget."""
+    from victor.tools.unified._search_helpers import grep_search
+
+    kwargs = {"query": query, "path": path, "regex": regex, "case_sensitive": case_sensitive}
+    if include_glob is not None:
+        # Forwarded only when set so existing grep_search doubles/monkeypatches
+        # without the parameter keep working unchanged.
+        kwargs["include_glob"] = include_glob
+    return await asyncio.wait_for(
+        grep_search(**kwargs),
+        timeout=_literal_search_timeout(),
+    )
+
+
+# --- grep-idiom forgiveness -------------------------------------------------
+#
+# `code grep` is not GNU grep, but models call it as if it were (measured: 96%
+# of `code` errors were grep-style flags). Pre-parse normalization ABSORBS
+# flags whose behavior is always-on, MAPS flags with a supported equivalent,
+# and REJECTS everything else with a corrective hint.
+
+_CODE_SUBCOMMANDS = ("search", "grep", "test", "python", "execute", "metrics")
+
+# Always-on behaviors: line numbers, recursion, case-insensitive matching.
+_GREP_ABSORB_SHORT = frozenset("nrRi")
+_GREP_MAP_SHORT = {"l": "--files-only", "E": "--regex", "P": "--regex"}
+_GREP_ABSORB_LONG = frozenset({"--line-number", "--recursive", "--ignore-case"})
+_GREP_MAP_LONG = {
+    "--files-with-matches": "--files-only",
+    "--extended-regexp": "--regex",
+    "--perl-regexp": "--regex",
+}
+_GREP_PASSTHROUGH_LONG = frozenset({"--regex", "--case-sensitive", "--files-only", "--include"})
+
+
+def _unsupported_grep_flag(flag: str) -> str:
+    return (
+        "### ⚠️ UNSUPPORTED GREP FLAG\n"
+        f"`code grep` is not GNU grep — `{flag}` is not supported here.\n"
+        'Supported: code grep "PATTERN" [PATH] [--regex] [-C|--case-sensitive] '
+        "[-l|--files-only] [--include GLOB]\n"
+        "Line numbers and recursive search are always on; matching is "
+        "case-insensitive by default.\n"
+        f"  • For full grep syntax use the shell tool:  shell(cmd='grep {flag} ...')\n"
+        "  • Or drop the flag and rerun this `code grep` call."
+    )
+
+
+def _unknown_subcommand_redirect(name: str) -> str:
+    return (
+        "### ⚠️ UNKNOWN SUBCOMMAND\n"
+        f"`code` has no `{name}` subcommand. Supported: "
+        f"{', '.join(_CODE_SUBCOMMANDS)}.\n"
+        "  • To list files, use the `ls` tool or shell(cmd='ls ...').\n"
+        "  • To find files by name, use shell(cmd='find ...').\n"
+        '  • To search file contents: code grep "PATTERN" [PATH] [--include GLOB].'
+    )
+
+
+def _normalize_grep_flags(tokens: list) -> tuple[list, Optional[str]]:
+    """Normalize grep-style flags in ``tokens`` (everything after ``grep``).
+
+    Returns ``(normalized_tokens, rejection)``: on success ``rejection`` is
+    ``None``; on an unsupported flag it is the full corrective message and the
+    call must not proceed. Tokens at and after a literal ``--`` are untouched.
+    """
+    out: list = []
+    for i, token in enumerate(tokens):
+        if token == "--":
+            out.extend(tokens[i:])
+            return out, None
+        if token.startswith("--"):
+            name, _, _ = token.partition("=")
+            if name in _GREP_ABSORB_LONG:
+                continue
+            if name in _GREP_MAP_LONG:
+                mapped = _GREP_MAP_LONG[name]
+                if mapped not in out:
+                    out.append(mapped)
+                continue
+            if name in _GREP_PASSTHROUGH_LONG:
+                out.append(token)  # keeps the `--include=X` form intact
+                continue
+            return [], _unsupported_grep_flag(token)
+        if token.startswith("-") and len(token) > 1:
+            # Short-flag run like `-rn`: absorb/map letter by letter.
+            mapped_flags: list = []
+            keep_case_sensitive = False
+            for letter in token[1:]:
+                if letter in _GREP_ABSORB_SHORT:
+                    continue
+                if letter in _GREP_MAP_SHORT:
+                    mapped_flags.append(_GREP_MAP_SHORT[letter])
+                    continue
+                if letter == "C":
+                    # Note: `-C` collides with GNU grep's context-lines flag;
+                    # here it is `code grep`'s own --case-sensitive alias and
+                    # passes through unchanged.
+                    keep_case_sensitive = True
+                    continue
+                return [], _unsupported_grep_flag(token)
+            for mapped in mapped_flags:
+                if mapped not in out:
+                    out.append(mapped)
+            if keep_case_sensitive:
+                out.append("-C")
+            continue
+        out.append(token)
+    return out, None
+
+
+def _literal_timeout_message(query: str) -> str:
+    return (
+        f"### ❌ ERROR\nLiteral search for {query!r} exceeded "
+        f"{_literal_search_timeout():.0f}s and was cancelled. Narrow the path "
+        f"argument, or raise {_LITERAL_SEARCH_TIMEOUT_ENV}."
+    )
+
+
 class UnifiedCodeParser(argparse.ArgumentParser):
     def error(self, message):
         self.print_usage(sys.stderr)
@@ -97,6 +241,19 @@ def create_code_parser() -> UnifiedCodeParser:
         action="store_true",
         help="Case-sensitive match (default is case-insensitive)",
     )
+    grep_parser.add_argument(
+        "-l",
+        "--files-only",
+        action="store_true",
+        dest="files_only",
+        help="Print only file names with matches",
+    )
+    grep_parser.add_argument(
+        "--include",
+        default=None,
+        metavar="GLOB",
+        help="Only search files whose name matches GLOB (e.g. *.py)",
+    )
 
     # `search` subcommand — semantic/graph code search (delegates to victor-coding)
     search_parser = subparsers.add_parser("search", help="Semantic code search")
@@ -125,11 +282,16 @@ async def code_tool(cmd: str) -> str:
     Do NOT pass code commands to the shell tool.
 
     Example commands:
-      code search "authentication logic"   # semantic code search
-      code grep "class RST"                # literal pattern search
+      code search "authentication logic"       # semantic code search
+      code grep "class RST"                    # literal pattern search
+      code grep "def run" src --include *.py   # only files matching a glob
       code test pytest tests/
       code python "print('hello')"
       code metrics src/
+
+    grep flags you do NOT need: -n, -r, -R, -i are always on (absorbed if
+    passed). Use --regex for regex, -C for case-sensitive, -l for file names
+    only.
 
     Args:
         cmd: A code-intelligence subcommand string (e.g. 'grep "pattern"').
@@ -146,6 +308,17 @@ async def code_tool(cmd: str) -> str:
         operator = detect_shell_operators(args_list)
         if operator is not None:
             return shell_operator_rejection("code", operator)
+        if args_list and not args_list[0].startswith("-") and args_list[0] not in _CODE_SUBCOMMANDS:
+            # Hallucinated subcommands (`ls`, `find`, ...) get a redirect
+            # instead of an argparse "invalid choice" dump; `help` gets usage.
+            if args_list[0] == "help":
+                return parser.format_help()
+            return _unknown_subcommand_redirect(args_list[0])
+        if args_list and args_list[0] == "grep":
+            normalized, rejection = _normalize_grep_flags(args_list[1:])
+            if rejection is not None:
+                return rejection
+            args_list = ["grep"] + normalized
         parsed_args = parser.parse_args(args_list)
     except ValueError as e:
         return f"### ❌ ERROR\n{e}"
@@ -189,19 +362,19 @@ async def code_tool(cmd: str) -> str:
             return f"### ❌ ERROR\nMetrics analysis failed: {e}"
 
     elif parsed_args.subcommand == "grep":
-        from victor.tools.unified._search_helpers import (
-            format_grep_results,
-            grep_search,
-        )
+        from victor.tools.unified._search_helpers import format_grep_results
 
         try:
-            results = await grep_search(
+            results = await _timed_grep_search(
                 query=parsed_args.query,
                 path=parsed_args.path,
                 regex=parsed_args.regex,
                 case_sensitive=parsed_args.case_sensitive,
+                include_glob=parsed_args.include,
             )
-            return format_grep_results(results)
+            return format_grep_results(results, files_only=parsed_args.files_only)
+        except asyncio.TimeoutError:
+            return _literal_timeout_message(parsed_args.query)
         except Exception as e:
             return f"### ❌ ERROR\ngrep failed: {e}"
 
@@ -223,10 +396,13 @@ async def _code_search(parsed_args) -> str:
     otherwise (and for ``--mode literal``) falls back to a literal grep so the
     surface always works, per the graceful-degradation principle.
     """
-    from victor.tools.unified._search_helpers import format_grep_results, grep_search
+    from victor.tools.unified._search_helpers import format_grep_results
 
     if parsed_args.mode == "literal":
-        results = await grep_search(query=parsed_args.query, path=parsed_args.path)
+        try:
+            results = await _timed_grep_search(query=parsed_args.query, path=parsed_args.path)
+        except asyncio.TimeoutError:
+            return _literal_timeout_message(parsed_args.query)
         return format_grep_results(results)
 
     from victor.tools.unified._vertical_resolver import resolve_vertical_callable
@@ -238,7 +414,10 @@ async def _code_search(parsed_args) -> str:
     )
     if search_fn is None:
         # No semantic backend available — degrade to literal with a hint.
-        results = await grep_search(query=parsed_args.query, path=parsed_args.path)
+        try:
+            results = await _timed_grep_search(query=parsed_args.query, path=parsed_args.path)
+        except asyncio.TimeoutError:
+            return _literal_timeout_message(parsed_args.query)
         return (
             "### 💡 SYSTEM HINT\nSemantic code search requires the victor-coding "
             "package, which is not installed. Showing literal matches instead.\n\n"
@@ -262,6 +441,19 @@ async def _code_search(parsed_args) -> str:
             return f"### ❌ ERROR\nSemantic search failed: {e}"
     except Exception as e:
         return f"### ❌ ERROR\nSemantic search failed: {e}"
+
+    if isinstance(result, dict) and result.get("success") is False:
+        # Backend resolved but errored (e.g. "Settings not available in tool
+        # context") — degrade to literal grep, mirroring the absent-backend path.
+        reason = result.get("error", "unknown error")
+        try:
+            results = await _timed_grep_search(query=parsed_args.query, path=parsed_args.path)
+        except asyncio.TimeoutError:
+            return _literal_timeout_message(parsed_args.query)
+        return (
+            f"### 💡 SYSTEM HINT\nSemantic backend unavailable ({reason}); "
+            "showing literal grep results.\n\n" + format_grep_results(results)
+        )
 
     return _format_code_search_result(result)
 

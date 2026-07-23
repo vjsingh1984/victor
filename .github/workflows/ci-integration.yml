@@ -58,6 +58,7 @@ jobs:
             ${{ runner.os }}-pip-integration-
             ${{ runner.os }}-pip-
 
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
@@ -99,6 +100,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-verticals-
             ${{ runner.os }}-pip-
+
 
       - name: Install victor with verticals
         run: |

@@ -9,9 +9,7 @@ expected to FAIL until the implementation is completed (GREEN phase).
 
 Contract under test:
 1. DeepSeekProvider.supports_prompt_caching() == True
-2. DeepSeek serializer places tools[] BEFORE messages[] in the payload dict
-   so that DeepSeek's server-side auto-prefix cache keys on a stable
-   tool-definition prefix.
+2. Victor keeps tool policy deterministic; Sandhi owns final wire serialization.
 """
 
 from typing import Any, Dict, List, Optional
@@ -62,16 +60,10 @@ class TestDeepSeekPromptCachingFlag:
 # ── 2. tools[] before messages[] for auto-prefix ───────────────────────────────
 
 
-class TestDeepSeekSerializerToolOrdering:
-    """Contract: DeepSeek payload must place tools[] before messages[].
+class TestDeepSeekDeterministicPromptPolicy:
+    """Victor supplies stable tools/messages without asserting Rust JSON field order."""
 
-    DeepSeek's context caching (``deepseek api`` docs) auto-detects a stable
-    prefix. By serializing tools before messages, the tools block becomes part
-    of the cacheable prefix and is identical across turns, enabling cache hits.
-    """
-
-    def test_tools_appear_before_messages_in_payload_keys(self):
-        """list(payload) ordering: 'tools' index < 'messages' index."""
+    def test_tools_and_messages_are_preserved(self):
         provider = _make_provider()
         messages = [
             Message(role="system", content="You are a helpful assistant."),
@@ -88,18 +80,14 @@ class TestDeepSeekSerializerToolOrdering:
             stream=False,
         )
 
-        keys = list(payload.keys())
-        assert "tools" in keys, f"tools missing from payload keys: {keys}"
-        assert "messages" in keys, f"messages missing from payload keys: {keys}"
-        tools_idx = keys.index("tools")
-        messages_idx = keys.index("messages")
-        assert tools_idx < messages_idx, (
-            f"tools (idx={tools_idx}) must appear BEFORE messages "
-            f"(idx={messages_idx}) in payload key order: {keys}"
-        )
+        assert [tool["function"]["name"] for tool in payload["tools"]] == [
+            "tool_0",
+            "tool_1",
+            "tool_2",
+        ]
+        assert [message["role"] for message in payload["messages"]] == ["system", "user"]
 
-    def test_tool_choice_precedes_messages(self):
-        """tool_choice must also appear before messages for prefix stability."""
+    def test_tool_choice_is_stable(self):
         provider = _make_provider()
         messages = [Message(role="user", content="Hi")]
         tools = _make_tools(2)
@@ -113,8 +101,4 @@ class TestDeepSeekSerializerToolOrdering:
             stream=False,
         )
 
-        keys = list(payload.keys())
-        if "tool_choice" in keys and "messages" in keys:
-            assert keys.index("tool_choice") < keys.index(
-                "messages"
-            ), f"tool_choice must precede messages: {keys}"
+        assert payload["tool_choice"] == "auto"

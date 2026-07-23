@@ -493,3 +493,287 @@ class TestHistory:
 
         history = tracker.get_history(limit=3)
         assert len(history) == 3
+
+
+class TestSaveGroupLockRetry:
+    """P6: _save_group retries transient 'database is locked' errors."""
+
+    def _record_one(self, tracker):
+        tracker.begin_change_group("edit", "Test lock retry")
+        tracker.record_change(
+            file_path="/tmp/test.py",
+            change_type=ChangeType.MODIFY,
+            original_content="a",
+            new_content="b",
+            tool_name="edit",
+        )
+
+    def test_save_group_retries_transient_lock_then_succeeds(self, tracker, monkeypatch):
+        """Two 'locked' failures then success -> commit succeeds after 2 retries."""
+        import sqlite3
+
+        import victor.agent.change_tracker as ct_mod
+
+        sleeps = []
+        monkeypatch.setattr(ct_mod.time, "sleep", lambda s: sleeps.append(s))
+
+        calls = {"n": 0}
+
+        def _flaky(group):
+            calls["n"] += 1
+            if calls["n"] <= 2:
+                raise sqlite3.OperationalError("database is locked")
+
+        monkeypatch.setattr(tracker, "_save_group_once", _flaky)
+
+        self._record_one(tracker)
+        group = tracker.commit_change_group()
+
+        assert group is not None
+        assert calls["n"] == 3
+        assert sleeps == [0.1, 0.1]
+
+    def test_save_group_reraises_after_bounded_retries(self, tracker, monkeypatch):
+        """Three consecutive 'locked' failures -> the error propagates."""
+        import sqlite3
+
+        import victor.agent.change_tracker as ct_mod
+
+        sleeps = []
+        monkeypatch.setattr(ct_mod.time, "sleep", lambda s: sleeps.append(s))
+
+        calls = {"n": 0}
+
+        def _always_locked(group):
+            calls["n"] += 1
+            raise sqlite3.OperationalError("database is locked")
+
+        monkeypatch.setattr(tracker, "_save_group_once", _always_locked)
+
+        self._record_one(tracker)
+        with pytest.raises(sqlite3.OperationalError, match="locked"):
+            tracker.commit_change_group()
+
+        assert calls["n"] == 3  # 1 initial attempt + 2 retries
+        assert sleeps == [0.1, 0.1]
+
+    def test_save_group_non_lock_error_not_retried(self, tracker, monkeypatch):
+        """A non-lock OperationalError propagates immediately (no retries)."""
+        import sqlite3
+
+        import victor.agent.change_tracker as ct_mod
+
+        sleeps = []
+        monkeypatch.setattr(ct_mod.time, "sleep", lambda s: sleeps.append(s))
+
+        calls = {"n": 0}
+
+        def _broken(group):
+            calls["n"] += 1
+            raise sqlite3.OperationalError("no such table: change_groups")
+
+        monkeypatch.setattr(tracker, "_save_group_once", _broken)
+
+        self._record_one(tracker)
+        with pytest.raises(sqlite3.OperationalError, match="no such table"):
+            tracker.commit_change_group()
+
+        assert calls["n"] == 1
+        assert sleeps == []
+
+
+class TestDedicatedUndoDb:
+    """The tracker persists to the dedicated undo.db, not project.db."""
+
+    def test_uses_undo_db_file(self, tracker):
+        assert tracker._db_path.name == "undo.db"
+
+    def test_does_not_create_project_db(self, temp_dir):
+        from pathlib import Path
+
+        proj = Path(temp_dir)
+        FileChangeHistory(project_path=proj)
+        assert (proj / ".victor" / "undo.db").exists()
+        assert not (proj / ".victor" / "project.db").exists()
+
+
+class TestConflictGuard:
+    """Session-scoped conflict guard: don't clobber files changed elsewhere."""
+
+    def _commit_modify(self, tracker, f):
+        with open(f, "w") as fh:
+            fh.write("original")
+        with open(f, "w") as fh:
+            fh.write("modified")
+        tracker.begin_change_group("edit", "mod")
+        tracker.record_change(f, ChangeType.MODIFY, "original", "modified", tool_name="edit")
+        tracker.commit_change_group()
+
+    def test_undo_skips_externally_modified_file(self, tracker, temp_dir):
+        f = os.path.join(temp_dir, "x.py")
+        self._commit_modify(tracker, f)
+        # Another session changes the file after our edit.
+        with open(f, "w") as fh:
+            fh.write("someone elses change")
+
+        success, message, files = tracker.undo()
+
+        assert not success
+        assert "another session" in message.lower()
+        assert files == []
+        with open(f) as fh:
+            assert fh.read() == "someone elses change"  # not clobbered
+        assert tracker.can_undo()  # not consumed; can retry with force
+
+    def test_force_undo_overrides_conflict(self, tracker, temp_dir):
+        f = os.path.join(temp_dir, "x.py")
+        self._commit_modify(tracker, f)
+        with open(f, "w") as fh:
+            fh.write("someone elses change")
+
+        success, _message, _files = tracker.undo(force=True)
+
+        assert success
+        with open(f) as fh:
+            assert fh.read() == "original"
+        assert tracker.can_redo()
+
+
+class TestAtomicGroupReplay:
+    """Group undo is all-or-nothing on the filesystem (crash-safe rollback)."""
+
+    def test_partial_failure_rolls_back_applied_files(self, tracker, temp_dir, monkeypatch):
+        f1 = os.path.join(temp_dir, "f1.py")
+        f2 = os.path.join(temp_dir, "f2.py")
+        for f in (f1, f2):
+            with open(f, "w") as fh:
+                fh.write("orig")
+        for f in (f1, f2):
+            with open(f, "w") as fh:
+                fh.write("mod")
+
+        tracker.begin_change_group("edit", "two files")
+        tracker.record_change(f1, ChangeType.MODIFY, "orig", "mod", tool_name="edit")
+        tracker.record_change(f2, ChangeType.MODIFY, "orig", "mod", tool_name="edit")
+        tracker.commit_change_group()
+
+        # undo reverses in reverse order (f2 then f1); fail on f1 AFTER f2 reverted.
+        real_reverse = tracker._reverse_change
+
+        def flaky_reverse(change):
+            if change.file_path == f1:
+                raise OSError("simulated write failure")
+            return real_reverse(change)
+
+        monkeypatch.setattr(tracker, "_reverse_change", flaky_reverse)
+
+        success, message, files = tracker.undo()
+
+        assert not success
+        assert "rolled back" in message.lower()
+        assert files == []
+        # Both files restored to their pre-undo (modified) content — nothing half-done.
+        with open(f1) as fh:
+            assert fh.read() == "mod"
+        with open(f2) as fh:
+            assert fh.read() == "mod"
+        assert tracker.can_undo()  # state transition not committed
+
+    def test_atomic_write_leaves_no_temp_on_success(self, tracker, temp_dir):
+        f = os.path.join(temp_dir, "x.py")
+        with open(f, "w") as fh:
+            fh.write("v2")
+        tracker.begin_change_group("edit", "mod")
+        tracker.record_change(f, ChangeType.MODIFY, "v1", "v2", tool_name="edit")
+        tracker.commit_change_group()
+
+        tracker.undo()
+
+        with open(f) as fh:
+            assert fh.read() == "v1"
+        # No leftover .undo_tmp_* temp files in the dir.
+        leftovers = [p for p in os.listdir(temp_dir) if p.startswith(".undo_tmp_")]
+        assert leftovers == []
+
+
+class TestMessageIdAndSeq:
+    """message_id (turn attribution) and seq (deterministic order) persist."""
+
+    def test_message_id_persists_on_group_and_changes(self, tracker, temp_dir):
+        f = os.path.join(temp_dir, "x.py")
+        with open(f, "w") as fh:
+            fh.write("c")
+        tracker.begin_change_group("edit", "d", message_id="turn-7")
+        tracker.record_change(f, ChangeType.CREATE, None, "c", tool_name="edit")
+        grp = tracker.commit_change_group()
+
+        conn = tracker._db.get_connection()
+        gmid = conn.execute(
+            "SELECT message_id FROM change_groups WHERE id=?", (grp.id,)
+        ).fetchone()[0]
+        assert gmid == "turn-7"
+        seq, cmid = conn.execute(
+            "SELECT seq, message_id FROM file_changes WHERE group_id=?", (grp.id,)
+        ).fetchone()
+        assert seq == 0
+        assert cmid == "turn-7"
+
+    def test_seq_orders_multiple_files(self, tracker, temp_dir):
+        f1 = os.path.join(temp_dir, "a.py")
+        f2 = os.path.join(temp_dir, "b.py")
+        for f in (f1, f2):
+            with open(f, "w") as fh:
+                fh.write("x")
+        tracker.begin_change_group("edit", "two")
+        tracker.record_change(f1, ChangeType.CREATE, None, "x", tool_name="edit")
+        tracker.record_change(f2, ChangeType.CREATE, None, "x", tool_name="edit")
+        grp = tracker.commit_change_group()
+
+        rows = (
+            tracker._db.get_connection()
+            .execute(
+                "SELECT file_path, seq FROM file_changes WHERE group_id=? ORDER BY seq",
+                (grp.id,),
+            )
+            .fetchall()
+        )
+        assert [r[1] for r in rows] == [0, 1]
+        assert rows[0][0] == f1 and rows[1][0] == f2
+
+
+class TestCrossSessionScoping:
+    """Multiple sessions share undo.db but each undoes only its own group."""
+
+    def test_two_sessions_undo_own_group(self, tmp_path):
+        from pathlib import Path
+
+        from victor.core.undo_database import reset_undo_databases
+
+        reset_change_tracker()
+        reset_undo_databases()
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        fdir = tmp_path / "files"
+        fdir.mkdir()
+
+        t_a = FileChangeHistory(project_path=proj, session_id="A")
+        t_b = FileChangeHistory(project_path=proj, session_id="B")
+        assert t_a._db is t_b._db  # same dedicated undo.db manager (cached per path)
+
+        fa = str(fdir / "a.py")
+        fb = str(fdir / "b.py")
+        Path(fa).write_text("a")
+        Path(fb).write_text("b")
+
+        t_a.begin_change_group("edit", "A change")
+        t_a.record_change(fa, ChangeType.CREATE, None, "a", tool_name="edit")
+        t_a.commit_change_group()
+
+        t_b.begin_change_group("edit", "B change")
+        t_b.record_change(fb, ChangeType.CREATE, None, "b", tool_name="edit")
+        t_b.commit_change_group()
+
+        ok_a, _, files_a = t_a.undo()
+        assert ok_a and fa in files_a and fb not in files_a
+        ok_b, _, files_b = t_b.undo()
+        assert ok_b and fb in files_b

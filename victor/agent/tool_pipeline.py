@@ -87,7 +87,6 @@ if TYPE_CHECKING:
     from victor.agent.search_router import SearchRouter
     from victor.tools.registry import ToolRegistry
     from victor.storage.cache.tool_cache import ToolCache
-    from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
     from victor.agent.signature_store import SignatureStore
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.tool_result_cache import ToolResultCache
@@ -108,10 +107,6 @@ class ToolPipelineConfig:
     enable_analytics: bool = True
     enable_failed_signature_tracking: bool = True
     max_tool_name_length: int = 64
-
-    # Code correction settings
-    enable_code_correction: bool = False
-    code_correction_auto_fix: bool = True
 
     # Per-tool-call timeout for serial execution path
     # Increased from 30 to 60 seconds for semantic search (code_search, etc.)
@@ -483,10 +478,6 @@ class ToolCallResult:
     retryable: Optional[bool] = None
     user_message: Optional[str] = None
 
-    # Code correction tracking
-    code_corrected: bool = False
-    code_validation_errors: Optional[List[str]] = None
-
     # OpenAI-compatible tool_call_id — links response to assistant's tool_calls[].id
     tool_call_id: Optional[str] = None
 
@@ -762,7 +753,6 @@ class ToolPipeline:
         config: Optional[ToolPipelineConfig] = None,
         tool_cache: Optional["ToolCache"] = None,
         argument_normalizer: Optional[ArgumentNormalizer] = None,
-        code_correction_middleware: Optional["CodeCorrectionMiddleware"] = None,
         signature_store: Optional["SignatureStore"] = None,
         on_tool_start: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         on_tool_complete: Optional[Callable[[ToolCallResult], None]] = None,
@@ -781,7 +771,6 @@ class ToolPipeline:
             config: Pipeline configuration
             tool_cache: Optional cache for tool results
             argument_normalizer: Optional argument normalizer
-            code_correction_middleware: Optional middleware for code validation/fixing
             signature_store: Optional persistent storage for failed
                 signatures (cross-session learning)
             on_tool_start: Callback when tool execution starts
@@ -796,7 +785,6 @@ class ToolPipeline:
         self.config = config or ToolPipelineConfig()
         self.tool_cache = tool_cache
         self.normalizer = argument_normalizer or ArgumentNormalizer()
-        self.code_correction_middleware = code_correction_middleware
         self.signature_store = signature_store
         self.deduplication_tracker = deduplication_tracker
         self.middleware_chain = middleware_chain
@@ -2959,42 +2947,10 @@ class ToolPipeline:
             if edited_path:
                 self._clear_read_tracking_for_file(edited_path)
 
-        # Code correction middleware - validate and fix code arguments
-        code_corrected = False
-        code_validation_errors: Optional[List[str]] = None
-
-        if (
-            self.config.enable_code_correction
-            and self.code_correction_middleware is not None
-            and self.code_correction_middleware.should_validate(tool_name)
-        ):
-            try:
-                correction_result = self.code_correction_middleware.validate_and_fix(
-                    tool_name, normalized_args
-                )
-
-                if correction_result.was_corrected:
-                    # Apply the correction
-                    normalized_args = self.code_correction_middleware.apply_correction(
-                        normalized_args, correction_result
-                    )
-                    code_corrected = True
-                    logger.info(
-                        f"Code auto-corrected for tool '{tool_name}': "
-                        f"{len(correction_result.validation.errors)} issues fixed"
-                    )
-
-                if not correction_result.validation.valid:
-                    # Collect validation errors for feedback
-                    code_validation_errors = list(correction_result.validation.errors)
-                    logger.warning(
-                        f"Code validation errors for tool '{tool_name}': "
-                        f"{code_validation_errors}"
-                    )
-            except (ValueError, TypeError, KeyError) as e:
-                logger.warning(f"Code correction middleware failed (data error): {e}")
-            except AttributeError as e:
-                logger.debug(f"Code correction middleware not configured: {e}")
+        # NOTE: code correction runs in the ToolExecutor (the choke point covering all
+        # call paths), not here. The pipeline-level correction path was dead code
+        # (enable_code_correction defaulted False, code_correction_middleware never wired)
+        # and is removed; see FEP-0024.
 
         # Check for repeated failures
         if self.config.enable_failed_signature_tracking:
@@ -3193,8 +3149,6 @@ class ToolPipeline:
             execution_time_ms=execution_time_ms,
             normalization_applied=normalization_applied,
             user_message=steering_user_message,
-            code_corrected=code_corrected,
-            code_validation_errors=code_validation_errors,
             error_info=exec_result.error_info,  # Preserve structured error info
         )
 
@@ -3244,8 +3198,6 @@ class ToolPipeline:
                                 f"{steering_user_message} {low_signal_reason}, so the "
                                 f"pipeline narrowed further with {fallback_tool_name}."
                             ),
-                            code_corrected=code_corrected,
-                            code_validation_errors=code_validation_errors,
                             error_info=recovered_exec_result.error_info,
                         )
 
@@ -3324,8 +3276,6 @@ class ToolPipeline:
                             execution_time_ms=((time.monotonic() - start_time) * 1000),
                             normalization_applied=normalization_applied,
                             user_message=steering_user_message,
-                            code_corrected=code_corrected,
-                            code_validation_errors=code_validation_errors,
                             error_info=recovered_exec_result.error_info,
                         )
             except Exception as e:
@@ -3362,8 +3312,6 @@ class ToolPipeline:
                         error=call_result.error,
                         execution_time_ms=call_result.execution_time_ms,
                         normalization_applied=call_result.normalization_applied,
-                        code_corrected=call_result.code_corrected,
-                        code_validation_errors=call_result.code_validation_errors,
                     )
                     if self.on_tool_event:
                         try:

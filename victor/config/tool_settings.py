@@ -175,7 +175,12 @@ class ToolSettings(BaseModel):
     # Tool grouping for content organization
     enable_tool_grouping: bool = Field(
         default=True,
-        description="Group related tools by category with visual headers (default: enabled)",
+        description=(
+            "DEPRECATED (no-op): per-result category group headers were removed "
+            "from the live renderer — results arrive in execution order, so "
+            "arrival-order grouping grouped nothing. Field kept for config "
+            "compatibility."
+        ),
     )
 
     tool_progress_streaming_enabled: bool = Field(

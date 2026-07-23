@@ -10,6 +10,13 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field, fields, replace
 from typing import Any, Dict, List, Mapping, Optional
 
+# RuntimeEvaluationFeedback now lives in victor_contracts (the shared definition
+# layer). Re-exported here so existing imports from this module keep working and
+# so victor.evaluation no longer has to import victor.framework at module scope.
+from victor_contracts.runtime_evaluation import RuntimeEvaluationFeedback
+
+__all__ = ["RuntimeEvaluationFeedback"]
+
 
 @dataclass(frozen=True)
 class ClarificationDecision:
@@ -52,47 +59,6 @@ class CompletionCalibration:
             "requires_additional_support": self.requires_additional_support,
             "reasons": list(self.reasons),
         }
-
-
-@dataclass(frozen=True)
-class RuntimeEvaluationFeedback:
-    """Calibrated runtime-threshold overlay produced by live or benchmark feedback."""
-
-    completion_threshold: Optional[float] = None
-    enhanced_progress_threshold: Optional[float] = None
-    minimum_supported_evidence_score: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize feedback for persistence."""
-        return {
-            "completion_threshold": self.completion_threshold,
-            "enhanced_progress_threshold": self.enhanced_progress_threshold,
-            "minimum_supported_evidence_score": self.minimum_supported_evidence_score,
-            "metadata": dict(self.metadata),
-        }
-
-    @classmethod
-    def from_dict(cls, payload: Mapping[str, Any]) -> "RuntimeEvaluationFeedback":
-        """Reconstruct persisted runtime-evaluation feedback."""
-        return cls(
-            completion_threshold=(
-                float(payload["completion_threshold"])
-                if payload.get("completion_threshold") is not None
-                else None
-            ),
-            enhanced_progress_threshold=(
-                float(payload["enhanced_progress_threshold"])
-                if payload.get("enhanced_progress_threshold") is not None
-                else None
-            ),
-            minimum_supported_evidence_score=(
-                float(payload["minimum_supported_evidence_score"])
-                if payload.get("minimum_supported_evidence_score") is not None
-                else None
-            ),
-            metadata=dict(payload.get("metadata") or {}),
-        )
 
 
 @dataclass(frozen=True)

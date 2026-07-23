@@ -109,11 +109,6 @@ impl FlatMatrix {
     pub fn row(&self, row: usize) -> &[f32] {
         &self.data[row * self.cols..(row + 1) * self.cols]
     }
-
-    /// Convert back to nested representation (for Python compatibility)
-    pub fn to_nested(&self) -> Vec<Vec<f32>> {
-        (0..self.rows).map(|i| self.row(i).to_vec()).collect()
-    }
 }
 
 /// Quantized embedding representation using int8.
@@ -467,11 +462,44 @@ pub fn random_projection(
         cols: input_dim,
     };
 
-    // Convert embeddings to flat matrix
-    let embeddings_flat = FlatMatrix::from_nested(embeddings)?;
-
-    // Use batch matmul for projection
-    batch_matmul_vector(projection.to_nested(), embeddings_flat.to_nested())
+    // Project each embedding directly against the flat projection matrix.
+    // The previous code rebuilt BOTH matrices via to_nested()/from_nested()
+    // round-trips (projection: flat->nested->flat; embeddings: nested->flat->
+    // nested) purely to call batch_matmul_vector — pure copy overhead. Multiply
+    // in place against the already-flat projection instead.
+    let cols = projection.cols();
+    let results: Vec<Vec<f32>> = if embeddings.len() > 10 {
+        embeddings
+            .par_iter()
+            .map(|e| {
+                if e.len() == cols {
+                    Ok(matmul_vector_internal(&projection, e))
+                } else {
+                    Err(pyo3::exceptions::PyValueError::new_err(format!(
+                        "Vector has {} dims, expected {}",
+                        e.len(),
+                        cols
+                    )))
+                }
+            })
+            .collect::<PyResult<Vec<_>>>()?
+    } else {
+        embeddings
+            .iter()
+            .map(|e| {
+                if e.len() == cols {
+                    Ok(matmul_vector_internal(&projection, e))
+                } else {
+                    Err(pyo3::exceptions::PyValueError::new_err(format!(
+                        "Vector has {} dims, expected {}",
+                        e.len(),
+                        cols
+                    )))
+                }
+            })
+            .collect::<PyResult<Vec<_>>>()?
+    };
+    Ok(results)
 }
 
 /// Compute pairwise distances for a set of embeddings.

@@ -50,6 +50,7 @@ from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
 from dataclasses import dataclass, field, replace
 
+from victor.agent.conversation.types import MESSAGE_SOURCE_METADATA_KEY, MessageSource
 from victor.agent.runtime.context import AgentRuntimeContext
 from victor.agent.response_completer import ToolFailureContext
 from victor.agent.services.context_service import compact_context_if_recommended
@@ -504,11 +505,6 @@ class TurnExecutor:
         self._chat_context._system_added = True
 
         # Add user message to history
-        from victor.agent.conversation.types import (
-            MESSAGE_SOURCE_METADATA_KEY,
-            MessageSource,
-        )
-
         self._chat_context.add_message(
             "user",
             user_message,
@@ -721,11 +717,6 @@ class TurnExecutor:
             # to be paired with the assistant message that declared its
             # tool_calls. Tool-only assistant turns often have empty content.
             if response.content or response.tool_calls:
-                from victor.agent.conversation.types import (
-                    MESSAGE_SOURCE_METADATA_KEY,
-                    MessageSource,
-                )
-
                 self._chat_context.add_message(
                     "assistant",
                     response.content or "",
@@ -858,11 +849,6 @@ class TurnExecutor:
         tool_calls = self._deterministic_tool_calls(user_message)
         if not tool_calls:
             return None
-
-        from victor.agent.conversation.types import (
-            MESSAGE_SOURCE_METADATA_KEY,
-            MessageSource,
-        )
 
         self._chat_context.add_message(
             "assistant",

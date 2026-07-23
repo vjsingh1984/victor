@@ -47,7 +47,9 @@ from typing import (
 from victor.agent.services.tool_batch_executor import execute_tool_call_batch
 from victor.agent.services.tool_budget_runtime import BudgetManager, ToolBudgetRuntime
 from victor.agent.services.tool_access_policy import ToolAccessPolicy
+from victor.agent.services.tool_error_display import print_tool_error_once
 from victor.agent.services.tool_usage_stats import ToolUsageStats
+from victor.tools.unified.parser import classify_tool_outcome
 from victor.tools.core_tool_aliases import (
     canonicalize_core_tool_name,
     normalize_model_tool_name,
@@ -414,6 +416,11 @@ def process_tool_results_with_context(
             else:
                 error_display = user_message or error_msg or skip_reason or "Unknown error"
 
+            # Telemetry truth: the EVENT reflects `### ❌` string errors; the
+            # LLM-visible path (semantic_success branches) stays untouched.
+            marker_kind, error_detail = classify_tool_outcome(output)
+            telemetry_success = semantic_success and marker_kind != "tool_error"
+
             if ctx.usage_logger and hasattr(ctx.usage_logger, "set_duration_context"):
                 ctx.usage_logger.set_duration_context(elapsed_ms)
             if ctx.usage_logger:
@@ -421,13 +428,14 @@ def process_tool_results_with_context(
                     "tool_result",
                     {
                         "tool_name": tool_name,
-                        "success": semantic_success,
+                        "success": telemetry_success,
                         "skipped": skipped,
-                        "outcome_kind": outcome_kind,
+                        "outcome_kind": outcome_kind or marker_kind,
                         "block_source": block_source,
                         "retryable": retryable,
                         "result": output,
-                        "error": error_display,
+                        "error": error_display or error_detail,
+                        "error_detail": error_detail,
                     },
                 )
 
@@ -479,18 +487,9 @@ def process_tool_results_with_context(
                 sig = f"{tool_name}:{hash(str(sorted(normalized_args.items())))}"
                 ctx.failed_tool_signatures.add(sig)
 
-            _not_found = "not found" in str(error_display).lower()
-            _shown_key = f"notfound:{tool_name}" if _not_found else None
-            if not (_shown_key and _shown_key in ctx.shown_tool_errors):
-                if _shown_key and len(ctx.shown_tool_errors) < 500:
-                    ctx.shown_tool_errors.add(_shown_key)
-                if ctx.console and ctx.presentation:
-                    prefix = "Tool call skipped" if skipped else "Tool execution failed"
-                    ctx.console.print(
-                        f"[red]{ctx.presentation.icon('error', with_color=False)} "
-                        f"{prefix}: {error_display}[/] "
-                        f"[dim]({elapsed_ms:.0f}ms)[/dim]"
-                    )
+            print_tool_error_once(
+                ctx, tool_name, error_display, skipped=skipped, elapsed_ms=elapsed_ms
+            )
 
             if isinstance(output, dict):
                 error_output = dict(output)

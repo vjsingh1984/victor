@@ -536,8 +536,10 @@ class TestSystemPromptGeneration:
         role = ManagerRole()
         prompt = role.get_system_prompt_section()
 
-        assert "Manager" in prompt
-        assert "coordinator" in prompt.lower() or "delegate" in prompt.lower()
+        # ManagerRole is now a compatibility alias for SupervisorRole; assert the
+        # role's supervision/coordination vocabulary rather than a literal name.
+        assert "supervisor" in prompt.lower()
+        assert any(term in prompt.lower() for term in ("coordinat", "delegate", "supervis"))
 
     def test_researcher_system_prompt(self):
         """Researcher role generates search-focused prompt."""

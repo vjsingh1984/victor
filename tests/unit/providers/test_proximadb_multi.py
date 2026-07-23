@@ -16,6 +16,20 @@ from victor.storage.vector_stores.proximadb_multi import ProximaDBMultiModelProv
 if importlib.util.find_spec("proximadb_sdk") is None:
     pytest.skip("proximadb_sdk not installed", allow_module_level=True)
 
+# The generated proximadb gRPC stubs hard-require grpcio >= 1.80.0. On an older
+# grpc runtime, importing the SDK raises at module load, so skip (don't fail).
+try:
+    import grpc as _grpc
+    from packaging.version import Version as _Version
+
+    if _Version(_grpc.__version__) < _Version("1.80.0"):
+        pytest.skip(
+            f"grpcio {_grpc.__version__} < 1.80.0 required by generated proximadb stubs",
+            allow_module_level=True,
+        )
+except ImportError:
+    pass  # grpc / packaging unavailable — let the import test surface it
+
 
 def test_proximadb_sdk_top_level_imports(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     """Smoke test the ProximaDB SDK imports Victor depends on."""

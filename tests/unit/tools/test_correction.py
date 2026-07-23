@@ -459,6 +459,31 @@ class TestPythonCodeValidator:
         assert "```" not in cleaned
         assert "def hello():" in cleaned
 
+    def test_clean_markdown_preserves_document(self):
+        """Regression: a markdown document (prose + code blocks) is returned verbatim.
+
+        Previously clean_markdown used an unanchored re.search and returned only the
+        first fenced block's interior, truncating documents to one code block.
+        """
+        doc = (
+            "# Title\n\nSome prose here.\n\n"
+            "```python\ndef h1():\n    return 1\n```\n\n"
+            "More prose.\n\n"
+            "```text\nsandhi keys add\n```\n"
+        )
+        assert self.validator.clean_markdown(doc) == doc
+
+    def test_clean_markdown_preserves_multiple_blocks(self):
+        """Two adjacent fenced blocks (no prose) are NOT collapsed to one."""
+        code = "```python\ndef a():\n    pass\n```\n```python\ndef b():\n    pass\n```"
+        assert self.validator.clean_markdown(code) == code
+
+    def test_clean_markdown_generic_single_fence(self):
+        """A single generic (untagged) fence wrapping the whole input is unwrapped."""
+        code = "```\ndef a():\n    pass\n```"
+        cleaned = self.validator.clean_markdown(code)
+        assert cleaned == "def a():\n    pass"
+
 
 class TestFeedbackGenerator:
     """Tests for FeedbackGenerator."""
@@ -582,6 +607,38 @@ class TestSelfCorrector:
         fixed_code, validation = corrector.validate_and_fix(code, Language.PYTHON)
         assert "```" not in fixed_code
         assert "def hello():" in fixed_code
+
+    def test_validate_and_fix_does_not_truncate_document(self):
+        """Regression: a markdown document passed to validate_and_fix is not truncated.
+
+        The destructive clean_markdown previously collapsed this to one ~20-byte block.
+        """
+        corrector = SelfCorrector()
+        doc = (
+            "# TD\n\nIntro prose.\n\n"
+            "```rust\nfn h1() -> i32 { 1 }\n```\n\nMore prose.\n\n"
+            "```text\nsandhi keys add\n```\n"
+        )
+        fixed_code, _validation = corrector.validate_and_fix(doc, Language.UNKNOWN)
+        assert fixed_code == doc  # document preserved verbatim, no truncation
+
+    def test_validate_is_read_only(self):
+        """validate() returns diagnostics without mutating/fixing the code."""
+        corrector = SelfCorrector()
+        code = "def hello():\n    return 42"
+        snapshot = code
+        validation = corrector.validate(code, Language.PYTHON)
+        assert isinstance(validation, CodeValidationResult)
+        # The input string is unchanged (validate never returns mutated code).
+        assert code == snapshot
+
+    def test_validate_does_not_truncate_document(self):
+        """validate() on a markdown document returns diagnostics without truncating."""
+        corrector = SelfCorrector()
+        doc = "# Title\n\nProse.\n\n```python\ndef a():\n    pass\n```\n\nMore.\n"
+        # Should not raise and should not depend on truncation; we only assert it returns.
+        validation = corrector.validate(doc, Language.UNKNOWN)
+        assert isinstance(validation, CodeValidationResult)
 
     def test_should_retry_under_limit(self):
         """Test should_retry under iteration limit."""

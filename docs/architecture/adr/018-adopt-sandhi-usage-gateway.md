@@ -2,7 +2,7 @@
 
 ## Metadata
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-07-18
 - **Decision Makers**: Vijaykumar Singh
 - **Related ADRs**: ADR-014/ADR-015 (shared `victor-codegraph` cross-repo pattern);
@@ -41,9 +41,33 @@ local cost display, and a self-hosted dashboard are all OSS. Authoritative
 multi-tenant billing, tier→$ policy, SSO/RBAC governance, and managed dashboards
 at scale are AnvaiOps's commercial layer — Victor does not build them.
 
-The dependency direction is one-way (`victor → sandhi`), and `sandhi` is pinned like
-the `victor-codegraph` / `proximadb` optional extras. It ships **default-off**;
-enabling it is opt-in with zero behavior change by default (FEP-0020 § Migration).
+The dependency direction is one-way (`victor → sandhi`). The typed provider runtime is a
+required Victor dependency; the separately configured attribution gateway/proxy remains
+default-off (FEP-0020 § Migration). Sandhi 0.1.1 is the last published version; the complete
+typed-runtime migration ships once as 0.1.2 because there are no external compatibility users.
+
+For provider transport, the ownership boundary is explicit: Victor owns agent/model
+policy and normalized framework objects; Sandhi owns endpoint routing, headers, HTTP/SSE,
+wire errors, resilience, and neutral usage extraction. The active transport is the sole
+retry/timeout/circuit owner. Per TD-0004, Sandhi's catalog contains stable wire facts **and
+curated model data** (id, context window, max output, wire capabilities; no pricing) exposed via
+`provider_models_json`, while Victor retains model **policy** — which models to expose/select and
+the discovery UX. (Revised 2026-07-23 by TD-0004; previously the catalog held wire facts only and
+Victor retained all model metadata.) An admitted provider has one
+Sandhi execution path with no replay, demotion, or native Python wire fallback.
+
+For OpenAI-compatible Chat Completions, Victor owns normalized history and provider/model
+capability policy while Sandhi owns the stable wire-role contract. Both preserve
+`developer`, `system`, `user`, `assistant`, `tool`, and legacy `function`; Sandhi rejects
+unknown roles and missing `tool_call_id`/legacy function `name` before HTTP. Neither layer
+silently rewrites `developer` to `system`, because that is model-specific policy.
+
+OpenAI Responses is a separate Sandhi endpoint family, not a Chat Completions alias. API-key
+Responses uses the public `/v1/responses` profile. ChatGPT subscription OAuth explicitly selects
+the Codex profile at `/backend-api/codex/responses`; Victor acquires and refreshes the credential
+and optional workspace account id, while Sandhi enforces the profile's item-array input,
+instructions, `store=false`, SSE-only upstream behavior, stream aggregation, and Responses token
+metering. Token text and URL shape are never used to guess the protocol.
 
 ## Rationale
 
@@ -60,8 +84,8 @@ enabling it is opt-in with zero behavior change by default (FEP-0020 § Migratio
   (it owns the commercial split); Victor records only the local consequence
   (dependency + boundary posture), per this directory's cross-repo rule 3.
 - **Pro:** closes the attribution gap; one neutral event feeds both Victor's
-  dashboard and AnvaiOps billing; no new provider plumbing (middleware wraps the
-  existing `usage` dict). **Con:** a new external dependency and a cross-repo wire
+  dashboard and AnvaiOps billing; provider wire plumbing converges in Sandhi instead
+  of multiplying in each consumer. **Con:** a new external dependency and a cross-repo wire
   contract to keep stable.
 
 ## Consequences
@@ -80,9 +104,12 @@ enabling it is opt-in with zero behavior change by default (FEP-0020 § Migratio
 
 ## Implementation
 
-Out of scope for this ADR (decision doc only, per AnvaiOps ADR-0047). The framework
-seams and phased plan live in FEP-0020; the remaining wiring is a TD row in
-`docs/tech-stack.md` (join `client_id`/`subject`→cost; proxy serve-mode hardening).
+The framework seams and migration ledger live in FEP-0020 and Sandhi TD-0002. Attribution,
+middleware, proxy serve mode, shared usage parsing, and the direct typed runtime have landed.
+The admitted OpenAI-compatible cloud providers are thin Victor model/orchestration policies;
+their endpoint routing, HTTP/SSE, errors, resilience, roles/tools, and usage parsing execute in
+Sandhi. Groq payload budgeting and Cerebras inline-reasoning presentation remain in Victor because
+they are agent/UX policy, not provider transport.
 
 ## Alternatives Considered
 
@@ -109,3 +136,6 @@ seams and phased plan live in FEP-0020; the remaining wiring is a TD row in
 | Date | Version | Changes | Author |
 |------|---------|---------|--------|
 | 2026-07-18 | 1.0 | Initial ADR | Vijaykumar Singh |
+| 2026-07-21 | 1.1 | Accepted; pinned Victor/Sandhi provider ownership and migration gates | Vijaykumar Singh |
+| 2026-07-22 | 1.2 | Added explicit public Responses and ChatGPT subscription/Codex profiles | Vijaykumar Singh |
+| 2026-07-23 | 1.3 | Revised catalog boundary per TD-0004: Sandhi owns model catalog data; Victor owns policy | Vijaykumar Singh |

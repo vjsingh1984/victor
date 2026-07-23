@@ -1319,6 +1319,18 @@ class ChatStreamHelperMixin:
         orch = self._orchestrator
 
         full_content = ""
+        # Intra-turn repetition guard (Tool Reliability P5): stops a degenerate
+        # generation (the model looping one sentence/paragraph) instead of
+        # burning tokens to max_tokens. Between-turn detection cannot see this.
+        repetition_detector = None
+        if getattr(orch.settings, "stream_repetition_enabled", True):
+            from victor.agent.streaming.repetition_guard import IntraTurnRepetitionDetector
+
+            repetition_detector = IntraTurnRepetitionDetector(
+                window_chars=getattr(orch.settings, "stream_repetition_window_chars", 4000),
+                min_segment_chars=getattr(orch.settings, "stream_repetition_min_segment_chars", 24),
+                max_repeats=getattr(orch.settings, "stream_repetition_max_repeats", 6),
+            )
         tool_calls = None
         garbage_detected = False
         consecutive_garbage_chunks = 0
@@ -1553,6 +1565,29 @@ class ChatStreamHelperMixin:
                     # (surfaced as api_*_tokens on the task report / cost footer).
                     estimated_content_tokens += len(chunk.content) / 4
                     stream_ctx.stream_metrics.total_content_length += len(chunk.content)
+
+                if repetition_detector is not None and chunk.content:
+                    repeated = repetition_detector.feed(chunk.content)
+                    if repeated is not None:
+                        # Degenerate loop: truncate at the second occurrence (keep
+                        # one instance) and break — the shared `finally` tears the
+                        # provider stream down exactly like the tool-call break.
+                        full_content = full_content[
+                            : repetition_detector.truncation_point(full_content)
+                        ]
+                        logger.warning(
+                            "Intra-turn repetition detected — stopping generation " "(segment: %r)",
+                            repeated[:120],
+                        )
+                        self._record_provider_status_event(
+                            stream_ctx,
+                            "completion_detected",
+                            waited_seconds=0.0,
+                            model=getattr(orch, "model", None),
+                            reason="content_repetition_intraturn",
+                            content_length=len(full_content),
+                        )
+                        break
 
                 if chunk.tool_calls:
                     logger.debug(f"Received tool_calls in chunk: {chunk.tool_calls}")

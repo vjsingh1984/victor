@@ -48,10 +48,13 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type
+
+from pydantic import SecretStr
 
 from victor.config.secrets import unwrap_secrets
 
@@ -217,7 +220,7 @@ class OpenAIConfig(ProviderConfigStrategy):
         if auth_mode == "oauth":
             # OAuth mode: use ChatGPT subscription
             result["auth_mode"] = "oauth"
-            result.setdefault("base_url", "https://chatgpt.com/backend-api/codex/v1")
+            result.setdefault("base_url", "https://chatgpt.com/backend-api/codex")
         else:
             # API key mode
             raw_key = settings.provider.openai_api_key
@@ -322,7 +325,9 @@ class QwenConfig(ProviderConfigStrategy):
 
     @property
     def aliases(self) -> List[str]:
-        return ["alibaba", "dashscope"]
+        from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
+
+        return list(get_openai_compat_provider_spec("qwen").aliases)
 
     def get_settings(
         self,
@@ -330,17 +335,19 @@ class QwenConfig(ProviderConfigStrategy):
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
         from victor.config.api_keys import get_api_key
+        from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
 
         result = dict(base_settings)
+        spec = get_openai_compat_provider_spec("qwen")
         auth_mode = base_settings.get("auth_mode", "api_key")
         if auth_mode == "oauth":
             result["auth_mode"] = "oauth"
-            result.setdefault("base_url", "https://portal.qwen.ai/v1/")
+            result.setdefault("base_url", spec.endpoint_options["portal"])
         else:
             api_key = get_api_key("qwen")
             if api_key:
                 result["api_key"] = api_key
-            result.setdefault("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1/")
+            result.setdefault("base_url", spec.endpoint_options["standard"])
         return result
 
 
@@ -357,7 +364,9 @@ class ZAIConfig(ProviderConfigStrategy):
 
     @property
     def aliases(self) -> List[str]:
-        return ["zhipu"]
+        from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
+
+        return list(get_openai_compat_provider_spec("zai").aliases)
 
     def get_settings(
         self,
@@ -365,8 +374,10 @@ class ZAIConfig(ProviderConfigStrategy):
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
         from victor.config.api_keys import get_api_key
+        from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
 
         result = dict(base_settings)
+        spec = get_openai_compat_provider_spec("zai")
 
         # Resolve API key
         api_key = get_api_key("zai")
@@ -376,10 +387,10 @@ class ZAIConfig(ProviderConfigStrategy):
         # Coding plan uses a dedicated endpoint
         coding_plan = result.pop("coding_plan", False)
         if coding_plan:
-            result.setdefault("base_url", "https://api.z.ai/api/coding/paas/v4/")
+            result.setdefault("base_url", spec.endpoint_options["coding"])
             result["coding_plan"] = True
         else:
-            result.setdefault("base_url", "https://api.z.ai/api/paas/v4/")
+            result.setdefault("base_url", spec.endpoint_options["standard"])
 
         return result
 
@@ -387,6 +398,44 @@ class ZAIConfig(ProviderConfigStrategy):
 # =============================================================================
 # Registry
 # =============================================================================
+
+
+def resolve_provider_gateway(base_settings: Dict[str, Any], provider: str) -> None:
+    """Normalize and env-resolve a per-provider Sandhi gateway block in place.
+
+    The ``gateway`` block (loaded from ``profiles.yaml`` providers section as a
+    ``ProviderGatewayConfig``) is normalized to a plain dict ``{"url", "virtual_key"}``
+    so it can flow through ``**kwargs`` into the provider's ``extra_config`` and be
+    read by the Sandhi transport. The virtual key is resolved from the block, else
+    from a per-provider env var (``SANDHI_GATEWAY_VIRTUAL_KEY_<PROVIDER>``), else the
+    global ``SANDHI_GATEWAY_VIRTUAL_KEY``. A block without a URL is dropped (gateway
+    mode stays off); a URL with no resolvable key is kept as an empty string so the
+    transport can fail closed with a clear error.
+    """
+    gateway = base_settings.get("gateway")
+    if gateway is None:
+        return
+    if isinstance(gateway, dict):
+        url = str(gateway.get("url") or "").strip()
+    else:
+        url = str(getattr(gateway, "url", "") or "").strip()
+    if not url:
+        base_settings.pop("gateway", None)
+        return
+    if isinstance(gateway, dict):
+        virtual_key = gateway.get("virtual_key")
+    else:
+        virtual_key = getattr(gateway, "virtual_key_value", getattr(gateway, "virtual_key", None))
+    if isinstance(virtual_key, SecretStr):
+        virtual_key = virtual_key.get_secret_value()
+    virtual_key = str(virtual_key or "").strip()
+    if not virtual_key:
+        virtual_key = (
+            os.environ.get(f"SANDHI_GATEWAY_VIRTUAL_KEY_{provider.upper()}")
+            or os.environ.get("SANDHI_GATEWAY_VIRTUAL_KEY")
+            or ""
+        ).strip()
+    base_settings["gateway"] = {"url": url, "virtual_key": virtual_key}
 
 
 @dataclass
@@ -464,6 +513,10 @@ class ProviderConfigRegistry:
             # 3. Apply profile overrides (CLI flags like --coding-plan, --auth-mode)
             if profile_overrides:
                 base_settings.update(profile_overrides)
+
+            # 3.5 Normalize + env-resolve the per-provider Sandhi gateway block so it
+            # flows as a plain dict into the provider kwargs regardless of strategy.
+            resolve_provider_gateway(base_settings, resolved)
 
             # Get strategy
             strategy = self._strategies.get(resolved)
@@ -557,6 +610,7 @@ __all__ = [
     "ProviderConfigRegistry",
     "get_provider_config_registry",
     "register_provider_config",
+    "resolve_provider_gateway",
     # Default strategy (handles most simple API key providers)
     "DefaultProviderConfig",
     "DEFAULT_PROVIDER_ENDPOINTS",

@@ -107,30 +107,43 @@ class BaseCodeValidator(ABC):
         pass
 
     def clean_markdown(self, code: str) -> str:
-        """Remove markdown code blocks - universal for all languages.
+        """Non-destructively unwrap a SINGLE wrapping markdown code fence.
 
-        This is a Template Method - shared implementation that all
-        validators can use for consistent markdown handling.
+        Acts ONLY when the entire content is one fenced block (the fence wraps the
+        whole document) — the common case where a model wraps one executable-code
+        snippet in a fence. It never extracts a block out of a prose document, never
+        drops prose, and never merges or skips multiple blocks. Markdown documents
+        (prose with embedded code blocks) are returned verbatim.
+
+        This is critical: the previous unanchored ``re.search(r"```...```")`` returned
+        only the FIRST fenced block's interior, silently destroying markdown documents
+        (e.g. a design doc with several code blocks collapsed to a single block) which
+        made agents loop rewriting the "mangled" file.
 
         Args:
-            code: Code potentially wrapped in markdown blocks
+            code: Code possibly wrapped in a single markdown fence.
 
         Returns:
-            Cleaned code without markdown formatting
+            The unwrapped code if the whole input was one fenced block; else the
+            input unchanged.
         """
-        # Try language-specific blocks first
-        for lang_marker in self.MARKDOWN_LANGUAGE_MARKERS:
-            pattern = rf"```{lang_marker}\n(.*?)```"
-            match = re.search(pattern, code, re.DOTALL | re.IGNORECASE)
-            if match:
-                return match.group(1).strip()
-
-        # Try generic code block
-        if "```" in code:
-            match = re.search(r"```\n?(.*?)```", code, re.DOTALL)
-            if match:
-                return match.group(1).strip()
-
+        if "```" not in code:
+            return code
+        stripped = code.strip()
+        # Only unwrap when the ENTIRE content is a single fenced block: exactly one
+        # fence pair (count == 2) AND the fence wraps the whole document. Anything else
+        # (multiple blocks, or a fence embedded in prose) is returned unchanged.
+        if stripped.count("```") != 2:
+            return code
+        # Whole-document, language-tagged fence:  ```lang\n ...\n```
+        match = re.match(r"^```[A-Za-z0-9+#.\-]*\n(.*?)\n?```\s*\Z", stripped, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        # Whole-document, generic fence:  ```\n? ...\n```
+        match = re.match(r"^```\n?(.*?)\n?```\s*\Z", stripped, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        # Fence embedded in a document, multiple blocks, or prose+code → UNCHANGED.
         return code
 
     def preprocess(self, code: str) -> str:

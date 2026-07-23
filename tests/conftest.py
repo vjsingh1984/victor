@@ -34,6 +34,27 @@ def reset_write_path_policy():
 
 
 @pytest.fixture(autouse=True)
+def reset_safety_checker_singleton():
+    """Keep the global safety-checker singleton from leaking between tests.
+
+    ``get_safety_checker()`` caches a process-global ``_default_checker`` that
+    freezes its approval mode at first creation and accumulates mutable state
+    (confirmation callback, custom deny patterns). A test that leaves it denying
+    blocks unrelated write tools in later tests — e.g. an ``edit`` execution
+    returning ``success=False`` "Operation cancelled by safety check" only when
+    run after the polluter (order-dependent). Reset it around every test.
+    """
+    try:
+        from victor.agent.safety import reset_safety_checker
+
+        reset_safety_checker()
+        yield
+        reset_safety_checker()
+    except Exception:
+        yield
+
+
+@pytest.fixture(autouse=True)
 def reset_tool_message_cleanup_stats():
     """Keep openai_compat tool-history-repair stats from leaking between tests.
 

@@ -17,14 +17,11 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 from victor.providers.anthropic_provider import AnthropicProvider
 from victor.providers.base import (
-    Message,
     ToolDefinition,
-    ProviderError,
-    ProviderAuthError,
-    ProviderRateLimitError,
 )
 from victor.workflows.services.credentials import SSOTokens
 
@@ -55,7 +52,9 @@ async def test_initialization():
     assert provider.base_url == "https://custom.url"
     assert provider.timeout == 45
     assert provider.max_retries == 5
-    assert provider.client is not None
+    # Transport is owned by the Sandhi typed variant; the policy shell must NOT
+    # own a provider generation client (TD-0002 deletion gate).
+    assert not hasattr(provider, "client")
 
 
 @pytest.mark.asyncio
@@ -75,7 +74,10 @@ async def test_oauth_mode_uses_claude_code_token_source():
         provider = AnthropicProvider(auth_mode="oauth", oauth_source="claude-code")
 
     MockMgr.assert_called_once_with("anthropic", token_source="claude-code")
-    assert provider.client.auth_token == "claude_oauth_token"
+    # OAuth acquisition stays in Victor; the cached token lands on _api_key,
+    # which the Sandhi typed handle consumes with bearer auth (no SDK client).
+    assert provider._api_key == "claude_oauth_token"
+    assert provider._sandhi_auth_scheme == "bearer"
 
 
 @pytest.mark.asyncio
@@ -94,399 +96,6 @@ async def test_supports_tools(anthropic_provider):
 async def test_supports_streaming(anthropic_provider):
     """Test streaming support."""
     assert anthropic_provider.supports_streaming() is True
-
-
-@pytest.mark.asyncio
-async def test_chat_success_basic(anthropic_provider):
-    """Test successful chat completion with basic message."""
-    # Create mock response
-    mock_message = MagicMock()
-    mock_message.content = [MagicMock(type="text", text="Hello! How can I help you?")]
-    mock_message.stop_reason = "end_turn"
-    mock_message.usage = MagicMock(
-        input_tokens=10,
-        output_tokens=20,
-    )
-    mock_message.model_dump = lambda: {"test": "response"}
-
-    with patch.object(
-        anthropic_provider.client.messages,
-        "create",
-        new_callable=AsyncMock,
-    ) as mock_create:
-        mock_create.return_value = mock_message
-
-        messages = [Message(role="user", content="Hello")]
-        response = await anthropic_provider.chat(
-            messages=messages,
-            model="claude-sonnet-4-5",
-            temperature=0.7,
-            max_tokens=1024,
-        )
-
-        assert response.content == "Hello! How can I help you?"
-        assert response.role == "assistant"
-        assert response.model == "claude-sonnet-4-5"
-        assert response.stop_reason == "end_turn"
-        assert response.usage is not None
-        assert response.usage["prompt_tokens"] == 10
-        assert response.usage["completion_tokens"] == 20
-        assert response.usage["total_tokens"] == 30
-
-
-@pytest.mark.asyncio
-async def test_chat_with_system_message(anthropic_provider):
-    """Test chat with system message."""
-    mock_message = MagicMock()
-    mock_message.content = [MagicMock(type="text", text="Response")]
-    mock_message.stop_reason = "end_turn"
-    mock_message.usage = None
-    mock_message.model_dump = lambda: {}
-
-    with patch.object(
-        anthropic_provider.client.messages,
-        "create",
-        new_callable=AsyncMock,
-    ) as mock_create:
-        mock_create.return_value = mock_message
-
-        messages = [
-            Message(role="system", content="You are a helpful assistant"),
-            Message(role="user", content="Hello"),
-        ]
-        await anthropic_provider.chat(
-            messages=messages,
-            model="claude-3-opus",
-        )
-
-        # Verify system message was separated and wrapped with cache_control
-        call_args = mock_create.call_args
-        assert "system" in call_args.kwargs
-        system_val = call_args.kwargs["system"]
-        # Anthropic provider wraps system messages with cache_control for prompt caching
-        assert system_val == [
-            {
-                "type": "text",
-                "text": "You are a helpful assistant",
-                "cache_control": {"type": "ephemeral"},
-            }
-        ]
-        assert len(call_args.kwargs["messages"]) == 1
-        assert call_args.kwargs["messages"][0]["role"] == "user"
-
-
-@pytest.mark.asyncio
-async def test_chat_with_tools(anthropic_provider):
-    """Test chat with tool definitions."""
-    # Create mock tool_use block
-    mock_tool_block = MagicMock()
-    mock_tool_block.type = "tool_use"
-    mock_tool_block.id = "tool_123"
-    mock_tool_block.name = "get_weather"
-    mock_tool_block.input = {"location": "London"}
-
-    mock_message = MagicMock()
-    mock_message.content = [mock_tool_block]
-    mock_message.stop_reason = "tool_use"
-    mock_message.usage = MagicMock(input_tokens=15, output_tokens=25)
-    mock_message.model_dump = lambda: {}
-
-    with patch.object(
-        anthropic_provider.client.messages,
-        "create",
-        new_callable=AsyncMock,
-    ) as mock_create:
-        mock_create.return_value = mock_message
-
-        tools = [
-            ToolDefinition(
-                name="get_weather",
-                description="Get weather for a location",
-                parameters={
-                    "type": "object",
-                    "properties": {"location": {"type": "string"}},
-                },
-            )
-        ]
-
-        messages = [Message(role="user", content="What's the weather in London?")]
-        response = await anthropic_provider.chat(
-            messages=messages,
-            model="claude-sonnet-4-5",
-            tools=tools,
-        )
-
-        assert response.tool_calls is not None
-        assert len(response.tool_calls) == 1
-        assert response.tool_calls[0]["id"] == "tool_123"
-        assert response.tool_calls[0]["name"] == "get_weather"
-        assert response.tool_calls[0]["arguments"] == {"location": "London"}
-        assert response.stop_reason == "tool_use"
-
-
-@pytest.mark.asyncio
-async def test_chat_with_mixed_content(anthropic_provider):
-    """Test chat with mixed text and tool call content."""
-    # Create mock blocks
-    mock_text_block = MagicMock()
-    mock_text_block.type = "text"
-    mock_text_block.text = "Let me check that for you. "
-
-    mock_tool_block = MagicMock()
-    mock_tool_block.type = "tool_use"
-    mock_tool_block.id = "tool_456"
-    mock_tool_block.name = "search"
-    mock_tool_block.input = {"query": "test"}
-
-    mock_message = MagicMock()
-    mock_message.content = [mock_text_block, mock_tool_block]
-    mock_message.stop_reason = "tool_use"
-    mock_message.usage = None
-    mock_message.model_dump = lambda: {}
-
-    with patch.object(
-        anthropic_provider.client.messages,
-        "create",
-        new_callable=AsyncMock,
-    ) as mock_create:
-        mock_create.return_value = mock_message
-
-        messages = [Message(role="user", content="Search for test")]
-        response = await anthropic_provider.chat(
-            messages=messages,
-            model="claude-3-opus",
-        )
-
-        assert response.content == "Let me check that for you. "
-        assert response.tool_calls is not None
-        assert len(response.tool_calls) == 1
-
-
-@pytest.mark.asyncio
-async def test_chat_authentication_error(anthropic_provider):
-    """Test authentication error handling."""
-    with patch.object(
-        anthropic_provider.client.messages,
-        "create",
-        new_callable=AsyncMock,
-    ) as mock_create:
-        mock_create.side_effect = Exception("authentication failed")
-
-        messages = [Message(role="user", content="Hello")]
-
-        with pytest.raises(ProviderAuthError) as exc_info:
-            await anthropic_provider.chat(
-                messages=messages,
-                model="claude-sonnet-4-5",
-            )
-
-        assert "Authentication failed" in str(exc_info.value)
-        assert exc_info.value.provider == "anthropic"
-
-
-@pytest.mark.asyncio
-async def test_chat_rate_limit_error(anthropic_provider):
-    """Test rate limit error handling."""
-    with patch.object(
-        anthropic_provider.client.messages,
-        "create",
-        new_callable=AsyncMock,
-    ) as mock_create:
-        mock_create.side_effect = Exception("rate_limit exceeded 429")
-
-        messages = [Message(role="user", content="Hello")]
-
-        with pytest.raises(ProviderRateLimitError) as exc_info:
-            await anthropic_provider.chat(
-                messages=messages,
-                model="claude-sonnet-4-5",
-            )
-
-        assert "Rate limit exceeded" in str(exc_info.value)
-        assert exc_info.value.provider == "anthropic"
-        assert exc_info.value.status_code == 429
-
-
-@pytest.mark.asyncio
-async def test_chat_generic_error(anthropic_provider):
-    """Test generic error handling."""
-    with patch.object(
-        anthropic_provider.client.messages,
-        "create",
-        new_callable=AsyncMock,
-    ) as mock_create:
-        mock_create.side_effect = Exception("Something went wrong")
-
-        messages = [Message(role="user", content="Hello")]
-
-        with pytest.raises(ProviderError) as exc_info:
-            await anthropic_provider.chat(
-                messages=messages,
-                model="claude-sonnet-4-5",
-            )
-
-        assert "Anthropic API error" in str(exc_info.value)
-        assert exc_info.value.provider == "anthropic"
-
-
-@pytest.mark.asyncio
-async def test_stream_success(anthropic_provider):
-    """Test successful streaming."""
-    # Create mock stream events - delta needs type="text_delta" for the provider to recognize it
-    mock_delta1 = MagicMock()
-    mock_delta1.type = "text_delta"
-    mock_delta1.text = "Hello "
-
-    mock_event1 = MagicMock()
-    mock_event1.type = "content_block_delta"
-    mock_event1.delta = mock_delta1
-
-    mock_delta2 = MagicMock()
-    mock_delta2.type = "text_delta"
-    mock_delta2.text = "world!"
-
-    mock_event2 = MagicMock()
-    mock_event2.type = "content_block_delta"
-    mock_event2.delta = mock_delta2
-
-    mock_event3 = MagicMock()
-    mock_event3.type = "message_stop"
-
-    # Create async context manager mock
-    mock_stream = MagicMock()
-    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
-    mock_stream.__aexit__ = AsyncMock()
-
-    async def async_iter():
-        for event in [mock_event1, mock_event2, mock_event3]:
-            yield event
-
-    mock_stream.__aiter__ = lambda self: async_iter()
-
-    with patch.object(
-        anthropic_provider.client.messages,
-        "stream",
-    ) as mock_stream_method:
-        mock_stream_method.return_value = mock_stream
-
-        messages = [Message(role="user", content="Hello")]
-        chunks = []
-
-        async for chunk in anthropic_provider.stream(
-            messages=messages,
-            model="claude-sonnet-4-5",
-        ):
-            chunks.append(chunk)
-
-        assert len(chunks) == 3
-        assert chunks[0].content == "Hello "
-        assert chunks[0].is_final is False
-        assert chunks[1].content == "world!"
-        assert chunks[1].is_final is False
-        assert chunks[2].content == ""
-        assert chunks[2].is_final is True
-
-
-@pytest.mark.asyncio
-async def test_stream_with_system_message(anthropic_provider):
-    """Test streaming with system message."""
-    mock_stream = MagicMock()
-    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
-    mock_stream.__aexit__ = AsyncMock()
-
-    async def async_iter():
-        yield MagicMock(type="message_stop")
-
-    mock_stream.__aiter__ = lambda self: async_iter()
-
-    with patch.object(
-        anthropic_provider.client.messages,
-        "stream",
-    ) as mock_stream_method:
-        mock_stream_method.return_value = mock_stream
-
-        messages = [
-            Message(role="system", content="System prompt"),
-            Message(role="user", content="Hello"),
-        ]
-
-        chunks = []
-        async for chunk in anthropic_provider.stream(
-            messages=messages,
-            model="claude-3-opus",
-        ):
-            chunks.append(chunk)
-
-        # Verify system message was separated and wrapped with cache_control
-        call_args = mock_stream_method.call_args
-        assert "system" in call_args.kwargs
-        assert call_args.kwargs["system"] == [
-            {
-                "type": "text",
-                "text": "System prompt",
-                "cache_control": {"type": "ephemeral"},
-            }
-        ]
-
-
-@pytest.mark.asyncio
-async def test_stream_with_tools(anthropic_provider):
-    """Test streaming with tools."""
-    mock_stream = MagicMock()
-    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
-    mock_stream.__aexit__ = AsyncMock()
-
-    async def async_iter():
-        yield MagicMock(type="message_stop")
-
-    mock_stream.__aiter__ = lambda self: async_iter()
-
-    with patch.object(
-        anthropic_provider.client.messages,
-        "stream",
-    ) as mock_stream_method:
-        mock_stream_method.return_value = mock_stream
-
-        tools = [
-            ToolDefinition(
-                name="calculate",
-                description="Perform calculation",
-                parameters={"type": "object", "properties": {}},
-            )
-        ]
-
-        messages = [Message(role="user", content="Calculate 2+2")]
-
-        chunks = []
-        async for chunk in anthropic_provider.stream(
-            messages=messages,
-            model="claude-sonnet-4-5",
-            tools=tools,
-        ):
-            chunks.append(chunk)
-
-        # Verify tools were converted
-        call_args = mock_stream_method.call_args
-        assert "tools" in call_args.kwargs
-
-
-@pytest.mark.asyncio
-async def test_stream_error(anthropic_provider):
-    """Test streaming error handling."""
-    with patch.object(
-        anthropic_provider.client.messages,
-        "stream",
-    ) as mock_stream_method:
-        mock_stream_method.side_effect = Exception("Stream error")
-
-        messages = [Message(role="user", content="Hello")]
-
-        with pytest.raises(ProviderError):
-            async for _chunk in anthropic_provider.stream(
-                messages=messages,
-                model="claude-sonnet-4-5",
-            ):
-                pass
 
 
 @pytest.mark.asyncio
@@ -528,119 +137,118 @@ async def test_convert_tools(anthropic_provider):
 
 
 @pytest.mark.asyncio
-async def test_parse_response_text_only(anthropic_provider):
-    """Test parsing response with text content only."""
-    mock_message = MagicMock()
-    mock_message.content = [
-        MagicMock(type="text", text="First part. "),
-        MagicMock(type="text", text="Second part."),
-    ]
-    mock_message.stop_reason = "end_turn"
-    mock_message.usage = MagicMock(input_tokens=5, output_tokens=10)
-    mock_message.model_dump = lambda: {"raw": "data"}
-
-    response = anthropic_provider._parse_response(mock_message, "test-model")
-
-    assert response.content == "First part. Second part."
-    assert response.role == "assistant"
-    assert response.model == "test-model"
-    assert response.stop_reason == "end_turn"
-    assert response.tool_calls is None
-    assert response.usage["prompt_tokens"] == 5
-    assert response.usage["completion_tokens"] == 10
+async def test_close_is_safe_without_generation_client(anthropic_provider):
+    """Transport is owned by Sandhi; the policy shell owns no client to close."""
+    # The policy shell must not own a provider generation client (TD-0002 gate),
+    # so close() is a safe no-op rather than a client.teardown.
+    assert not hasattr(anthropic_provider, "client")
+    await anthropic_provider.close()  # must not raise
 
 
 @pytest.mark.asyncio
-async def test_parse_response_no_usage(anthropic_provider):
-    """Test parsing response without usage information."""
-    mock_message = MagicMock()
-    mock_message.content = [MagicMock(type="text", text="Test")]
-    mock_message.stop_reason = "end_turn"
-    mock_message.usage = None
-    mock_message.model_dump = lambda: {}
-
-    response = anthropic_provider._parse_response(mock_message, "test-model")
-
-    assert response.content == "Test"
-    assert response.usage is None
-
-
-@pytest.mark.asyncio
-async def test_close(anthropic_provider):
-    """Test closing the provider client."""
-    with patch.object(
-        anthropic_provider.client,
-        "close",
-        new_callable=AsyncMock,
-    ) as mock_close:
-        await anthropic_provider.close()
-        mock_close.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_chat_with_custom_kwargs(anthropic_provider):
-    """Test chat with additional custom parameters."""
-    mock_message = MagicMock()
-    mock_message.content = [MagicMock(type="text", text="Response")]
-    mock_message.stop_reason = "end_turn"
-    mock_message.usage = None
-    mock_message.model_dump = lambda: {}
-
-    with patch.object(
-        anthropic_provider.client.messages,
-        "create",
-        new_callable=AsyncMock,
-    ) as mock_create:
-        mock_create.return_value = mock_message
-
-        messages = [Message(role="user", content="Hello")]
-        await anthropic_provider.chat(
-            messages=messages,
-            model="claude-sonnet-4-5",
-            top_p=0.9,
-            top_k=40,
-        )
-
-        # Verify custom kwargs were passed
-        call_args = mock_create.call_args
-        assert "top_p" in call_args.kwargs
-        assert call_args.kwargs["top_p"] == 0.9
-        assert "top_k" in call_args.kwargs
-        assert call_args.kwargs["top_k"] == 40
-
-
-@pytest.mark.asyncio
-async def test_multiple_system_messages(anthropic_provider):
-    """Test handling multiple system messages (last one wins)."""
-    mock_message = MagicMock()
-    mock_message.content = [MagicMock(type="text", text="Response")]
-    mock_message.stop_reason = "end_turn"
-    mock_message.usage = None
-    mock_message.model_dump = lambda: {}
-
-    with patch.object(
-        anthropic_provider.client.messages,
-        "create",
-        new_callable=AsyncMock,
-    ) as mock_create:
-        mock_create.return_value = mock_message
-
-        messages = [
-            Message(role="system", content="First system message"),
-            Message(role="system", content="Second system message"),
-            Message(role="user", content="Hello"),
-        ]
-        await anthropic_provider.chat(
-            messages=messages,
-            model="claude-3-opus",
-        )
-
-        # Verify the last system message was used (wrapped with cache_control)
-        call_args = mock_create.call_args
-        assert call_args.kwargs["system"] == [
+async def test_list_models_uses_sandhi_catalog(monkeypatch):
+    """When the Sandhi catalog is available, list_models() uses it (Victor shapes the facts)."""
+    provider = AnthropicProvider(api_key="test-key")
+    monkeypatch.setattr(
+        provider,
+        "_models_from_sandhi",
+        lambda: [
             {
-                "type": "text",
-                "text": "Second system message",
-                "cache_control": {"type": "ephemeral"},
+                "id": "claude-fable-5",
+                "name": "Claude Fable 5",
+                "context_window": 1_000_000,
+                "max_output_tokens": 131_072,
             }
-        ]
+        ],
+    )
+    # The SDK must NOT be consulted when the catalog is present.
+    with patch(
+        "anthropic.AsyncAnthropic", side_effect=AssertionError("SDK unused when catalog present")
+    ):
+        models = await provider.list_models()
+
+    assert models == [
+        {
+            "id": "claude-fable-5",
+            "name": "Claude Fable 5",
+            "context_window": 1_000_000,
+            "max_output_tokens": 131_072,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_list_models_uses_live_sdk_when_catalog_absent(monkeypatch):
+    """When the Sandhi catalog is unavailable, list_models() falls back to the SDK /v1/models.
+
+    The SDK client is discovery-only (transient); transport stays Sandhi-owned.
+    """
+    provider = AnthropicProvider(api_key="test-key")
+    monkeypatch.setattr(provider, "_models_from_sandhi", lambda: None)
+    fake_model = SimpleNamespace(
+        id="claude-future-9",
+        display_name="Claude Future 9",
+        type="model",
+        max_input_tokens=2_000_000,
+        max_tokens=200_000,
+    )
+    fake_client = MagicMock()
+    fake_client.__aenter__ = AsyncMock(return_value=fake_client)
+    fake_client.__aexit__ = AsyncMock(return_value=False)
+    fake_client.models.list = AsyncMock(return_value=SimpleNamespace(data=[fake_model]))
+
+    with patch("anthropic.AsyncAnthropic", return_value=fake_client) as mock_ctor:
+        models = await provider.list_models()
+
+    mock_ctor.assert_called_once()
+    assert models == [
+        {
+            "id": "claude-future-9",
+            "name": "Claude Future 9",
+            "type": "model",
+            "context_window": 2_000_000,
+            "max_output_tokens": 200_000,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_list_models_falls_back_to_current_static_list(monkeypatch):
+    """When catalog + SDK both fail, list_models() returns the curated static fallback."""
+    provider = AnthropicProvider(api_key="test-key")
+    monkeypatch.setattr(provider, "_models_from_sandhi", lambda: None)
+    with patch("anthropic.AsyncAnthropic", side_effect=RuntimeError("offline")):
+        models = await provider.list_models()
+
+    ids = [m["id"] for m in models]
+    # Current Claude lineup (web-sourced 2026-07): catalog + live discovery down -> static.
+    assert "claude-fable-5" in ids
+    assert "claude-opus-4-8" in ids
+    assert "claude-sonnet-5" in ids
+    assert "claude-haiku-4-5-20251001" in ids
+    # Retired/ancient models must not be advertised in the fallback.
+    assert "claude-sonnet-4-20250514" not in ids
+    assert "claude-3-5-sonnet-20241022" not in ids
+
+
+@pytest.mark.asyncio
+async def test_models_from_sandhi_reads_real_catalog_when_available():
+    """Integration: _models_from_sandhi reads the real Sandhi catalog when the binding exposes it.
+
+    Skips cleanly when the installed Sandhi predates the catalog surface (TD-0004 Phase A),
+    so it is not CI-flaky.
+    """
+    try:
+        import sandhi_gateway as sg
+    except Exception:  # pragma: no cover - sandhi absent
+        pytest.skip("sandhi-gateway not installed")
+    if not hasattr(sg, "provider_models_json"):
+        pytest.skip("installed sandhi predates the catalog surface (TD-0004 Phase A)")
+
+    provider = AnthropicProvider(api_key="test-key")
+    models = provider._models_from_sandhi()
+    assert models is not None
+    ids = [m["id"] for m in models]
+    # The curated Anthropic lineup admitted in sandhi-providers catalog.rs.
+    assert "claude-fable-5" in ids
+    assert "claude-opus-4-8" in ids

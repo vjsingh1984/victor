@@ -43,25 +43,30 @@ class TestCodeCorrectionConfig:
         assert config.max_iterations == 1
         assert config.collect_metrics is True
 
-    def test_default_code_tools(self):
-        """Test default code tools set."""
+    def test_default_executable_code_tools(self):
+        """Executable-code tools (run generated code immediately) are correctable."""
         config = CodeCorrectionConfig()
 
-        # Should include common code execution tools
-        assert "code_executor" in config.code_tools
-        assert "execute_code" in config.code_tools
-        assert "write" in config.code_tools
-        assert "edit" in config.code_tools
-        assert "file_editor" in config.code_tools
+        # Code-execution tools qualify by name
+        assert "code_executor" in config.executable_code_tools
+        assert "execute_code" in config.executable_code_tools
+        assert "run_code" in config.executable_code_tools
+        # File-authoring tools are NEVER correctable (content is a document)
+        assert "write" not in config.executable_code_tools
+        assert "edit" not in config.executable_code_tools
+        assert "file_editor" not in config.executable_code_tools
 
     def test_default_code_argument_names(self):
-        """Test default code argument names."""
+        """Only executable-code argument names are correctable."""
         config = CodeCorrectionConfig()
 
         assert "code" in config.code_argument_names
-        assert "content" in config.code_argument_names
         assert "source" in config.code_argument_names
         assert "script" in config.code_argument_names
+        # File-content argument names are never treated as correctable code
+        assert "content" not in config.code_argument_names
+        assert "new_content" not in config.code_argument_names
+        assert "file_content" not in config.code_argument_names
 
     def test_custom_config(self):
         """Test custom configuration values."""
@@ -69,14 +74,14 @@ class TestCodeCorrectionConfig:
             enabled=False,
             auto_fix=False,
             max_iterations=3,
-            code_tools={"my_custom_tool"},
+            executable_code_tools={"my_custom_tool"},
             code_argument_names={"my_code_arg"},
         )
 
         assert config.enabled is False
         assert config.auto_fix is False
         assert config.max_iterations == 3
-        assert "my_custom_tool" in config.code_tools
+        assert "my_custom_tool" in config.executable_code_tools
         assert "my_code_arg" in config.code_argument_names
 
 
@@ -97,28 +102,40 @@ class TestCodeCorrectionMiddleware:
         return CodeCorrectionMiddleware(config=config)
 
     def test_should_validate_code_executor(self, middleware):
-        """Test that code_executor tool should be validated."""
+        """Executable-code tools should be validated."""
         assert middleware.should_validate("code_executor") is True
 
-    def test_should_validate_write_tool(self, middleware):
-        """Test that canonical write tool should be validated."""
-        assert middleware.should_validate("write") is True
+    def test_should_not_validate_write_tool(self, middleware):
+        """File-authoring tools (write) must NOT be validated — content is a document."""
+        assert middleware.should_validate("write") is False
 
-    def test_should_validate_write_file_alias(self, middleware):
-        """Legacy write alias should still be validated."""
-        assert middleware.should_validate("write_file") is True
+    def test_should_not_validate_write_file_alias(self, middleware):
+        """Legacy write alias must not be validated either."""
+        assert middleware.should_validate("write_file") is False
 
-    def test_should_validate_edit_file_alias(self, middleware):
-        """Legacy edit alias should still be validated."""
-        assert middleware.should_validate("edit_file") is True
+    def test_should_not_validate_edit_file_alias(self, middleware):
+        """Legacy edit alias must not be validated either."""
+        assert middleware.should_validate("edit_file") is False
 
     def test_should_not_validate_read_file(self, middleware):
         """Test that read_file tool should not be validated."""
         assert middleware.should_validate("read_file") is False
 
     def test_should_not_validate_random_tool(self, middleware):
-        """Test that unknown tools are not validated."""
+        """Test that unknown tools are not validated (fail-safe)."""
         assert middleware.should_validate("random_tool") is False
+
+    def test_should_validate_executes_trait_tool(self, middleware):
+        """A tool whose contract declares access_mode=EXECUTE qualifies by trait."""
+
+        class _ExecTool:
+            access_mode = "execute"
+
+        class _WriteTool:
+            access_mode = "write"
+
+        assert middleware.should_validate("custom_runner", tool=_ExecTool()) is True
+        assert middleware.should_validate("custom_writer", tool=_WriteTool()) is False
 
     def test_should_not_validate_when_disabled(self, disabled_middleware):
         """Test that disabled middleware doesn't validate any tools."""
@@ -142,13 +159,12 @@ class TestFindCodeArgument:
         assert result[0] == "code"
         assert result[1] == "print('hello')"
 
-    def test_find_code_argument_with_content(self, middleware):
-        """Test finding 'content' argument."""
+    def test_find_code_argument_ignores_content(self, middleware):
+        """File-content args ('content') are not treated as correctable code."""
         args = {"content": "def foo(): pass", "path": "/tmp/test.py"}
         result = middleware.find_code_argument(args)
 
-        assert result is not None
-        assert result[0] == "content"
+        assert result is None
 
     def test_find_code_argument_with_source(self, middleware):
         """Test finding 'source' argument."""
@@ -297,6 +313,64 @@ class TestApplyCorrection:
 
         # Should return same arguments
         assert new_args is original_args
+
+
+class TestFileContentNotCorrected:
+    """Regression: file-authoring tools' content must never be auto-corrected.
+
+    Root cause of the sandhi-c3966e22 stuck loop: a markdown document written via
+    ``write`` was silently truncated to a single code block by the corrector's
+    destructive ``clean_markdown``. These guard the whole class.
+    """
+
+    @pytest.fixture
+    def middleware(self):
+        CodeValidatorRegistry.reset_singleton()
+        return CodeCorrectionMiddleware()
+
+    @staticmethod
+    def _markdown_doc() -> str:
+        # Multi-section markdown with prose and several fenced code blocks — the exact
+        # shape that was truncated to one ~20-byte block.
+        doc = "# TD\n\n## Context\n\nIntro prose here.\n\n## Scope\n\n"
+        for i in range(1, 4):
+            doc += (
+                f"### Pillar {i}\n\nNarrative about pillar {i}.\n\n"
+                f"```rust\nfn h{i}() -> i32 {{ {i} }}\n```\n\n"
+            )
+        doc += "```text\nsandhi keys add <provider>\nsandhi usage --by key\n```\n"
+        return doc
+
+    def test_process_write_leaves_markdown_untouched(self, middleware):
+        """process() on write returns content byte-identical and no correction result."""
+        doc = self._markdown_doc()
+        args = {"path": "x.md", "content": doc, "force": True}
+        out_args, result = middleware.process("write", args)
+        assert result is None  # gate not entered (write is not executable-code)
+        assert out_args["content"] == doc
+
+    def test_process_write_file_alias_leaves_markdown_untouched(self, middleware):
+        doc = self._markdown_doc()
+        args = {"path": "x.md", "content": doc}
+        out_args, result = middleware.process("write_file", args)
+        assert result is None
+        assert out_args["content"] == doc
+
+    def test_process_edit_leaves_markdown_untouched(self, middleware):
+        doc = self._markdown_doc()
+        args = {"ops": [{"type": "create", "path": "x.md", "content": doc}]}
+        out_args, result = middleware.process("edit", args)
+        assert result is None
+        assert out_args == args
+
+    def test_process_code_executor_still_corrects_fenced_code(self, middleware):
+        """Executable-code tools still get fenced code unwrapped and corrected."""
+        args = {"code": "```python\ndef f():\n    return 1\n```"}
+        out_args, result = middleware.process("code_executor", args)
+        assert result is not None
+        assert result.was_corrected is True
+        assert "```" not in out_args["code"]
+        assert out_args["code"].strip() == "def f():\n    return 1"
 
 
 class TestFormatValidationError:

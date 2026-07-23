@@ -50,7 +50,15 @@ class BufferedRenderer:
         """Resume (no-op for buffered)."""
         pass
 
-    def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
+    def on_tool_start(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        tool_call_id: str | None = None,
+        batch_index: int | None = None,
+        batch_total: int | None = None,
+        execution_mode: str | None = None,
+    ) -> None:
         """Record tool execution start."""
         self._tool_calls.append({"name": name, "arguments": arguments, "result": None})
 
@@ -75,6 +83,7 @@ class BufferedRenderer:
         was_pruned: bool = False,
         original_result: Any = None,
         result: Any = None,
+        tool_call_id: str | None = None,
     ) -> None:
         """Record tool execution result."""
         tool_output = str(result) if result is not None else ""

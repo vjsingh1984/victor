@@ -1,616 +1,121 @@
 # Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
+"""Cerebras model and presentation policy over Sandhi's typed runtime."""
 
-"""Cerebras Inference API provider for ultra-fast LLM inference.
+from __future__ import annotations
 
-Cerebras provides extremely fast inference using their Wafer Scale Engine (WSE)
-hardware with a generous free tier.
-
-Free Tier:
-- 10-30 requests/min (varies by model)
-- 60,000 tokens/min input
-- Access to Llama 3.1, GPT-OSS, Qwen 3, and ZAI GLM models
-
-Features:
-- Fastest inference available (1000+ tokens/sec)
-- OpenAI-compatible API
-- Tool calling support
-- Free tier with no credit card
-
-References:
-- https://inference-docs.cerebras.ai/
-- https://inference-docs.cerebras.ai/api-reference
-"""
-
-import asyncio
-from victor.core.json_utils import json_dumps, json_loads
-from json import JSONDecodeError
-import os
 import re
-import ssl
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
-import httpx
+from victor.providers.base import CompletionResponse, Message, StreamChunk, ToolDefinition
+from victor.providers.openai_compat_model_policy import get_openai_compat_provider_spec
+from victor.providers.sandhi_openai_compat_policy import SandhiOpenAICompatPolicy
 
-from victor.providers.base import (
-    CacheCostModel,
-    BaseProvider,
-    CompletionResponse,
-    Message,
-    ProviderAuthError,
-    ProviderError,
-    ProviderRateLimitError,
-    ProviderTimeoutError,
-    StreamChunk,
-    ToolDefinition,
-)
-from victor.providers.resolution import (
-    UnifiedApiKeyResolver,
-    APIKeyNotFoundError,
-)
-from victor.providers.logging import ProviderLogger
-
-
-@dataclass
-class StreamingThinkingFilter:
-    """Filter for detecting and separating thinking content during streaming.
-
-    For Qwen-3 models that output reasoning inline, this filter:
-    1. Buffers initial content until we have enough to analyze
-    2. Detects thinking patterns at the start
-    3. Tracks transition from thinking to main content
-    4. Emits only main content, storing thinking in metadata
-    """
-
-    model: str
-    buffer_size: int = 150  # Buffer chars before analyzing
-    max_thinking_buffer: int = 2000  # Max chars to buffer before giving up
-    _buffer: str = field(default="", init=False)
-    _in_thinking: bool = field(default=True, init=False)  # Start assuming thinking
-    _thinking_content: str = field(default="", init=False)
-    _analyzed: bool = field(default=False, init=False)
-    _emit_queue: List[str] = field(default_factory=list, init=False)
-    _gave_up: bool = field(default=False, init=False)  # If we gave up filtering
-
-    def process_chunk(self, content: str) -> Tuple[str, Optional[Dict[str, Any]]]:
-        """Process a streaming chunk, filtering thinking content.
-
-        Args:
-            content: Incoming content chunk
-
-        Returns:
-            Tuple of (content_to_emit, metadata_update)
-        """
-        if not _is_thinking_model(self.model):
-            # Not a thinking model, pass through directly
-            return content, None
-
-        # If we gave up filtering, pass through directly
-        if self._gave_up:
-            return content, None
-
-        self._buffer += content
-
-        # Haven't analyzed enough content yet
-        if not self._analyzed:
-            # Wait for buffer to fill or newline
-            if len(self._buffer) < self.buffer_size and "\n" not in self._buffer:
-                return "", None  # Hold content until we have enough
-
-            # Analyze buffered content
-            self._analyze_buffer()
-            self._analyzed = True
-
-        # If we're in thinking mode, accumulate but don't emit
-        if self._in_thinking:
-            # Check if we've transitioned to main content
-            self._check_transition()
-
-            if self._in_thinking:
-                # Check if buffer is too large - give up and emit everything
-                if len(self._buffer) > self.max_thinking_buffer:
-                    # Buffer too large, give up on thinking detection
-                    pass
-                    self._gave_up = True
-                    emit_content = self._buffer
-                    self._buffer = ""
-                    return emit_content, None
-
-                # Still in thinking mode - store and don't emit
-                self._thinking_content = self._buffer
-                return "", None
-
-        # We're in main content mode - emit pending content
-        emit_content = self._buffer
-        self._buffer = ""
-
-        # Return accumulated thinking in metadata only on first main content emission
-        metadata = None
-        if self._thinking_content:
-            metadata = {"reasoning_content": self._thinking_content}
-            self._thinking_content = ""  # Clear after emitting metadata
-
-        return emit_content, metadata
-
-    def _analyze_buffer(self) -> None:
-        """Analyze buffer to determine if it starts with thinking content."""
-        content = self._buffer.strip()
-        if not content:
-            self._in_thinking = False
-            return
-
-        # Check if content starts with thinking patterns
-        for pattern in QWEN3_THINKING_PATTERNS:
-            if re.match(pattern, content, re.IGNORECASE):
-                self._in_thinking = True
-                return
-
-        # No thinking pattern detected - treat as main content
-        self._in_thinking = False
-
-    def _check_transition(self) -> None:
-        """Check if buffer has transitioned from thinking to main content."""
-        # Look for double newline or significant structure change
-        lines = self._buffer.split("\n")
-        if len(lines) < 2:
-            return
-
-        # Check for empty line (paragraph break) indicating transition
-        for i, line in enumerate(lines):
-            if not line.strip() and i > 0:
-                # Found paragraph break - check if next content looks like main response
-                remaining = "\n".join(lines[i + 1 :]).strip()
-                if remaining and self._looks_like_main_content(remaining[:150]):
-                    # Transition detected - split content
-                    self._thinking_content = "\n".join(lines[: i + 1])
-                    self._buffer = remaining
-                    self._in_thinking = False
-                    return
-
-    def _looks_like_main_content(self, text: str) -> bool:
-        """Check if text looks like main response content (not thinking)."""
-        text_stripped = text.strip()
-
-        # Patterns that indicate main content (answers, explanations)
-        main_content_patterns = [
-            r"^(Here(?:'s| is)|The answer|Based on|In summary|To summarize)",
-            r"^(According to|Looking at|From the|The result)",
-            r"^(This (?:is|means|indicates|shows|returns))",
-            r"^(The (?:code|function|file|output|response))",
-            r"^(Yes|No|True|False)[,.\s]",
-            r"^(```|def |class |import |from )",  # Code blocks
-            r"^\d+\.?\s",  # Numbered lists
-            r"^[-*]\s",  # Bullet lists
-            r"^#+\s",  # Markdown headers
-        ]
-
-        for pattern in main_content_patterns:
-            if re.match(pattern, text_stripped, re.IGNORECASE):
-                return True
-
-        # Check if it doesn't look like thinking
-        return not self._looks_like_thinking(text_stripped)
-
-    def _looks_like_thinking(self, text: str) -> bool:
-        """Check if text looks like thinking/reasoning content."""
-        for pattern in QWEN3_THINKING_PATTERNS:
-            if re.match(pattern, text, re.IGNORECASE):
-                return True
-        # Also check continuation patterns
-        if text.startswith(
-            (
-                "Although",
-                "Since",
-                "Because",
-                "However",
-                "But wait",
-                "And then",
-                "So I",
-                "This means",
-                "That would",
-                "Maybe",
-                "Perhaps",
-                "I should",
-                "I need to",
-                "Let me",
-                "Wait,",
-                "Actually,",
-            )
-        ):
-            return True
-        return False
-
-    def finalize(self) -> Tuple[str, Optional[Dict[str, Any]]]:
-        """Finalize and return any remaining content.
-
-        Returns:
-            Tuple of (remaining_content, final_metadata)
-        """
-        if not _is_thinking_model(self.model):
-            return self._buffer, None
-
-        # If we never transitioned out of thinking, all content is main
-        if self._in_thinking and self._buffer:
-            # Everything was thinking-like but we should still emit it
-            thinking, main = _extract_qwen3_thinking(self._buffer)
-            metadata = {"reasoning_content": thinking} if thinking else None
-            self._buffer = ""
-            return main, metadata
-
-        # Return any remaining buffered content
-        content = self._buffer
-        self._buffer = ""
-
-        metadata = None
-        if self._thinking_content:
-            metadata = {"reasoning_content": self._thinking_content}
-            self._thinking_content = ""
-
-        return content, metadata
-
-
-DEFAULT_BASE_URL = "https://api.cerebras.ai/v1"
-
-CEREBRAS_MODELS = {
-    "llama3.1-8b": {
-        "description": "Llama 3.1 8B - Fast, efficient",
-        "context_window": 131072,
-        "max_output": 8192,
-        "supports_tools": True,
-        "rate_limit": "30 req/min, 60K tokens/min",
-    },
-    "gpt-oss-120b": {
-        "description": "GPT-OSS 120B - Best general-purpose, reasoning support",
-        "context_window": 131072,
-        "max_output": 32768,
-        "supports_tools": True,
-        "rate_limit": "30 req/min, 60K tokens/min",
-    },
-    "qwen-3-235b-a22b-instruct-2507": {
-        "description": "Qwen 3 235B - Strong multilingual and coding (preview)",
-        "context_window": 131072,
-        "max_output": 32768,
-        "supports_tools": True,
-        "has_thinking": False,
-        "preview": True,
-    },
-    "zai-glm-4.7": {
-        "description": "ZAI GLM 4.7 - Frontier coding and reasoning (preview)",
-        "context_window": 131072,
-        "max_output": 40960,
-        "supports_tools": True,
-        "has_reasoning": True,
-        "preview": True,
-    },
-}
-
-# Models that output thinking/reasoning inline (need filtering)
+_SPEC = get_openai_compat_provider_spec("cerebras")
+DEFAULT_BASE_URL = _SPEC.base_url
+CEREBRAS_MODELS = {model: dict(metadata) for model, metadata in _SPEC.models.items()}
 THINKING_MODELS = {"qwen-3-235b-a22b-instruct-2507"}
-
-# Patterns that indicate start of thinking content in Qwen-3 models
-QWEN3_THINKING_PATTERNS = [
+QWEN3_THINKING_PATTERNS = (
     r"^Okay,?\s+(?:the\s+)?(?:user\s+)?(?:is\s+)?(?:asking|wants?|needs?|said)",
     r"^(?:Let\s+me\s+)?(?:think|see|check|analyze|consider)",
     r"^(?:Hmm|Well|So),?\s+",
     r"^(?:First|Now),?\s+(?:I\s+)?(?:need|should|will|'ll)",
     r"^(?:The\s+)?(?:user|question|task|request)\s+(?:is|asks?|wants?)",
     r"^(?:I\s+)?(?:need|should|will|'ll)\s+(?:first|start|begin)",
-]
-
-
-_MAX_TRANSIENT_RETRIES = 2
-_TRANSIENT_BACKOFF_BASE = 1.0  # seconds
-
-
-def _is_transient_error(exc: Exception) -> bool:
-    """Check if an exception is a transient network error worth retrying.
-
-    Covers SSL record errors, connection resets, and other network-level
-    failures that are typically caused by infrastructure flakiness rather
-    than bad requests.
-    """
-    if isinstance(exc, ssl.SSLError):
-        return True
-    if isinstance(exc, (httpx.ConnectError, httpx.RemoteProtocolError)):
-        return True
-    if isinstance(exc, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
-        return True
-    # httpx wraps low-level errors — check the cause chain
-    cause = exc.__cause__
-    while cause is not None:
-        if isinstance(cause, ssl.SSLError):
-            return True
-        if isinstance(cause, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
-            return True
-        cause = getattr(cause, "__cause__", None)
-    return False
+)
 
 
 def _is_thinking_model(model: str) -> bool:
-    """Check if model outputs inline thinking content."""
-    model_lower = model.lower()
-    return any(pattern in model_lower for pattern in ["qwen-3", "qwen3"])
+    normalized = model.lower()
+    return any(name in normalized for name in ("qwen-3", "qwen3"))
+
+
+def _looks_like_thinking(text: str) -> bool:
+    return any(re.match(pattern, text, re.IGNORECASE) for pattern in QWEN3_THINKING_PATTERNS)
 
 
 def _extract_qwen3_thinking(content: str) -> Tuple[str, str]:
-    """Extract thinking content from Qwen-3 model output.
-
-    Qwen-3 models output their reasoning inline without special tags.
-    This function detects and separates thinking from the actual response.
-
-    Args:
-        content: Raw response content
-
-    Returns:
-        Tuple of (thinking_content, main_content)
-    """
+    """Separate a leading inline reasoning paragraph from visible response text."""
     if not content:
         return "", ""
-
-    lines = content.split("\n")
-    thinking_lines = []
-    main_lines = []
-    in_thinking = True
-
-    for line in lines:
-        stripped = line.strip()
-
-        # Check if this line looks like thinking
-        is_thinking_line = False
-        if in_thinking and stripped:
-            for pattern in QWEN3_THINKING_PATTERNS:
-                if re.match(pattern, stripped, re.IGNORECASE):
-                    is_thinking_line = True
-                    break
-
-            # Also check for continuation of thinking
-            if not is_thinking_line and thinking_lines:
-                # If previous was thinking and this continues the thought
-                if stripped.startswith(
-                    (
-                        "Although",
-                        "Since",
-                        "Because",
-                        "However",
-                        "But",
-                        "And",
-                        "Or",
-                        "So",
-                        "This",
-                        "That",
-                        "These",
-                        "Those",
-                        "None",
-                        "The",
-                    )
-                ):
-                    is_thinking_line = True
-
-        if is_thinking_line:
-            thinking_lines.append(line)
-        else:
-            # Once we hit non-thinking content, stop looking for thinking
-            in_thinking = False
-            main_lines.append(line)
-
-    thinking = "\n".join(thinking_lines).strip()
-    main = "\n".join(main_lines).strip()
-
-    # If everything was classified as thinking, return it as main content
-    if not main and thinking:
-        return "", thinking
-
-    return thinking, main
+    paragraphs = re.split(r"\n\s*\n", content, maxsplit=1)
+    if len(paragraphs) == 2 and _looks_like_thinking(paragraphs[0].strip()):
+        return paragraphs[0].strip(), paragraphs[1].strip()
+    return "", content
 
 
-class CerebrasProvider(BaseProvider):
-    """Provider for Cerebras Inference API (OpenAI-compatible).
+@dataclass
+class StreamingThinkingFilter:
+    """Bounded presentation filter for models that emit reasoning inline."""
 
-    Features:
-    - Fastest inference available (WSE hardware)
-    - Generous free tier
-    - Native tool calling support
-    - OpenAI-compatible API
-    """
+    model: str
+    buffer_size: int = 150
+    max_thinking_buffer: int = 2000
+    _buffer: str = field(default="", init=False)
+    _decided: bool = field(default=False, init=False)
+    _filtering: bool = field(default=False, init=False)
 
-    DEFAULT_TIMEOUT = 60  # Cerebras is very fast
+    def process_chunk(self, content: str) -> Tuple[str, Optional[Dict[str, Any]]]:
+        if not _is_thinking_model(self.model):
+            return content, None
+        if self._decided and not self._filtering:
+            return content, None
 
-    def __init__(
-        self,
-        api_key: Optional[str] = None,
-        base_url: str = DEFAULT_BASE_URL,
-        timeout: int = DEFAULT_TIMEOUT,
-        non_interactive: Optional[bool] = None,
-        **kwargs: Any,
-    ):
-        """Initialize Cerebras provider.
+        self._buffer += content
+        if not self._decided:
+            if len(self._buffer) < self.buffer_size and "\n" not in self._buffer:
+                return "", None
+            self._filtering = _looks_like_thinking(self._buffer.strip())
+            self._decided = True
+            if not self._filtering:
+                visible, self._buffer = self._buffer, ""
+                return visible, None
 
-        Args:
-            api_key: Cerebras API key (or set CEREBRAS_API_KEY env var)
-            base_url: API endpoint
-            timeout: Request timeout
-            non_interactive: Force non-interactive mode (None = auto-detect)
-            **kwargs: Additional configuration
-        """
-        # Initialize structured logger
-        self._provider_logger = ProviderLogger("cerebras", __name__)
+        thinking, visible = _extract_qwen3_thinking(self._buffer)
+        if thinking:
+            self._buffer = ""
+            self._filtering = False
+            return visible, {"reasoning_content": thinking}
+        if len(self._buffer) > self.max_thinking_buffer:
+            visible, self._buffer = self._buffer, ""
+            self._filtering = False
+            return visible, None
+        return "", None
 
-        # Resolve API key using unified resolver
-        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
-        key_result = resolver.get_api_key("cerebras", explicit_key=api_key)
+    def finalize(self) -> Tuple[str, Optional[Dict[str, Any]]]:
+        content, self._buffer = self._buffer, ""
+        if not content:
+            return "", None
+        thinking, visible = _extract_qwen3_thinking(content)
+        if thinking:
+            return visible, {"reasoning_content": thinking}
+        return content, None
 
-        # Log API key resolution
-        self._provider_logger.log_api_key_resolution(key_result)
 
-        if key_result.key is None:
-            # Raise detailed error with actionable suggestions
-            raise APIKeyNotFoundError(
-                provider="cerebras",
-                sources_attempted=key_result.sources_attempted,
-                non_interactive=key_result.non_interactive,
-            )
+def _with_cerebras_metadata(response: CompletionResponse, model: str) -> CompletionResponse:
+    raw = response.raw_response or {}
+    total_time = (raw.get("time_info") or {}).get("total_time")
+    if response.usage is not None and isinstance(total_time, (int, float)):
+        response.usage["total_time_ms"] = int(total_time * 1000)
+    if response.content and _is_thinking_model(model):
+        thinking, visible = _extract_qwen3_thinking(response.content)
+        if thinking:
+            response.content = visible
+            response.metadata = {**(response.metadata or {}), "reasoning_content": thinking}
+    return response
 
-        self._api_key = key_result.key
 
-        # Log provider initialization
-        self._provider_logger.log_provider_init(
-            model="llama",  # Will be set on chat()
-            key_source=key_result.source_detail,
-            non_interactive=key_result.non_interactive,
-            config={
-                "base_url": base_url,
-                "timeout": timeout,
-                **kwargs,
-            },
-        )
+class CerebrasProvider(SandhiOpenAICompatPolicy):
+    """Victor model/UX policy for Cerebras; Sandhi owns all provider I/O."""
 
-        super().__init__(base_url=base_url, timeout=timeout, **kwargs)
+    CONFIG_KEY = "cerebras"
 
-        self.client = httpx.AsyncClient(
-            base_url=base_url,
-            timeout=httpx.Timeout(timeout),
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "Content-Type": "application/json",
-            },
-        )
+    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+        return _with_cerebras_metadata(super()._parse_response(result, model), model)
 
-    @property
-    def name(self) -> str:
-        return "cerebras"
-
-    def supports_tools(self) -> bool:
-        return True
-
-    def supports_streaming(self) -> bool:
-        return True
-
-    def supports_prompt_caching(self) -> bool:
-        """Cerebras auto-caches prompts with 5min TTL (latency savings)."""
-        return True
-
-    def supports_kv_prefix_caching(self) -> bool:
-        """Cerebras reuses KV cache with 5min TTL for matching prefixes."""
-        return True
-
-    def cache_cost_model(self) -> CacheCostModel:
-        """Characterized API caching (FEP-0011): latency-only, 5m TTL (no billing discount)."""
-        return CacheCostModel(
-            supported=True,
-            read_discount=0.0,
-            write_overhead=1.0,
-            ttl_seconds=300.0,
-            min_prefix_tokens=0,
-            prefix_granularity="token",
-        )
-
-    def context_window(self, model: Optional[str] = None) -> int:
-        from victor.providers.context_windows import CEREBRAS, CEREBRAS_DEFAULT, lookup
-
-        target = model or getattr(self, "_current_model", None)
-        return lookup(CEREBRAS, target, CEREBRAS_DEFAULT)
-
-    async def chat(
-        self,
-        messages: List[Message],
-        *,
-        model: str,
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
-        **kwargs: Any,
-    ) -> CompletionResponse:
-        """Send chat completion request to Cerebras.
-
-        Args:
-            messages: Conversation messages
-            model: Model name
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            tools: Available tools
-            **kwargs: Additional parameters
-
-        Returns:
-            CompletionResponse with generated content
-
-        Raises:
-            ProviderAuthError: If authentication fails
-            ProviderRateLimitError: If rate limit is exceeded
-            ProviderError: For other errors
-        """
-        # Use structured logging context manager
-        with self._provider_logger.log_api_call(
-            endpoint="/chat/completions",
-            model=model,
-            operation="chat",
-            num_messages=len(messages),
-            has_tools=tools is not None,
-        ) as log_success:
-            try:
-                payload = self._build_request_payload(
-                    messages, model, temperature, max_tokens, tools, False, **kwargs
-                )
-
-                response = await self._execute_with_circuit_breaker(
-                    self.client.post, "/chat/completions", json=payload
-                )
-                response.raise_for_status()
-
-                parsed = self._parse_response(response.json(), model)
-
-                # Log success with usage info
-                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                log_success(tokens=tokens)
-
-                return parsed
-
-            except Exception as e:
-                # Convert to specific provider error types based on error message
-                # Skip if already a ProviderError to avoid double-wrapping
-                if isinstance(e, ProviderError):
-                    raise
-
-                error_str = str(e).lower()
-                if any(
-                    term in error_str
-                    for term in [
-                        "auth",
-                        "unauthorized",
-                        "invalid key",
-                        "invalid api",
-                        "api_key",
-                        "401",
-                    ]
-                ):
-                    raise ProviderAuthError(
-                        message=f"Authentication failed: {str(e)}",
-                        provider=self.name,
-                    ) from e
-                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
-                    raise ProviderRateLimitError(
-                        message=f"Rate limit exceeded: {str(e)}",
-                        provider=self.name,
-                        status_code=429,
-                    ) from e
-                else:
-                    # Wrap generic errors in ProviderError
-                    raise ProviderError(
-                        message=f"Cerebras API error: {str(e)}",
-                        provider=self.name,
-                        raw_error=e,
-                    ) from e
+    def _completion_from_typed(self, response: Dict[str, Any], model: str) -> CompletionResponse:
+        return _with_cerebras_metadata(super()._completion_from_typed(response, model), model)
 
     async def stream(
         self,
@@ -622,323 +127,32 @@ class CerebrasProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
-        """Stream chat completion from Cerebras with thinking content filtering.
-
-        Args:
-            messages: Conversation messages
-            model: Model name
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            tools: Available tools
-            **kwargs: Additional parameters
-
-        Yields:
-            StreamChunk with incremental content
-
-        Raises:
-            ProviderError: If request fails
-        """
-        try:
-            async for chunk in self._stream_inner(
-                messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=tools,
-                **kwargs,
-            ):
-                yield chunk
-
-        except Exception as e:
-            raise self._handle_error(e)
-
-    async def _stream_inner(
-        self,
-        messages: List[Message],
-        *,
-        model: str,
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
-        **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
-        """Inner streaming implementation (no retry logic)."""
-        payload = self._build_request_payload(
-            messages, model, temperature, max_tokens, tools, True, **kwargs
-        )
-
-        # Initialize thinking filter for Qwen-3 models
-        thinking_filter = StreamingThinkingFilter(model=model)
-        accumulated_reasoning: str = ""
-
-        async with self.client.stream("POST", "/chat/completions", json=payload) as response:
-            response.raise_for_status()
-            accumulated_tool_calls: List[Dict[str, Any]] = []
-
-            async for line in response.aiter_lines():
-                if not line.strip() or not line.startswith("data: "):
-                    continue
-
-                data_str = line[6:]
-                if data_str.strip() == "[DONE]":
-                    # Finalize any buffered content
-                    remaining_content, final_metadata = thinking_filter.finalize()
-                    if final_metadata and "reasoning_content" in final_metadata:
-                        accumulated_reasoning = final_metadata["reasoning_content"]
-
-                    # Emit final chunk with remaining content and metadata
-                    yield StreamChunk(
-                        content=remaining_content,
-                        tool_calls=(accumulated_tool_calls if accumulated_tool_calls else None),
-                        stop_reason="stop",
-                        is_final=True,
-                        metadata=(
-                            {"reasoning_content": accumulated_reasoning}
-                            if accumulated_reasoning
-                            else None
-                        ),
-                    )
-                    break
-
-                try:
-                    chunk_data = json_loads(data_str)
-                    raw_chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
-
-                    # Filter thinking content
-                    if raw_chunk.content:
-                        filtered_content, filter_metadata = thinking_filter.process_chunk(
-                            raw_chunk.content
-                        )
-                        if filter_metadata and "reasoning_content" in filter_metadata:
-                            accumulated_reasoning = filter_metadata["reasoning_content"]
-
-                        # Only yield if there's content to emit
-                        if filtered_content or raw_chunk.tool_calls:
-                            yield StreamChunk(
-                                content=filtered_content,
-                                tool_calls=raw_chunk.tool_calls,
-                                stop_reason=raw_chunk.stop_reason,
-                                is_final=raw_chunk.is_final,
-                                metadata=filter_metadata,
-                            )
-                    elif raw_chunk.tool_calls or raw_chunk.is_final:
-                        # Yield tool calls or final markers
-                        yield raw_chunk
-
-                except JSONDecodeError:
-                    pass
-
-    def _build_request_payload(
-        self, messages, model, temperature, max_tokens, tools, stream, **kwargs
-    ) -> Dict[str, Any]:
-        formatted_messages = []
-        for msg in messages:
-            formatted_msg = {"role": msg.role, "content": msg.content}
-            if msg.role == "tool" and hasattr(msg, "tool_call_id"):
-                formatted_msg["tool_call_id"] = msg.tool_call_id
-            if msg.tool_calls:
-                formatted_msg["tool_calls"] = [
-                    {
-                        "id": tc.get("id", ""),
-                        "type": "function",
-                        "function": {
-                            "name": tc.get("name", ""),
-                            "arguments": (
-                                json_dumps(tc.get("arguments", {}))
-                                if isinstance(tc.get("arguments"), dict)
-                                else tc.get("arguments", "{}")
-                            ),
-                        },
-                    }
-                    for tc in msg.tool_calls
-                ]
-            formatted_messages.append(formatted_msg)
-
-        payload = {
-            "model": model,
-            "messages": formatted_messages,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "stream": stream,
-        }
-
-        if tools:
-            payload["tools"] = [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.parameters,
-                    },
-                }
-                for tool in tools
-            ]
-            payload["tool_choice"] = "auto"
-
-        return payload
-
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
-        choices = result.get("choices", [])
-        if not choices:
-            return CompletionResponse(
-                content="", role="assistant", model=model, raw_response=result
-            )
-
-        choice = choices[0]
-        message = choice.get("message", {})
-        content = message.get("content", "") or ""
-        tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
-
-        # Extract thinking content for Qwen-3 models
-        metadata = {}
-        if content and _is_thinking_model(model):
-            thinking, main_content = _extract_qwen3_thinking(content)
-            if thinking:
-                metadata["reasoning_content"] = thinking
-                content = main_content
-
-        usage = None
-        if usage_data := result.get("usage"):
-            usage = {
-                "prompt_tokens": usage_data.get("prompt_tokens", 0),
-                "completion_tokens": usage_data.get("completion_tokens", 0),
-                "total_tokens": usage_data.get("total_tokens", 0),
-            }
-            # Cerebras provides timing info
-            if "time_info" in result:
-                time_info = result["time_info"]
-                usage["total_time_ms"] = int(time_info.get("total_time", 0) * 1000)
-
-        return CompletionResponse(
-            content=content,
-            role="assistant",
-            tool_calls=tool_calls,
-            stop_reason=choice.get("finish_reason"),
-            usage=usage,
+        thinking_filter = StreamingThinkingFilter(model)
+        async for chunk in super().stream(
+            messages,
             model=model,
-            raw_response=result,
-            metadata=metadata if metadata else None,
-        )
-
-    def _normalize_tool_calls(self, tool_calls) -> Optional[List[Dict[str, Any]]]:
-        if not tool_calls:
-            return None
-        normalized = []
-        for call in tool_calls:
-            if "function" in call:
-                func = call["function"]
-                args = func.get("arguments", "{}")
-                if isinstance(args, str):
-                    try:
-                        args = json_loads(args)
-                    except JSONDecodeError:
-                        args = {}
-                normalized.append(
-                    {
-                        "id": call.get("id", ""),
-                        "name": func.get("name", ""),
-                        "arguments": args,
-                    }
-                )
-        return normalized if normalized else None
-
-    def _parse_stream_chunk(self, chunk_data, accumulated_tool_calls) -> StreamChunk:
-        choices = chunk_data.get("choices", [])
-        if not choices:
-            return StreamChunk(content="", is_final=False)
-
-        choice = choices[0]
-        delta = choice.get("delta", {})
-        content = delta.get("content", "") or ""
-        finish_reason = choice.get("finish_reason")
-
-        for tc_delta in delta.get("tool_calls", []):
-            idx = tc_delta.get("index", 0)
-            while len(accumulated_tool_calls) <= idx:
-                accumulated_tool_calls.append({"id": "", "name": "", "arguments": ""})
-            if "id" in tc_delta:
-                accumulated_tool_calls[idx]["id"] = tc_delta["id"]
-            if "function" in tc_delta:
-                func = tc_delta["function"]
-                if "name" in func:
-                    accumulated_tool_calls[idx]["name"] = func["name"]
-                if "arguments" in func:
-                    accumulated_tool_calls[idx]["arguments"] += func["arguments"]
-
-        final_tool_calls = None
-        if finish_reason in ("tool_calls", "stop") and accumulated_tool_calls:
-            final_tool_calls = []
-            for tc in accumulated_tool_calls:
-                if tc.get("name"):
-                    args = tc.get("arguments", "{}")
-                    try:
-                        args = json_loads(args) if isinstance(args, str) else args
-                    except JSONDecodeError:
-                        args = {}
-                    final_tool_calls.append(
-                        {
-                            "id": tc.get("id", ""),
-                            "name": tc["name"],
-                            "arguments": args,
-                        }
-                    )
-
-        return StreamChunk(
-            content=content,
-            tool_calls=final_tool_calls,
-            stop_reason=finish_reason,
-            is_final=finish_reason is not None,
-        )
-
-    def _handle_error(self, error: Exception) -> ProviderError:
-        """Handle and convert API errors.
-
-        Args:
-            error: Original exception
-
-        Returns:
-            ProviderError with details
-
-        Raises:
-            ProviderError: Always raises after converting
-        """
-        error_msg = str(error)
-
-        if "authentication" in error_msg.lower() or "unauthorized" in error_msg.lower():
-            raise ProviderAuthError(
-                message=f"Authentication failed: {error_msg}",
-                provider=self.name,
-                raw_error=error,
-            )
-        elif (
-            "invalid api" in error_msg.lower()
-            or "invalid key" in error_msg.lower()
-            or "api_key" in error_msg.lower()
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=tools,
+            **kwargs,
         ):
-            raise ProviderAuthError(
-                message=f"Authentication failed: {error_msg}",
-                provider=self.name,
-                raw_error=error,
-            )
-        elif (
-            "rate limit" in error_msg.lower()
-            or "rate_limit" in error_msg.lower()
-            or "429" in error_msg
-            or "too many requests" in error_msg.lower()
-        ):
-            raise ProviderRateLimitError(
-                message=f"Rate limit exceeded: {error_msg}",
-                provider=self.name,
-                status_code=429,
-                raw_error=error,
-            )
-        else:
-            raise ProviderError(
-                message=f"Cerebras API error: {error_msg}",
-                provider=self.name,
-                raw_error=error,
-            )
+            content, reasoning = thinking_filter.process_chunk(chunk.content)
+            if chunk.is_final:
+                trailing, final_reasoning = thinking_filter.finalize()
+                content += trailing
+                reasoning = final_reasoning or reasoning
+            metadata = {**(chunk.metadata or {}), **(reasoning or {})} or None
+            if content or chunk.is_final or chunk.tool_calls or metadata:
+                yield chunk.model_copy(update={"content": content, "metadata": metadata})
 
-    async def close(self) -> None:
-        await self.client.aclose()
+
+__all__ = [
+    "CEREBRAS_MODELS",
+    "DEFAULT_BASE_URL",
+    "QWEN3_THINKING_PATTERNS",
+    "StreamingThinkingFilter",
+    "THINKING_MODELS",
+    "CerebrasProvider",
+    "_extract_qwen3_thinking",
+    "_is_thinking_model",
+]

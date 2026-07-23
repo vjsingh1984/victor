@@ -23,13 +23,14 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
 
-try:  # scipy ships in the [ml] extra — keep the CLI import chain scipy-free.
-    from scipy import stats
+# scipy is heavy (~180ms to import) and ships in the optional [ml] extra.
+# Probe availability without importing (find_spec) so it stays out of the CLI
+# cold-start path; the real import is deferred to first use via the ``stats``
+# proxy below. numpy is comparatively cheap and used pervasively, so it stays
+# eager.
+import importlib.util
 
-    SCIPY_AVAILABLE = True
-except ImportError:  # pragma: no cover - environment-dependent
-    stats = None  # type: ignore[assignment]
-    SCIPY_AVAILABLE = False
+SCIPY_AVAILABLE = importlib.util.find_spec("scipy") is not None
 
 
 def _require_scipy() -> None:
@@ -39,6 +40,25 @@ def _require_scipy() -> None:
             "scipy is required for A/B statistical analysis. "
             'Install it with: pip install "victor-ai[ml]"'
         )
+
+
+class _LazyStats:
+    """Lazy proxy for ``scipy.stats``; imports scipy on first attribute access.
+
+    Each ``stats.<name>`` access first runs ``_require_scipy()`` (actionable
+    error when scipy is absent) then resolves the attribute from the real
+    module. This also guards methods that historically used ``stats`` without a
+    preceding ``_require_scipy()`` call.
+    """
+
+    def __getattr__(self, name: str) -> Any:
+        _require_scipy()
+        from scipy import stats
+
+        return getattr(stats, name)
+
+
+stats: Any = _LazyStats()
 
 
 # =============================================================================

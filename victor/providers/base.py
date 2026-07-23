@@ -56,7 +56,13 @@ from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 class Message(BaseModel):
     """Standard message format across all providers."""
 
-    role: str = Field(..., description="Message role: system, user, or assistant")
+    role: str = Field(
+        ...,
+        description=(
+            "Message role. OpenAI Chat Completions supports developer, system, user, "
+            "assistant, tool, and legacy function; other provider families may differ."
+        ),
+    )
     content: str = Field(..., description="Message content")
     name: Optional[str] = Field(default=None, description="Optional name for the message sender")
     tool_calls: Optional[List[Dict[str, Any]]] = Field(

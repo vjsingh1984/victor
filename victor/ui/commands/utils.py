@@ -107,9 +107,12 @@ def configure_logging_from_config(
     if session_id is None:
         session_id = str(uuid.uuid4())[:8]
 
-    # Console handler
+    # Console handler — Live-aware so records print cleanly above an active
+    # Rich Live display instead of tearing it (plain stream when no display).
+    from victor.ui.rendering.log_handler import LiveAwareLogHandler
+
     console_formatter = logging.Formatter(config.console_format)
-    console_handler = logging.StreamHandler(stream or sys.stderr)
+    console_handler: logging.Handler = LiveAwareLogHandler(stream)
     console_handler.setLevel(config.get_console_level_int())
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
@@ -259,7 +262,9 @@ def configure_logging(
     file_formatter = logging.Formatter(file_format)
 
     # Console handler (WARNING by default, can be overridden by log_level)
-    console_handler = logging.StreamHandler(stream or sys.stderr)
+    from victor.ui.rendering.log_handler import LiveAwareLogHandler
+
+    console_handler: logging.Handler = LiveAwareLogHandler(stream)
     effective_console_level = getattr(logging, log_level.upper(), None)
     if effective_console_level is None:
         effective_console_level = getattr(logging, console_level.upper(), logging.WARNING)

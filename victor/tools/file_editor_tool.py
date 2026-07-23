@@ -24,6 +24,8 @@ import logging
 from typing import Any, Dict, List, Optional, Set
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 # =============================================================================
 # EDIT OPERATION NORMALIZATION
 # =============================================================================
@@ -464,6 +466,13 @@ async def edit(
     IMPORTANT: You MUST provide the 'ops' parameter. Example:
         edit(ops=[{"type": "replace", "path": "file.py", "old_str": "old", "new_str": "new"}])
 
+    Each op REQUIRES `type` (create/modify/delete/rename/replace/replace_lines)
+    unless inferable from keys (`old_str`→replace, `content`→create).
+
+    Preview a diff without applying:
+        edit(ops=[{"type": "replace", "path": "file.py", "old_str": "old",
+                   "new_str": "new"}], preview=True, commit=False)
+
     Performs literal string replacement. Does NOT understand code structure.
     WARNING: May cause false positives in code (e.g., 'foo' matches 'foobar').
     For Python symbol renaming, use rename() from refactor_tool instead.
@@ -529,9 +538,9 @@ async def edit(
     # Allow callers (models) to pass ops as a JSON string; normalize to list[dict]
     if isinstance(ops, str):
         import json
-        import logging
 
-        logger = logging.getLogger(__name__)
+        # NOTE: do not rebind `logger` here — an assignment would make it local to
+        # the whole function and break later uses on the non-string path.
 
         def _fix_json_control_chars(json_str: str) -> str:
             """Fix raw control characters inside JSON strings.
@@ -1193,8 +1202,19 @@ async def edit(
         _capture_stdout(_do_commit)
         success = success_ref[0]
         if success:
-            # Commit the change group for undo/redo
-            tracker.commit_change_group()
+            # Commit the change group for undo/redo. The files are ALREADY written
+            # to disk at this point (editor.commit above), so this is /undo-history
+            # bookkeeping only — it must NEVER fail an applied edit. A project.db
+            # lock here used to propagate as a tool error while files stayed
+            # mutated, so the model's retry hit 'old_str not found'.
+            undo_note = None
+            try:
+                tracker.commit_change_group()
+            except Exception as exc:
+                logger.warning("edit applied but undo history not recorded: %s", exc)
+                undo_note = (
+                    "⚠️ note: edit applied; undo history not recorded (project database busy)"
+                )
 
             # Invalidate file content cache for all modified paths
             try:
@@ -1213,7 +1233,11 @@ async def edit(
             except (ImportError, Exception) as e:
                 logger.debug(f"Failed to invalidate file cache: {e}")
 
-            _msg = f"Successfully applied {operations_queued} operations. Use /undo to revert."
+            if undo_note is None:
+                _msg = f"Successfully applied {operations_queued} operations. Use /undo to revert."
+            else:
+                # Don't advertise /undo when the undo history was not persisted.
+                _msg = f"Successfully applied {operations_queued} operations."
             if failed_files:
                 _bad = ", ".join(sorted({str(f["path"]) for f in failed_files}))
                 _msg = (
@@ -1222,6 +1246,8 @@ async def edit(
                     "— those file groups were rolled back atomically. "
                     "Other files were committed; re-read and retry the failed ones."
                 )
+            if undo_note:
+                _msg = f"{_msg}\n{undo_note}"
             result = {
                 "success": True,
                 "operations_queued": operations_queued,

@@ -194,6 +194,34 @@ class TestUpdateFromAssistantResponse:
         ledger.update_from_assistant_response(content, turn_index=3)
         assert len(ledger.entries) == 0
 
+    def test_technical_should_is_not_a_recommendation(self):
+        """FEP-0023 P1: bare 'should' in technical prose must not extract.
+
+        On 12.7k real assistant messages the old bare-``should`` pattern dropped
+        recommendation precision to ~62% by matching prose like these. Regression
+        guard for the hardened patterns.
+        """
+        ledger = SessionLedger()
+        for prose in (
+            "The function should return None on an empty input.",
+            "You should see the test output above.",
+            "Note that the cache should be invalidated on model switch.",
+            "This should work now.",
+        ):
+            ledger.update_from_assistant_response(prose, turn_index=1)
+        recs = [e for e in ledger.entries if e.category == "recommendation"]
+        assert recs == [], f"unexpected recommendation extractions: {[e.summary for e in recs]}"
+
+    def test_we_should_is_a_recommendation(self):
+        """A genuine 'we should X' recommendation is still captured."""
+        ledger = SessionLedger()
+        ledger.update_from_assistant_response(
+            "I think we should measure token cost before defaulting the flag ON.",
+            turn_index=1,
+        )
+        recs = [e for e in ledger.entries if e.category == "recommendation"]
+        assert len(recs) >= 1
+
     def test_empty_content(self):
         ledger = SessionLedger()
         ledger.update_from_assistant_response("", turn_index=1)

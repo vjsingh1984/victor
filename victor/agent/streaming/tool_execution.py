@@ -658,7 +658,10 @@ class ToolExecutionHandler:
             tool_args = tool_call.get("arguments", {})
             status_msg = self._get_tool_status_message(tool_name, tool_args)
             chunk = self._chunk_generator.generate_tool_start_chunk(
-                tool_name, tool_args, status_msg
+                tool_name,
+                tool_args,
+                status_msg,
+                tool_call_id=tool_call.get("id"),
             )
             metadata = chunk.metadata if isinstance(chunk.metadata, dict) else None
             tool_start = metadata.get("tool_start") if metadata else None

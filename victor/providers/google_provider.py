@@ -21,7 +21,6 @@ the deprecated google-generativeai package.
 """
 
 import logging
-import os
 import warnings
 from typing import Any, AsyncIterator, Dict, List, Optional
 
@@ -35,29 +34,11 @@ warnings.filterwarnings(
     module="google_genai.types",
 )
 
-# New Google GenAI SDK (replaces deprecated google.generativeai)
-try:
-    from google import genai
-    from google.genai import types
-
-    # Verify that the Client class is available
-    if not hasattr(genai, "Client"):
-        HAS_GOOGLE_GENAI = False
-        genai = None
-        types = None
-    else:
-        HAS_GOOGLE_GENAI = True
-except ImportError:
-    HAS_GOOGLE_GENAI = False
-    genai = None
-    types = None
-
 from victor.providers.base import (
     CacheCostModel,
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderError,
     StreamChunk,
     ToolDefinition,
 )
@@ -67,23 +48,21 @@ from victor.providers.resolution import (
 )
 from victor.providers.logging import ProviderLogger
 
-# Safety threshold levels mapping to new SDK string values
-# The new SDK uses string-based category and threshold identifiers
-SAFETY_LEVELS: Dict[str, str] = {
-    "block_none": "BLOCK_NONE",
-    "off": "OFF",
-    "block_few": "BLOCK_ONLY_HIGH",
-    "block_some": "BLOCK_MEDIUM_AND_ABOVE",
-    "block_most": "BLOCK_LOW_AND_ABOVE",
-}
-
-# Harm categories supported by the new SDK
-HARM_CATEGORIES = [
-    "HARM_CATEGORY_HARASSMENT",
-    "HARM_CATEGORY_HATE_SPEECH",
-    "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-    "HARM_CATEGORY_DANGEROUS_CONTENT",
-    "HARM_CATEGORY_CIVIC_INTEGRITY",
+# Curated offline fallback (mirrors the Sandhi catalog lineup): used when the
+# installed sandhi-gateway predates the TD-0004 catalog surface.
+_GOOGLE_STATIC_MODELS: List[Dict[str, Any]] = [
+    {
+        "id": "gemini-3-pro",
+        "name": "Gemini 3 Pro",
+        "context_window": 1_048_576,
+        "max_output_tokens": 65_536,
+    },
+    {
+        "id": "gemini-3-flash",
+        "name": "Gemini 3 Flash",
+        "context_window": 1_048_576,
+        "max_output_tokens": 65_536,
+    },
 ]
 
 
@@ -134,11 +113,9 @@ class GoogleProvider(BaseProvider):
         self._provider_logger = ProviderLogger("google", __name__)
         self._oauth_manager = None
         self._current_token = None
-
-        if not HAS_GOOGLE_GENAI:
-            raise ImportError(
-                "google-genai package not installed. Install with: pip install victor[google]"
-            )
+        # Sandhi owns transport: pick the auth scheme the typed variant passes to the Gemini
+        # handle. OAuth/ADC → Authorization: Bearer; API key → x-goog-api-key.
+        self._sandhi_auth_scheme = "bearer" if auth_mode == "oauth" else "api_key"
 
         if auth_mode == "oauth":
             # OAuth mode: use Google subscription (AI Pro/Ultra) instead of API key
@@ -172,7 +149,9 @@ class GoogleProvider(BaseProvider):
             )
             self._google_credentials = creds
             self._current_token = access_token
-            self._api_key = "oauth"
+            # The access token (or a placeholder until _ensure_valid_token refreshes it) is what
+            # Sandhi sends as Authorization: Bearer via the typed Gemini handle.
+            self._api_key = access_token or "oauth-pending"
 
             self._provider_logger.log_provider_init(
                 model="gemini",
@@ -181,8 +160,7 @@ class GoogleProvider(BaseProvider):
                 config={"timeout": timeout, "safety_level": safety_level, **kwargs},
             )
 
-            super().__init__(api_key="oauth", timeout=timeout, **kwargs)
-            self.client = genai.Client(credentials=creds)
+            super().__init__(api_key=self._api_key, timeout=timeout, **kwargs)
         else:
             # Standard API key mode
             self._google_credentials = None
@@ -209,13 +187,6 @@ class GoogleProvider(BaseProvider):
             )
 
             super().__init__(api_key=self._api_key, timeout=timeout, **kwargs)
-            self.client = genai.Client(api_key=self._api_key)
-
-        # Configure safety settings using string-based thresholds
-        threshold = SAFETY_LEVELS.get(safety_level, "BLOCK_NONE")
-        self.safety_settings = [
-            types.SafetySetting(category=cat, threshold=threshold) for cat in HARM_CATEGORIES
-        ]
 
     @property
     def name(self) -> str:
@@ -255,6 +226,36 @@ class GoogleProvider(BaseProvider):
         target = model or getattr(self, "_current_model", None)
         return lookup(GOOGLE, target, GOOGLE_DEFAULT)
 
+    async def list_models(self) -> List[Dict[str, Any]]:
+        """List available Google Gemini models.
+
+        Resolution order -- Sandhi owns the catalog **data** (TD-0004 Phase A); Victor
+        owns the catalog **policy**:
+
+        1. **Sandhi catalog** -- curated model data via
+           ``sandhi_gateway.provider_models_json``, when the installed binding exposes it.
+        2. **Curated static list** (``_GOOGLE_STATIC_MODELS``) -- offline fallback
+           mirroring the catalog lineup.
+
+        Returns:
+            List of available models with metadata
+        """
+        catalog = self._models_from_sandhi()
+        if catalog is not None:
+            return catalog
+        return [dict(model) for model in _GOOGLE_STATIC_MODELS]
+
+    def _models_from_sandhi(self) -> Optional[List[Dict[str, Any]]]:
+        """Victor-shaped models from the Sandhi catalog, or ``None`` to fall back.
+
+        Shared catalog policy lives in ``victor.providers.sandhi_catalog``; ``None``
+        means the installed Sandhi binding predates the catalog surface (or has no
+        Gemini data), so ``list_models`` falls through to the static list.
+        """
+        from victor.providers.sandhi_catalog import models_from_sandhi
+
+        return models_from_sandhi(self.name)
+
     async def _ensure_valid_token(self) -> None:
         """Ensure OAuth token is valid, refreshing if needed."""
         if self._oauth_manager is None:
@@ -274,8 +275,9 @@ class GoogleProvider(BaseProvider):
                 ),
                 client_secret="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",
             )
-            self.client = genai.Client(credentials=self._google_credentials)
             self._current_token = token
+            # Keep _api_key in sync so the Sandhi Gemini handle receives the refreshed token.
+            self._api_key = token
 
     async def chat(
         self,
@@ -287,98 +289,16 @@ class GoogleProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
-        """Send chat completion request to Google.
+        """Chat transport is owned by the Sandhi typed variant.
 
-        Args:
-            messages: Conversation messages
-            model: Model name (e.g., "gemini-1.5-pro", "gemini-1.5-flash")
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            tools: Available tools
-            **kwargs: Additional Google parameters
-
-        Returns:
-            CompletionResponse with generated content
-
-        Raises:
-            ProviderError: If request fails
+        This policy shell stays concrete for auth/capability use; completion
+        transport is delegated to the Sandhi runtime. Obtain the typed provider
+        via ``resolve_transport_class()`` (e.g. ``SandhiGoogleProvider``).
         """
-        await self._ensure_valid_token()
-
-        try:
-            # Convert tools to Gemini format
-            gemini_tools = self._convert_tools(tools) if tools else None
-
-            # Build generation config
-            generation_config = types.GenerateContentConfig(
-                temperature=temperature,
-                max_output_tokens=max_tokens,
-                safety_settings=self.safety_settings,
-            )
-
-            # Add tools if present
-            if gemini_tools:
-                generation_config.tools = gemini_tools
-                generation_config.tool_config = types.ToolConfig(
-                    function_calling_config=types.FunctionCallingConfig(mode="AUTO")
-                )
-
-            # Convert messages to Gemini format
-            contents = self._convert_messages(messages)
-
-            logger.debug(
-                f"Gemini chat: model={model}, tools={len(tools) if tools else 0}, messages={len(contents)}"
-            )
-
-            # Generate response using the new client pattern
-            response = await self._execute_with_circuit_breaker(
-                self.client.aio.models.generate_content,
-                model=model,
-                contents=contents,
-                config=generation_config,
-            )
-
-            # Debug logging for raw response
-            logger.debug(f"Gemini raw response type: {type(response)}")
-            if hasattr(response, "candidates") and response.candidates:
-                candidate = response.candidates[0]
-                logger.debug(
-                    f"Gemini candidate: finish_reason={getattr(candidate, 'finish_reason', 'N/A')}"
-                )
-                if hasattr(candidate, "content") and candidate.content:
-                    content = candidate.content
-                    logger.debug(
-                        f"Gemini content: role={getattr(content, 'role', 'N/A')}, parts_count={len(content.parts) if hasattr(content, 'parts') else 0}"
-                    )
-                    if hasattr(content, "parts"):
-                        for i, part in enumerate(content.parts):
-                            part_type = (
-                                "text"
-                                if hasattr(part, "text") and part.text
-                                else (
-                                    "function_call"
-                                    if hasattr(part, "function_call") and part.function_call
-                                    else "other"
-                                )
-                            )
-                            if part_type == "function_call":
-                                fc = part.function_call
-                                logger.info(f"Gemini part[{i}]: NATIVE FUNCTION CALL: {fc.name}")
-                            else:
-                                logger.debug(f"Gemini part[{i}]: type={part_type}")
-            else:
-                logger.warning("Gemini response has no candidates!")
-
-            return self._parse_response(response, model)
-
-        except ProviderError:
-            raise
-        except Exception as e:
-            raise ProviderError(
-                message=f"Google API error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            )
+        raise NotImplementedError(
+            f"{self.name} chat() is owned by the Sandhi typed variant; "
+            "use resolve_transport_class() to obtain the typed provider."
+        )
 
     async def stream(
         self,
@@ -390,386 +310,13 @@ class GoogleProvider(BaseProvider):
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
-        """Stream chat completion from Google.
-
-        When tools are provided, this method uses non-streaming chat() internally
-        because Gemini's native function calling returns structured function_call
-        parts that can't be easily represented in streaming text chunks.
-
-        Args:
-            messages: Conversation messages
-            model: Model name
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            tools: Available tools
-            **kwargs: Additional parameters
-
-        Yields:
-            StreamChunk with incremental content
-
-        Raises:
-            ProviderError: If request fails
-        """
-        await self._ensure_valid_token()
-
-        # When tools are provided, use non-streaming to properly handle native function calls
-        # Gemini's native function calling returns structured parts that need to be processed
-        # differently from streaming text chunks
-        if tools:
-            logger.debug(
-                "Gemini stream with tools: falling back to non-streaming for native function calling"
-            )
-            response = await self.chat(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=tools,
-                **kwargs,
-            )
-            # Yield the full response as a single chunk with tool_calls attached
-            # The orchestrator will handle extracting tool calls from the response
-            chunk = StreamChunk(
-                content=response.content or "",
-                is_final=True,
-                tool_calls=response.tool_calls,
-            )
-            yield chunk
-            return
-
-        try:
-            # No tools - use true streaming for text-only responses
-            generation_config = types.GenerateContentConfig(
-                temperature=temperature,
-                max_output_tokens=max_tokens,
-                safety_settings=self.safety_settings,
-            )
-
-            # Convert messages
-            contents = self._convert_messages(messages)
-
-            logger.debug(f"Gemini stream (no tools): model={model}, messages={len(contents)}")
-
-            # Stream response using the new client pattern
-            response_stream = self.client.aio.models.generate_content_stream(
-                model=model,
-                contents=contents,
-                config=generation_config,
-            )
-
-            async for chunk in response_stream:
-                parsed_chunk = self._parse_stream_chunk(chunk)
-                if parsed_chunk:
-                    yield parsed_chunk
-
-        except ProviderError:
-            raise
-        except Exception as e:
-            raise ProviderError(
-                message=f"Google streaming error: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            )
-
-    def _convert_tools(self, tools: List[ToolDefinition]) -> List[Any]:
-        """Convert tools to Gemini format using proper SDK types.
-
-        Uses google.genai.types for proper native function calling support.
-
-        Args:
-            tools: List of ToolDefinition objects
-
-        Returns:
-            List containing Tool objects with function declarations
-        """
-        if not tools:
-            return []
-
-        function_declarations = []
-        for tool in tools:
-            # Build parameters dict for FunctionDeclaration
-            params = None
-            if tool.parameters and tool.parameters.get("properties"):
-                # Clean parameters - Gemini doesn't support some JSON Schema fields
-                params = self._clean_schema_for_gemini(tool.parameters)
-
-            # Create FunctionDeclaration using proper SDK types
-            func_decl = types.FunctionDeclaration(
-                name=tool.name,
-                description=tool.description,
-                parameters=params,
-            )
-            function_declarations.append(func_decl)
-
-        # Log tool count at INFO for first-principles debugging of the
-        # serialized Gemini payload. Gemini uses opaque SDK types, so we log
-        # tool names + count rather than a fingerprint.
-        _tool_names = ", ".join(t.name for t in tools)
-        logger.info(
-            "[ToolSchemas→LLM] Gemini payload: %d tools: %s",
-            len(function_declarations),
-            _tool_names,
+        """Stream transport is owned by the Sandhi typed variant (see ``chat``)."""
+        if False:  # pragma: no cover - async-generator marker for typing
+            yield StreamChunk()
+        raise NotImplementedError(
+            f"{self.name} stream() is owned by the Sandhi typed variant; "
+            "use resolve_transport_class() to obtain the typed provider."
         )
-        # Wrap in Tool object - this is the proper way to pass tools
-        return [types.Tool(function_declarations=function_declarations)]
-
-    def _clean_schema_for_gemini(self, schema: Dict[str, Any]) -> Dict[str, Any]:
-        """Remove unsupported JSON Schema fields for Gemini API compatibility.
-
-        Gemini's Schema proto doesn't support certain standard JSON Schema fields
-        like 'default', 'examples', etc. This method recursively strips them.
-
-        Args:
-            schema: JSON Schema dictionary
-
-        Returns:
-            Cleaned schema compatible with Gemini API
-        """
-        # Fields not supported by Gemini's Schema proto
-        unsupported_fields = {"default", "examples", "$schema", "$id", "definitions"}
-
-        def clean_recursive(obj: Any) -> Any:
-            if isinstance(obj, dict):
-                cleaned = {}
-                for key, value in obj.items():
-                    if key not in unsupported_fields:
-                        cleaned[key] = clean_recursive(value)
-                return cleaned
-            elif isinstance(obj, list):
-                return [clean_recursive(item) for item in obj]
-            else:
-                return obj
-
-        return clean_recursive(schema)
-
-    def _convert_messages(self, messages: List[Message]) -> List[Any]:
-        """Convert messages to Gemini format.
-
-        Args:
-            messages: Standard messages
-
-        Returns:
-            List of Content objects for the new SDK
-        """
-        contents = []
-
-        for msg in messages:
-            # Gemini uses "user" and "model" roles
-            role = "model" if msg.role == "assistant" else "user"
-
-            contents.append(
-                types.Content(
-                    role=role,
-                    parts=[types.Part(text=msg.content)],
-                )
-            )
-
-        return contents
-
-    def _parse_response(self, response: Any, model: str) -> CompletionResponse:
-        """Parse Google API response.
-
-        Args:
-            response: Raw Google response
-            model: Model name
-
-        Returns:
-            Normalized CompletionResponse
-
-        Raises:
-            ProviderError: If response was blocked by safety filters
-        """
-        # Check for blocked responses (safety filters, recitation, etc.)
-        if response.candidates:
-            candidate = response.candidates[0]
-            finish_reason = getattr(candidate, "finish_reason", None)
-
-            # Handle finish reasons (new SDK may use string or enum)
-            finish_reason_str = str(finish_reason) if finish_reason else ""
-            logger.debug(f"Gemini response finish_reason: {finish_reason_str}")
-
-            if "SAFETY" in finish_reason_str:
-                safety_ratings = getattr(candidate, "safety_ratings", [])
-                logger.warning(f"Gemini safety block - raw ratings: {safety_ratings}")
-                # Get explicitly blocked categories
-                blocked_categories = [
-                    f"{r.category}: {r.probability}"
-                    for r in safety_ratings
-                    if hasattr(r, "blocked") and r.blocked
-                ]
-                # If no blocked categories, show all ratings for debugging
-                if not blocked_categories:
-                    all_ratings = [
-                        f"{r.category}: {r.probability}"
-                        for r in safety_ratings
-                        if hasattr(r, "category") and hasattr(r, "probability")
-                    ]
-                    details = all_ratings or ["no details available"]
-                else:
-                    details = blocked_categories
-                logger.error(f"Gemini safety filter triggered: {details}")
-                raise ProviderError(
-                    message=(
-                        f"Response blocked by Gemini safety filters. "
-                        f"Categories: {details}. "
-                        f"This is a Google API restriction - try rephrasing your request."
-                    ),
-                    provider=self.name,
-                )
-            elif "RECITATION" in finish_reason_str:
-                raise ProviderError(
-                    message="Response blocked due to potential recitation of copyrighted content",
-                    provider=self.name,
-                )
-
-        # Extract text content and function calls from parts
-        content = ""
-        tool_calls = []
-
-        if response.candidates and response.candidates[0].content.parts:
-            for part in response.candidates[0].content.parts:
-                # Extract text content
-                if hasattr(part, "text") and part.text:
-                    content += part.text
-                # Extract function calls
-                if hasattr(part, "function_call") and part.function_call:
-                    fc = part.function_call
-                    # Convert args to dict
-                    args = {}
-                    if hasattr(fc, "args") and fc.args:
-                        try:
-                            # In new SDK, args may already be a dict or need conversion
-                            if isinstance(fc.args, dict):
-                                args = fc.args
-                            else:
-                                # Fallback: try to convert from protobuf Struct
-                                from google.protobuf.json_format import MessageToDict
-
-                                args = MessageToDict(fc.args)
-                        except Exception:
-                            # Fallback: try direct dict access
-                            args = dict(fc.args) if fc.args else {}
-                    tool_calls.append(
-                        {
-                            "name": fc.name,
-                            "arguments": args,
-                            "id": f"gemini-{fc.name}-{len(tool_calls)}",
-                        }
-                    )
-                    logger.debug(f"Extracted Gemini function call: {fc.name}({args})")
-
-        # If no content from parts, try response.text as fallback
-        if not content:
-            try:
-                if hasattr(response, "text") and response.text:
-                    content = response.text
-            except (ValueError, AttributeError):
-                # response.text raises ValueError if no valid parts
-                pass
-
-        if tool_calls:
-            logger.info(f"Gemini returned {len(tool_calls)} native function call(s)")
-
-        # Parse usage (if available)
-        usage = None
-        if hasattr(response, "usage_metadata") and response.usage_metadata:
-            usage = {
-                "prompt_tokens": getattr(response.usage_metadata, "prompt_token_count", 0),
-                "completion_tokens": getattr(response.usage_metadata, "candidates_token_count", 0),
-                "total_tokens": getattr(response.usage_metadata, "total_token_count", 0),
-            }
-
-        return CompletionResponse(
-            content=content,
-            role="assistant",
-            tool_calls=tool_calls if tool_calls else None,
-            usage=usage,
-            model=model,
-        )
-
-    def _parse_stream_chunk(self, chunk: Any) -> Optional[StreamChunk]:
-        """Parse streaming chunk from Google.
-
-        Args:
-            chunk: Stream chunk
-
-        Returns:
-            StreamChunk or None
-
-        Raises:
-            ProviderError: If chunk was blocked by safety filters
-        """
-        # Check for safety blocks in streaming
-        if hasattr(chunk, "candidates") and chunk.candidates:
-            candidate = chunk.candidates[0]
-            finish_reason = getattr(candidate, "finish_reason", None)
-            finish_reason_str = str(finish_reason) if finish_reason else ""
-            if "SAFETY" in finish_reason_str:
-                raise ProviderError(
-                    message="Streaming response blocked by safety filters",
-                    provider=self.name,
-                )
-
-        # Extract content safely
-        content = ""
-        try:
-            if hasattr(chunk, "text") and chunk.text:
-                content = chunk.text
-        except (ValueError, AttributeError):
-            # Ignore ValueError when text is not available
-            pass
-
-        # Check if this is the final chunk
-        is_final = (
-            hasattr(chunk, "candidates")
-            and chunk.candidates
-            and hasattr(chunk.candidates[0], "finish_reason")
-            and chunk.candidates[0].finish_reason is not None
-        )
-
-        return StreamChunk(
-            content=content,
-            is_final=is_final,
-        )
-
-    async def list_models(self) -> List[Dict[str, Any]]:
-        """List available Google Gemini models.
-
-        Queries the Google API to list available generative models.
-
-        Returns:
-            List of available models with metadata
-
-        Raises:
-            ProviderError: If request fails
-        """
-        try:
-            # Use client to list models (new SDK pattern)
-            models = []
-            for model in self.client.models.list():
-                # Filter to generative models that support generateContent
-                supported_methods = getattr(model, "supported_generation_methods", [])
-                if "generateContent" in supported_methods:
-                    model_name = getattr(model, "name", "")
-                    models.append(
-                        {
-                            "id": model_name.replace("models/", ""),
-                            "name": getattr(model, "display_name", model_name),
-                            "description": getattr(model, "description", ""),
-                            "input_token_limit": getattr(model, "input_token_limit", 0),
-                            "output_token_limit": getattr(model, "output_token_limit", 0),
-                            "supported_methods": supported_methods,
-                        }
-                    )
-            # Sort by name for consistent output
-            models.sort(key=lambda x: x["id"])
-            return models
-        except Exception as e:
-            raise ProviderError(
-                message=f"Failed to list models: {str(e)}",
-                provider=self.name,
-                raw_error=e,
-            ) from e
 
     async def close(self) -> None:
         """Close connections (Gemini client doesn't need explicit closing)."""

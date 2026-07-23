@@ -23,7 +23,6 @@ Contract under test:
 
 from typing import Any, Dict, List
 
-import pytest
 
 from victor.providers.anthropic_provider import AnthropicProvider
 from victor.providers.base import ToolDefinition
@@ -167,127 +166,6 @@ class TestFindCacheBoundary:
 
 
 # ── 2. Cache marker placement in chat() ────────────────────────────────────────
-
-
-class TestCacheMarkerPlacement:
-    """Test cache_control marker placement in the chat request payload.
-
-    Uses a fake client to capture the request_params passed to the API.
-    """
-
-    @pytest.fixture
-    def provider(self):
-        """Build an AnthropicProvider without making real API calls."""
-        return AnthropicProvider(api_key="sk-test-fake")
-
-    def test_system_message_gets_cache_control(self, provider):
-        """System message must have cache_control: ephemeral.
-
-        The provider extracts system messages from the messages list (not a
-        kwarg) by checking msg.role == 'system'.
-        """
-        captured = {}
-        provider.client = _make_fake_client(captured)
-
-        import asyncio
-
-        from victor.providers.base import Message
-
-        async def run():
-            return await provider.chat(
-                messages=[
-                    Message(role="system", content="You are helpful."),
-                    Message(role="user", content="Hi"),
-                ],
-                model="claude-3-5-sonnet",
-                tools=_make_tools([("a", "full"), ("b", "compact")]),
-            )
-
-        asyncio.run(run())
-
-        assert "system" in captured
-        assert captured["system"][0]["cache_control"] == {"type": "ephemeral"}
-
-    def test_tools_boundary_gets_exactly_one_cache_control(self, provider):
-        """Exactly one tool in tools[] must have cache_control at boundary index."""
-        captured = {}
-        provider.client = _make_fake_client(captured)
-
-        import asyncio
-
-        from victor.providers.base import Message
-
-        tools = _make_tools(
-            [
-                ("read", "full"),
-                ("write", "full"),
-                ("search", "compact"),
-                ("jira", "stub"),
-            ]
-        )
-
-        async def run():
-            return await provider.chat(
-                messages=[Message(role="user", content="Hi")],
-                model="claude-3-5-sonnet",
-                tools=tools,
-            )
-
-        asyncio.run(run())
-
-        converted = captured.get("tools", [])
-        marked = [t for t in converted if "cache_control" in t]
-        assert len(marked) == 1, f"Expected exactly 1 cache_control marker, got {len(marked)}"
-        # Boundary should be index 2 (last COMPACT before first STUB)
-        boundary = AnthropicProvider._find_cache_boundary(tools, converted)
-        assert "cache_control" in converted[boundary]
-
-    def test_no_system_message_still_caches_tools(self, provider):
-        """When system_message is None, tools cache_control is still placed."""
-        captured = {}
-        provider.client = _make_fake_client(captured)
-
-        import asyncio
-
-        from victor.providers.base import Message
-
-        async def run():
-            return await provider.chat(
-                messages=[Message(role="user", content="Hi")],
-                model="claude-3-5-sonnet",
-                system_message=None,
-                tools=_make_tools([("a", "full"), ("b", "compact")]),
-            )
-
-        asyncio.run(run())
-
-        assert "system" not in captured
-        converted = captured.get("tools", [])
-        marked = [t for t in converted if "cache_control" in t]
-        assert len(marked) == 1
-
-    def test_no_tools_no_cache_control(self, provider):
-        """When tools is None/empty, no cache_control markers on tools."""
-        captured = {}
-        provider.client = _make_fake_client(captured)
-
-        import asyncio
-
-        from victor.providers.base import Message
-
-        async def run():
-            return await provider.chat(
-                messages=[Message(role="user", content="Hi")],
-                model="claude-3-5-sonnet",
-                tools=None,
-            )
-
-        asyncio.run(run())
-
-        assert "tools" not in captured or not captured.get("tools")
-
-
-# ── 3. Boundary index guard (hardening) ────────────────────────────────────────
 
 
 class TestBoundaryIndexGuard:

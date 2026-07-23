@@ -20,13 +20,13 @@ import logging
 import os
 import warnings
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Dict, Optional, Union, List
+from typing import Annotated, Any, Callable, ClassVar, Dict, Optional, Union, List
 
 logger = logging.getLogger(__name__)
 
 import yaml
-from pydantic import Field, SecretStr, computed_field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, Field, SecretStr, computed_field, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
 from victor.core.constants import DEFAULT_VERTICAL
@@ -148,6 +148,16 @@ class ProjectPaths:
     def project_db(self) -> Path:
         """Get project-local database path (conversations, state)."""
         return self.project_victor_dir / "project.db"
+
+    @property
+    def undo_db(self) -> Path:
+        """Get project-local undo/redo history database path.
+
+        A dedicated SQLite file (sibling of ``project.db``) so the per-edit undo
+        write has its own write-lock and never contends with the graph indexer's
+        continuous reindex stream on ``project.db``. Rebuildable/ephemeral.
+        """
+        return self.project_victor_dir / "undo.db"
 
     @property
     def embeddings_dir(self) -> Path:
@@ -321,6 +331,33 @@ def reset_project_paths() -> None:
     _current_project_paths = None
 
 
+class ProviderGatewayConfig(BaseModel):
+    """Per-provider Sandhi gateway mode (TD-0003 P3).
+
+    When set, the provider's Sandhi FFI handle is pointed at the Sandhi proxy and
+    presents the virtual key as a bearer token, so traffic is centrally attributed
+    and budget-enforced. The provider slug is preserved so the proxy still speaks the
+    right dialect (openai-compat / anthropic / responses) and routes to the
+    vault-resolved upstream. Opt-in and default-off: an unset ``gateway`` leaves the
+    provider in direct FFI mode (unchanged behavior).
+    """
+
+    url: str = Field(..., description="Sandhi proxy URL, e.g. http://localhost:8600")
+    virtual_key: Optional[SecretStr] = Field(
+        default=None,
+        description=(
+            "Virtual key (vk_...) presented to the proxy as a bearer token. Also "
+            "resolvable from env (per-provider SANDHI_GATEWAY_VIRTUAL_KEY_<PROVIDER> "
+            "or SANDHI_GATEWAY_VIRTUAL_KEY)."
+        ),
+    )
+
+    @property
+    def virtual_key_value(self) -> Optional[str]:
+        """Return the plain virtual key for provider construction."""
+        return reveal_secret(self.virtual_key)
+
+
 class ProviderConfig(BaseSettings):
     """Configuration for a specific provider."""
 
@@ -329,6 +366,10 @@ class ProviderConfig(BaseSettings):
     timeout: int = 300  # 5 minutes - increased for CPU-only inference
     max_retries: int = 3
     organization: Optional[str] = None  # For OpenAI
+    gateway: Optional[ProviderGatewayConfig] = Field(
+        default=None,
+        description="Opt-in Sandhi gateway/virtual-key mode (TD-0003 P3).",
+    )
 
     @property
     def api_key_value(self) -> Optional[str]:
@@ -355,7 +396,10 @@ class ProviderConfig(BaseSettings):
             val = getattr(self, name, None)
             if val is not None:
                 result[name] = val.get_secret_value() if isinstance(val, SecretStr) else val
-        return result
+        # Recursively unwrap any SecretStr nested inside non-secret sub-models
+        # (e.g. providers.<name>.gateway.virtual_key) so downstream consumers and
+        # the transport layer receive plain strings.
+        return unwrap_secrets(result)
 
 
 class ProfileConfig(BaseSettings):
@@ -515,6 +559,7 @@ from victor.config.groups import (
     ServerSettings,
     CodebaseSettings,
     UsageSettings,
+    UsageGatewaySettings,
     SubprocessSettings,
     HeadlessSettings,
     WorkflowSettings,
@@ -622,6 +667,7 @@ _NESTED_GROUPS = {
     "server": ServerSettings,
     "codebase": CodebaseSettings,
     "usage": UsageSettings,
+    "usage_gateway": UsageGatewaySettings,
     "subprocess": SubprocessSettings,
     "headless": HeadlessSettings,
     "workflow": WorkflowSettings,
@@ -1127,6 +1173,7 @@ class Settings(BaseSettings):
     server: Optional[ServerSettings] = Field(default=None, exclude=True, repr=False)
     codebase: Optional[CodebaseSettings] = Field(default=None, exclude=True, repr=False)
     usage: Optional[UsageSettings] = Field(default=None, exclude=True, repr=False)
+    usage_gateway: Optional[UsageGatewaySettings] = Field(default=None, exclude=True, repr=False)
     subprocess: Optional[SubprocessSettings] = Field(default=None, exclude=True, repr=False)
     headless: Optional[HeadlessSettings] = Field(default=None, exclude=True, repr=False)
     workflow: Optional[WorkflowSettings] = Field(default=None, exclude=True, repr=False)
@@ -1463,13 +1510,12 @@ class Settings(BaseSettings):
     # Tracks success rates and adjusts limits automatically
     enable_continuation_rl_learning: bool = True
 
-    # FEP-0012 RL feedback: after the agent declares task completion in an
-    # interactive `victor chat` session, prompt "Did this resolve your task?"
-    # The yes/no answer is the reward label that flows (via
-    # record_session_outcome → decision_outcome) into classifier training.
-    # Skippable (enter=skip); /rate works regardless of this flag. Interactive
-    # REPL only — never fires for oneshot/API/headless.
-    enable_rl_feedback_prompt: bool = True
+    # DEPRECATED (default False): the blocking "Did this resolve your task?"
+    # prompt after each completed turn. Feedback is now passive — the reward
+    # loop records outcomes automatically and explicit feedback lives in
+    # /rate. Setting this to True restores the legacy per-turn prompt; the
+    # task_completion decision is logged either way.
+    enable_rl_feedback_prompt: bool = False
 
     # Session idle timeout: Maximum seconds of inactivity before forcing completion
     # Timer resets on each provider response or tool execution
@@ -2289,46 +2335,91 @@ class Settings(BaseSettings):
         return config_dir
 
     @classmethod
+    def _bundled_default_profiles_text(cls) -> Optional[str]:
+        """Return the packaged ``profiles.default.yaml`` contents, if present."""
+        try:
+            from importlib import resources
+
+            ref = resources.files("victor.config").joinpath("profiles.default.yaml")
+            return ref.read_text(encoding="utf-8")
+        except Exception:
+            return None
+
+    @staticmethod
+    def _parse_profiles_yaml(text: str) -> Dict[str, Dict[str, Any]]:
+        """Parse a profiles YAML document into raw per-profile dicts."""
+        data = yaml.safe_load(text) or {}
+        raw = data.get("profiles", {}) or {}
+        return {str(name): dict(config or {}) for name, config in raw.items()}
+
+    @classmethod
     def load_profiles(cls) -> Dict[str, ProfileConfig]:
-        """Load profiles from YAML file.
+        """Load profiles, layering the user file over bundled defaults.
+
+        The package ships ``victor/config/profiles.default.yaml``. On first run
+        (no ``~/.victor/profiles.yaml``) it is seeded there so the CLI works
+        out of the box and stays user-editable. At load time bundled defaults
+        act as the base layer: a user profile with the same name overrides it
+        key-by-key, and bundled profiles added by package upgrades appear
+        automatically without touching the user's file.
 
         Returns:
             Dictionary of profile configurations
         """
         profiles_file = cls.get_config_dir() / "profiles.yaml"
+        bundled_text = cls._bundled_default_profiles_text()
 
         if not profiles_file.exists():
-            urls = getattr(cls, "lmstudio_base_urls", []) or [
-                "http://localhost:1234",
-            ]
-            default_model = cls._choose_default_lmstudio_model(
-                urls, max_vram_gb=cls().lmstudio_max_vram_gb
-            )
-            # Return default profiles
-            return {
-                "default": ProfileConfig(
-                    provider="lmstudio",
-                    model=default_model,
-                    temperature=0.6,
-                    max_tokens=4096,
-                    description=None,
-                    tool_selection=None,
+            if bundled_text is not None:
+                try:
+                    profiles_file.write_text(bundled_text, encoding="utf-8")
+                    logger.info("Seeded default profiles at %s", profiles_file)
+                except OSError as exc:
+                    logger.warning("Could not seed %s: %s", profiles_file, exc)
+            else:
+                # No bundled resource (unusual install) — legacy LM Studio probe.
+                urls = getattr(cls, "lmstudio_base_urls", []) or [
+                    "http://localhost:1234",
+                ]
+                default_model = cls._choose_default_lmstudio_model(
+                    urls, max_vram_gb=cls().lmstudio_max_vram_gb
                 )
-            }
+                return {
+                    "default": ProfileConfig(
+                        provider="lmstudio",
+                        model=default_model,
+                        temperature=0.6,
+                        max_tokens=4096,
+                        description=None,
+                        tool_selection=None,
+                    )
+                }
+
+        bundled_raw: Dict[str, Dict[str, Any]] = {}
+        if bundled_text is not None:
+            try:
+                bundled_raw = cls._parse_profiles_yaml(bundled_text)
+            except Exception as exc:
+                logger.warning("Failed to parse bundled default profiles: %s", exc)
 
         try:
-            with open(profiles_file, "r") as f:
-                data = yaml.safe_load(f)
-
-            profiles = {}
-            for name, config in data.get("profiles", {}).items():
-                profiles[name] = ProfileConfig(**config)
-
-            return profiles
-
+            user_raw = (
+                cls._parse_profiles_yaml(profiles_file.read_text(encoding="utf-8"))
+                if profiles_file.exists()
+                else {}
+            )
         except Exception as e:
             print(f"Warning: Failed to load profiles: {e}")
             return {}
+
+        profiles: Dict[str, ProfileConfig] = {}
+        for name in {**bundled_raw, **user_raw}:
+            merged = {**bundled_raw.get(name, {}), **user_raw.get(name, {})}
+            try:
+                profiles[name] = ProfileConfig(**merged)
+            except Exception as exc:
+                print(f"Warning: Skipping invalid profile '{name}': {exc}")
+        return profiles
 
     @classmethod
     def load_provider_config(cls, provider: str) -> Optional[ProviderConfig]:

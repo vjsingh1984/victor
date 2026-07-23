@@ -1586,6 +1586,11 @@ class ProjectDatabaseManager(_DatabaseManagerBase):
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute(f"PRAGMA wal_autocheckpoint={self._WAL_AUTOCHECKPOINT_PAGES}")
+        # Deliberately 5000ms, NOT the 30s connect() timeout: non-critical writers
+        # (e.g. the edit tool's undo-log bookkeeping) no longer hard-fail on a lock,
+        # so a long stall is worse than a skipped undo record. This overrides the
+        # 30000ms busy handler sqlite3.connect(timeout=30.0) installs.
+        conn.execute("PRAGMA busy_timeout = 5000")
 
     def _ensure_database(self) -> None:
         """Ensure database exists and is up to date."""

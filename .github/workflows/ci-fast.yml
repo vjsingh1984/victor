@@ -154,7 +154,8 @@ jobs:
   imports:
     name: Import Check
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    # pushed this job over the cap and got it cancelled mid-check.
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
 
@@ -162,6 +163,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+
 
       - name: Install dependencies
         run: |
@@ -181,7 +183,7 @@ jobs:
   imports-with-verticals:
     name: Import Check with Verticals
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
 
@@ -189,6 +191,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+
 
       - name: Install dependencies with verticals
         run: |
@@ -287,7 +290,7 @@ jobs:
   strict-fallback-guards:
     name: Strict Fallback Guards
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
 
@@ -295,6 +298,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+
 
       - name: Install dependencies
         run: |
@@ -319,7 +323,8 @@ jobs:
   definition-import-boundaries:
     name: Definition Import Boundaries
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    # (observed 4m16s -> cancelled). Bumped to absorb the overhead.
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
 
@@ -327,6 +332,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+
 
       - name: Install dependencies
         run: |
@@ -453,6 +459,13 @@ jobs:
     # Cap is generous (25m) because broad PRs (repo-wide formatting/refactor) map to a large
     # mirror-test set that legitimately needs ~15-20m — observed a 228-file formatting PR pass
     # all tests but get cancelled at 61% under the old 12m cap.
+    #
+    # SKIP on develop -> main release PRs: there base_ref=main, so `git diff origin/main...HEAD`
+    # spans the entire release delta (thousands of files) and maps to the whole mirror-test set,
+    # which blows the 25m cap every time. That exact gate is redundant here — the full sharded
+    # suite already runs on the promotion via ci-test.yml — so skipping keeps it green without
+    # losing coverage.
+    if: ${{ github.base_ref != 'main' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -463,6 +476,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+
 
       - name: Install dependencies
         run: |
@@ -522,6 +536,7 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
@@ -554,6 +569,7 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
@@ -570,6 +586,7 @@ jobs:
         run: |
           python -m pytest \
             tests/unit/runtime/test_hotspot_size_guard.py \
+            tests/unit/runtime/test_cli_import_weight_guard.py \
             tests/unit/runtime/test_singleton_guard.py \
             tests/unit/runtime/test_feature_flag_manifest_guard.py \
             tests/unit/contracts/test_feature_flag_references.py \

@@ -18,7 +18,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-ai"
-version = "0.7.8"
+version = "0.8.0"
 description = "Open-source agentic AI framework with multi-provider support, workflow orchestration, and extensible tool system"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -52,12 +52,14 @@ classifiers = [
 
 dependencies = [
     # Core
-    "victor-contracts>=0.6.0,<1.0",  # Contract protocol definitions (independent semver)
+    "victor-contracts>=0.8.0,<1.0",  # Contract protocol definitions (independent semver)
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "python-dotenv>=1.0",
     "typing-extensions>=4.9",  # For typing.Self on Python 3.10
     "orjson>=3.9.0",  # Fast JSON serialization (Rust-backed, 5-10x faster than stdlib)
+    # Typed provider runtime and wire transport; Sandhi is a core boundary, not an extra.
+    "sandhi-gateway==0.1.2",
     # Imported on the `import victor` path (core.verticals.version_matrix) and for
     # vertical version gating. Previously satisfied only transitively via dev tools —
     # a bare `pip install victor-ai` could land in an env without it.
@@ -138,26 +140,27 @@ langchain = [
     "langchain-core>=0.2.0",
 ]
 
-# Sandhi usage gateway (FEP-0020): per-user / per-team usage attribution over the
-# neutral usage-event contract. Imported lazily with graceful fallback in
-# victor.observability.sandhi_meter — absent ⇒ no gateway metering, base install
-# unaffected. The bare name `sandhi` on PyPI is an unrelated linguistics library;
-# the gateway binding is `sandhi-gateway` (anvai-labs/sandhi, Apache-2.0).
-sandhi = [
-    "sandhi-gateway>=0.1,<0.2",
-]
-
 # Reverse-proxy serve mode (FEP-0020 Phase 3): `victor gateway serve` — share one
 # upstream key across a team with per-user virtual keys + budgets + metering.
 # Bundles the sandhi metering core with the serve deps (fastapi + uvicorn).
 gateway = [
-    "sandhi-gateway>=0.1,<0.2",
     "fastapi>=0.109",
     "uvicorn>=0.27",
 ]
 
 # Interactive examples and playground (typer, rich already in main deps)
 examples = []
+
+# Web tooling: headless browser rendering + high-quality text extraction.
+# Used by web_fetch (render: browser) and by the DDG browser fallback in
+# web_search/web_summarize, plus trafilatura-based content extraction. All
+# import sites are lazy/guarded (the _NATIVE_AVAILABLE pattern), so the base
+# install degrades to plain HTTP + BeautifulSoup without this extra.
+# Install the browser binary separately:  playwright install chromium
+web = [
+    "playwright>=1.40",
+    "trafilatura>=1.6",
+]
 
 # Web chat UI: a pure-Python Chainlit surface bound to VictorClient (`victor ui`)
 chat-ui = [

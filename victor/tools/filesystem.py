@@ -1266,6 +1266,70 @@ TEXT_EXTENSIONS = {
 }
 
 
+# Cache of allowed read roots per project root: (expiry_ts, frozenset_of_roots).
+# Git worktrees are legitimate working dirs for the same repo but resolve OUTSIDE
+# the main project root, so the workspace guard must treat every linked worktree
+# as in-workspace. Discovering them shells out to ``git worktree list`` once and
+# caches the result (TTL) so reading many files inside a worktree stays cheap.
+_ALLOWED_READ_ROOTS_CACHE: "Dict[str, Tuple[float, frozenset]]" = {}
+_ALLOWED_READ_ROOTS_TTL = 60.0  # seconds
+
+
+def _discover_read_roots(project_root: Path) -> "frozenset[str]":
+    """Return the project root plus every linked git-worktree root (as strings)."""
+    roots = {str(project_root)}
+    try:
+        import subprocess
+
+        proc = subprocess.run(
+            ["git", "-C", str(project_root), "worktree", "list", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if proc.returncode == 0:
+            for line in proc.stdout.splitlines():
+                if line.startswith("worktree "):
+                    wt = line[len("worktree ") :].strip()
+                    if wt:
+                        roots.add(str(Path(wt).resolve()))
+    except Exception:
+        # git absent / not a repo / timeout → fall back to project root only.
+        pass
+    return frozenset(roots)
+
+
+def _allowed_read_roots(project_root: Path, *, refresh: bool = False) -> "frozenset[str]":
+    """Cached set of in-workspace roots (project root + git worktrees)."""
+    key = str(project_root)
+    now = time.monotonic()
+    if not refresh:
+        cached = _ALLOWED_READ_ROOTS_CACHE.get(key)
+        if cached is not None and cached[0] > now:
+            return cached[1]
+    roots = _discover_read_roots(project_root)
+    _ALLOWED_READ_ROOTS_CACHE[key] = (now + _ALLOWED_READ_ROOTS_TTL, roots)
+    return roots
+
+
+def _path_within_workspace(file_path: Path, project_root: Path) -> bool:
+    """True if ``file_path`` is under the project root or any linked git worktree.
+
+    On a cache-miss for the path (e.g. a worktree created mid-session), the
+    worktree list is refreshed once before deciding, so newly added worktrees
+    are recognized immediately.
+    """
+    target = str(file_path)
+
+    def _under(roots: "frozenset[str]") -> bool:
+        return any(target == r or target.startswith(r + os.sep) for r in roots)
+
+    if _under(_allowed_read_roots(project_root)):
+        return True
+    # Miss: a worktree may have appeared since the cache was populated.
+    return _under(_allowed_read_roots(project_root, refresh=True))
+
+
 @tool(
     category="filesystem",
     priority=Priority.CRITICAL,  # Always available for selection
@@ -1414,7 +1478,11 @@ async def read(
             from victor.config.settings import get_project_paths
 
             _project_root = Path(get_project_paths().project_root).resolve()
-            if not str(file_path).startswith(str(_project_root)):
+            # Allow the project root AND any linked git worktree of the same repo:
+            # worktrees resolve outside the main root but are legitimate (and the
+            # documented) working dirs, so a naive prefix check would wrongly block
+            # reads that edit/write already permit.
+            if not _path_within_workspace(file_path, _project_root):
                 return (
                     f"Path '{path}' is outside the current workspace "
                     f"({_project_root.name}). You are working in the "
@@ -2058,6 +2126,9 @@ async def write(
 ) -> Union[str, Dict[str, Any]]:
     """Write a file — thin facade over ``edit(create)``.
 
+    Requires `path` AND `content`; overwriting an existing file requires
+    reading it first in this session.
+
     Consolidating write() onto edit() gives ONE write path and ONE
     read-before-overwrite gate (see ``enforce_read_before_write``). Behavior is
     preserved from the previous standalone implementation:
@@ -2098,7 +2169,7 @@ async def write(
 
     if run_lsp:
         try:
-            from victor.tools.lsp_write_enhancer import write_with_lsp
+            from victor.tools.lsp_write_enhancer import DiagnosticSeverity, write_with_lsp
 
             result = await write_with_lsp(
                 path=str(file_path),
@@ -2125,8 +2196,15 @@ async def write(
             if result.formatted:
                 lsp_info.append(f"formatted with {result.formatter_used}")
             if result.validated:
-                error_count = sum(1 for d in result.diagnostics if d.severity == "error")
-                warning_count = sum(1 for d in result.diagnostics if d.severity == "warning")
+                # Diagnostic.severity is a DiagnosticSeverity Enum (not a str), so compare
+                # against the enum members — a string compare was always False and silently
+                # reported "validation passed" even for error-level diagnostics.
+                error_count = sum(
+                    1 for d in result.diagnostics if d.severity == DiagnosticSeverity.ERROR
+                )
+                warning_count = sum(
+                    1 for d in result.diagnostics if d.severity == DiagnosticSeverity.WARNING
+                )
                 if error_count or warning_count:
                     lsp_info.append(f"{error_count} errors, {warning_count} warnings")
                 else:

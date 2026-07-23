@@ -175,7 +175,7 @@ async def test_execute_tools_streaming_yields_tool_start_before_callback_awaits(
 def test_tool_start_chunks_include_batch_metadata():
     recovery_runtime = SimpleNamespace()
 
-    def start_chunk(tool_name, tool_args, status_msg):
+    def start_chunk(tool_name, tool_args, status_msg, tool_call_id=None):
         return StreamChunk(
             content="",
             metadata={

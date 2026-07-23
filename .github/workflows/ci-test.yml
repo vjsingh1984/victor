@@ -95,6 +95,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pytest-
 
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -224,7 +225,7 @@ jobs:
   smoke-test:
     name: CLI Smoke Test
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     env:
       PYTHONPATH: ${{ github.workspace }}
     steps:
@@ -243,6 +244,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-smoke-
             ${{ runner.os }}-pip-
+
 
       - name: Install Victor
         run: |

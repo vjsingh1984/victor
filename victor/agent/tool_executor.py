@@ -748,29 +748,16 @@ class ToolExecutor:
                     logger.info("Path redirect applied: '%s' → '%s'", _bad, _fixed)
                     break
 
-        # Code correction middleware - validate and fix code arguments
-        if (
-            self.enable_code_correction
-            and self.code_correction_middleware is not None
-            and self.code_correction_middleware.should_validate(tool_name)
-        ):
+        # Code correction middleware - validate and fix executable-code arguments.
+        # Gated on the tool's access_mode contract (executable code only); file content is
+        # never auto-corrected. Single ``process()`` entry shared with ToolPipeline.
+        if self.enable_code_correction and self.code_correction_middleware is not None:
             try:
-                correction_result = self.code_correction_middleware.validate_and_fix(
-                    tool_name, normalized_args
+                tool_obj = self.get_tool_function(tool_name)
+                normalized_args, correction_result = self.code_correction_middleware.process(
+                    tool_name, normalized_args, tool=tool_obj
                 )
-
-                if correction_result.was_corrected:
-                    # Apply the correction
-                    normalized_args = self.code_correction_middleware.apply_correction(
-                        normalized_args, correction_result
-                    )
-                    logger.info(
-                        "Code auto-corrected for tool '%s': %d issues fixed",
-                        tool_name,
-                        len(correction_result.validation.errors),
-                    )
-
-                if not correction_result.validation.valid:
+                if correction_result is not None and not correction_result.validation.valid:
                     # Log validation errors but proceed - tool may still work
                     logger.warning(
                         "Code validation errors for tool '%s': %s",
@@ -953,7 +940,7 @@ class ToolExecutor:
                         break
 
         # Emit RL event for tool execution (for learner activation)
-        self._emit_rl_tool_event(tool_name, success, execution_time, exec_context)
+        self._emit_rl_tool_event(tool_name, success, execution_time, exec_context, result=result)
 
         # Complete tool call in tracer
         self._complete_tool_call(call_id, success, result=result, error=error)
@@ -1063,6 +1050,7 @@ class ToolExecutor:
         success: bool,
         execution_time: float,
         context: Dict[str, Any],
+        result: Any = None,
     ) -> None:
         """Emit RL event for tool execution to activate tool_selector learner.
 
@@ -1081,6 +1069,15 @@ class ToolExecutor:
                 return
 
             from victor.framework.rl.hooks import RLEvent, RLEventType
+
+            # Truthful RL signal (P7): unified tools report failures as
+            # '### ❌' markdown strings with invocation-level success=True —
+            # recording those as successes hid the real error rate from
+            # the Q-values.
+            from victor.tools.unified.parser import classify_result_marker
+
+            if success and classify_result_marker(result) == "tool_error":
+                success = False
 
             # Calculate quality score based on success and execution time
             # Fast successful executions get higher scores

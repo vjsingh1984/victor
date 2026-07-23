@@ -180,6 +180,38 @@ class FeatureFlag(Enum):
     # Default: False (opt-in, enable with VICTOR_USE_E3_TIR_EXPLORATION=true)
     USE_E3_TIR_EXPLORATION = "use_e3_tir_exploration"
 
+    # Phase 20 - Context Management Subsystem Activation (FEP-0023, Phase 1)
+    # Gates population of the live SessionLedger (orchestrator._session_ledger)
+    # from tool results and assistant responses at the per-turn boundary. When
+    # ON, the assembler's already-wired <SESSION_STATE> block is populated with
+    # files read/modified, decisions, and recommendations (persistent session
+    # memory that survives compaction). When OFF the ledger stays empty and the
+    # block is inert. Keystone for FEP-0023 Phases 2-3.
+    #
+    # Default: ON. Graduated from opt-in on the FEP-0023 P1 measurement: over
+    # 12.7k real assistant messages the (hardened) extractor holds ~100% labeled
+    # precision, and <SESSION_STATE> costs ~400 tokens/turn (hard-capped at
+    # ~750). Disable with VICTOR_USE_SESSION_LEDGER=false. The one dimension not
+    # yet measured is task-accuracy A/B (EVR-gated); this flag retro-gates it.
+    USE_SESSION_LEDGER = "use_session_ledger"
+
+    # Phase 20 - Context Management Subsystem Activation (FEP-0023, Phase 2)
+    # Gates the ToolResultDeduplicator as a *view stage* inside the context
+    # assembler: older duplicate tool outputs (identical file re-reads) in the
+    # assembled context copy are replaced with compact stubs to cut tokens. It
+    # operates on the assembler's throwaway copy and NEVER mutates the
+    # source-of-truth history. When OFF the assembler passes context through
+    # unchanged.
+    #
+    # Default: ON. Graduated from opt-in on the FEP-0023 P2 measurement: across 9
+    # real victor sessions ~3% of large (>=500 char) tool outputs recurred
+    # identically (~460+ chars saved per stub; ~7k tokens in-sample), and this is
+    # complementary to — not redundant with — the cross-turn idempotent-call cache
+    # (a different layer: execution vs context tokens, and those duplicates reached
+    # history despite it). Zero accuracy risk: exact-content dups only, newest copy
+    # retained, view-only. Disable with VICTOR_USE_TOOL_RESULT_DEDUP=false.
+    USE_TOOL_RESULT_DEDUP = "use_tool_result_dedup"
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 

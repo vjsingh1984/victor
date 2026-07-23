@@ -51,7 +51,6 @@ if TYPE_CHECKING:
     from victor.agent.middleware_chain import MiddlewareChain
     from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
-    from victor.agent.referential_intent_resolver import ReferentialIntentResolver
     from victor.agent.session_ledger import SessionLedger
     from victor.observability.integration import ObservabilityIntegration
     from victor.storage.embeddings.intent_classifier import IntentClassifier
@@ -804,12 +803,15 @@ class CoordinationBuildersMixin:
         self,
         ledger: Optional["SessionLedger"] = None,
         controller: Optional["ConversationController"] = None,
+        tool_result_deduplicator: Optional[object] = None,
     ) -> "TurnBoundaryContextAssembler":
         """Create TurnBoundaryContextAssembler for context selection.
 
         Args:
             ledger: SessionLedger instance
             controller: ConversationController (for semantic retrieval)
+            tool_result_deduplicator: optional ToolResultDeduplicator wired as the
+                FEP-0023 P2 view-stage (passed only when USE_TOOL_RESULT_DEDUP is on)
         """
         from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
         from victor.agent.conversation.scoring import score_messages, CONTROLLER_WEIGHTS
@@ -827,16 +829,7 @@ class CoordinationBuildersMixin:
             session_ledger=ledger,
             score_fn=_canonical_score_fn,
             conversation_controller=controller,
+            tool_result_deduplicator=tool_result_deduplicator,
         )
         logger.debug("TurnBoundaryContextAssembler created")
         return assembler
-
-    def create_referential_intent_resolver(
-        self, ledger: Optional["SessionLedger"] = None
-    ) -> "ReferentialIntentResolver":
-        """Create ReferentialIntentResolver for anaphoric reference resolution."""
-        from victor.agent.referential_intent_resolver import ReferentialIntentResolver
-
-        resolver = ReferentialIntentResolver(session_ledger=ledger)
-        logger.debug("ReferentialIntentResolver created")
-        return resolver

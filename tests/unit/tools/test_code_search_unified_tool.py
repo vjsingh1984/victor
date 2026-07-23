@@ -33,7 +33,9 @@ class TestCodeSearchLiteral:
         mock_grep = AsyncMock(return_value=[{"file": "a.py", "line": 1, "content": "auth"}])
         with patch("victor.tools.unified._search_helpers.grep_search", mock_grep):
             result = await code_tool('code search "auth" src --mode literal')
-        mock_grep.assert_awaited_once_with(query="auth", path="src")
+        mock_grep.assert_awaited_once_with(
+            query="auth", path="src", regex=False, case_sensitive=False
+        )
         assert "a.py:1" in result
 
 
@@ -77,14 +79,20 @@ class TestCodeSearchSemanticDelegation:
 
     @pytest.mark.asyncio
     async def test_delegation_failure_surfaced(self):
+        """Backend error dicts degrade to literal grep; the reason stays visible."""
         mock_search = AsyncMock(return_value={"success": False, "error": "index missing"})
-        with patch(
-            "victor.tools.unified._vertical_resolver.resolve_vertical_callable",
-            return_value=(mock_search, "victor_coding.tools.code_search_tool"),
+        mock_grep = AsyncMock(return_value=[])
+        with (
+            patch(
+                "victor.tools.unified._vertical_resolver.resolve_vertical_callable",
+                return_value=(mock_search, "victor_coding.tools.code_search_tool"),
+            ),
+            patch("victor.tools.unified._search_helpers.grep_search", mock_grep),
         ):
             result = await code_tool('code search "foo"')
-        assert "### ❌ ERROR" in result
+        assert "SYSTEM HINT" in result
         assert "index missing" in result
+        assert "### ❌ ERROR" not in result
 
 
 class TestCodeSearchFallback:
@@ -101,7 +109,32 @@ class TestCodeSearchFallback:
             patch("victor.tools.unified._search_helpers.grep_search", mock_grep),
         ):
             result = await code_tool('code search "auth" src')
-        mock_grep.assert_awaited_once_with(query="auth", path="src")
+        mock_grep.assert_awaited_once_with(
+            query="auth", path="src", regex=False, case_sensitive=False
+        )
         assert "SYSTEM HINT" in result
         assert "literal" in result.lower()
         assert "a.py:1" in result
+
+    @pytest.mark.asyncio
+    async def test_backend_error_dict_falls_back_to_literal(self):
+        """A resolved backend returning success:False degrades to literal grep
+        with a SYSTEM HINT naming the reason (measured 20x live: Settings not
+        available in tool context)."""
+        mock_search = AsyncMock(
+            return_value={"success": False, "error": "Settings not available in tool context."}
+        )
+        mock_grep = AsyncMock(return_value=[{"file": "a.py", "line": 1, "content": "auth"}])
+        with (
+            patch(
+                "victor.tools.unified._vertical_resolver.resolve_vertical_callable",
+                return_value=(mock_search, "victor_coding.tools.code_search_tool"),
+            ),
+            patch("victor.tools.unified._search_helpers.grep_search", mock_grep),
+        ):
+            result = await code_tool('code search "auth" src')
+        mock_grep.assert_awaited_once()
+        assert "SYSTEM HINT" in result
+        assert "Settings not available in tool context." in result
+        assert "a.py:1" in result
+        assert "### ❌ ERROR" not in result

@@ -13,6 +13,8 @@ To keep the runner queue free and feature work merging fast, CI is split by the 
 | **PR → `main`** (the `develop` → `main` promotion PR) and pushes to `main` | The full battery: `ci`, `ci-test` (sharded units), `ci-integration`, `build`, `security`, `performance-tests`, `validation`, `vertical-validation`, `external-vertical-compat` | **Extensive** — full verification before promoting to the protected branch |
 
 > The develop gate runs only the unit tests **relevant to the PR's changed files**, not the whole suite: the full non-slow unit suite is ~7h single-process (26.8k tests) and hours even sharded, so it can't gate every PR. Full coverage runs once at **develop → main**.
+>
+> On the **develop → main** promotion PR the changed-file unit job is **skipped** (`ci-fast.yml` → `quick-tests` `if: base_ref != 'main'`): there the diff spans the whole release delta and would map to the entire mirror-test set, blowing the job's timeout every time. Coverage isn't lost — the full sharded suite runs on that same PR via `ci-test`.
 
 This is enforced by the `branches:` filter on each workflow's `push`/`pull_request`
 triggers: heavy workflows target `[main]`; `ci-fast` targets `[main, develop]`. `main`

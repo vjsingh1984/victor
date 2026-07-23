@@ -78,6 +78,21 @@ def reset_tool_stats(tool_name: str, confirm: bool = False) -> bool:
         # Delete from rl_tool_outcome
         db.execute("DELETE FROM rl_tool_outcome WHERE tool_name = ?", (tool_name,))
 
+        # Unified tables (live since the v0.7.0 migration) — the legacy deletes
+        # above only touch frozen pre-migration rows.
+        db.execute(
+            "DELETE FROM rl_q_value WHERE learner_id = 'tool_selector' AND state_key = ?",
+            (tool_name,),
+        )
+        db.execute(
+            "DELETE FROM rl_task_stat WHERE learner_id = 'tool_selector' AND task_type = ?",
+            (tool_name,),
+        )
+        db.execute(
+            "DELETE FROM rl_transition WHERE learner_id = 'tool_selector' AND to_state = ?",
+            (tool_name,),
+        )
+
         if outcome_count > 0:
             logger.info(
                 f"[reset_tool_stats] Cleared {outcome_count} rl_tool_outcome records for '{tool_name}'"

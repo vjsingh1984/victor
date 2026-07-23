@@ -1774,6 +1774,12 @@ class ConversationStore:
             # Compute embeddings and similarities for historical messages
             scored_messages: List[Tuple[ConversationMessage, float]] = []
 
+            # Collect candidate messages + embeddings, then score them against the
+            # query in ONE native crossing (batch_cosine_similarity) instead of
+            # paying the FFI + observability cost per row. The query vector is
+            # converted once, not once per row.
+            query_vec = query_embedding.tolist()
+            candidates: List[Tuple[ConversationMessage, List[float]]] = []
             for row in historical_rows:
                 message = self._message_from_row(row)
 
@@ -1781,14 +1787,16 @@ class ConversationStore:
                 if len(message.content) < 20:
                     continue
 
-                # Compute similarity
                 msg_embedding = self._embedding_service.embed_text_sync(message.content[:2000])
-                similarity = self._cosine_similarity(
-                    query_embedding.tolist(), msg_embedding.tolist()
-                )
+                candidates.append((message, msg_embedding.tolist()))
 
-                if similarity >= min_similarity:
-                    scored_messages.append((message, similarity))
+            if candidates:
+                similarities = self._batch_cosine_similarity(
+                    query_vec, [emb for _, emb in candidates]
+                )
+                for (message, _), similarity in zip(candidates, similarities):
+                    if similarity >= min_similarity:
+                        scored_messages.append((message, similarity))
 
             # Sort by similarity (descending) and limit
             scored_messages.sort(key=lambda x: x[1], reverse=True)
@@ -1841,16 +1849,24 @@ class ConversationStore:
             query_embedding = self._embedding_service.embed(query[:2000])
             scored_summaries: List[Tuple[str, float]] = []
 
+            # Collect candidate summaries + embeddings, then score them in ONE
+            # native crossing instead of one cosine_similarity call per row.
+            candidates: List[Tuple[str, List[float]]] = []
             for row in rows:
                 summary = row["summary"]
                 if len(summary) < 10:
                     continue
 
                 summary_embedding = self._embedding_service.embed(summary[:2000])
-                similarity = self._cosine_similarity(query_embedding, summary_embedding)
+                candidates.append((summary, summary_embedding))
 
-                if similarity >= min_similarity:
-                    scored_summaries.append((summary, similarity))
+            if candidates:
+                similarities = self._batch_cosine_similarity(
+                    query_embedding, [emb for _, emb in candidates]
+                )
+                for (summary, _), similarity in zip(candidates, similarities):
+                    if similarity >= min_similarity:
+                        scored_summaries.append((summary, similarity))
 
             scored_summaries.sort(key=lambda x: x[1], reverse=True)
             return scored_summaries[:limit]
@@ -2840,6 +2856,25 @@ class ConversationStore:
         except Exception as e:
             logger.debug("Cosine similarity computation failed, returning 0.0: %s", e)
         return 0.0
+
+    def _batch_cosine_similarity(
+        self, query: List[float], corpus: List[List[float]]
+    ) -> List[float]:
+        """Cosine similarity of ``query`` against many vectors in one crossing.
+
+        Amortises the native FFI + dispatch cost over the whole corpus instead
+        of paying it per pair. Falls back to per-item scoring on any error so
+        behaviour matches :meth:`_cosine_similarity`.
+        """
+        if not corpus:
+            return []
+        try:
+            from victor.processing.native import batch_cosine_similarity
+
+            return batch_cosine_similarity(query, corpus)
+        except Exception as e:
+            logger.debug("Batch cosine similarity failed, scoring per-item: %s", e)
+            return [self._cosine_similarity(query, vec) for vec in corpus]
 
 
 # Convenience function to get global store

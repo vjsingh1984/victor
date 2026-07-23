@@ -62,6 +62,8 @@ from typing import (
     runtime_checkable,
 )
 
+from victor.runtime.reachability import record_service_resolution
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -439,6 +441,10 @@ class ServiceContainer:
             ServiceResolutionError: If circular dependency detected
         """
         descriptor = self._get_descriptor(service_type)
+
+        # FEP-0022 Probe A: witness that this registered type was resolved. Inert
+        # when no recorder is armed (the call is a contextvar read + None check).
+        record_service_resolution(service_type)
 
         # Circular dependency detection (per-thread)
         resolving = self._get_resolving()

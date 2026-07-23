@@ -66,22 +66,49 @@ class BudgetSignalReader:
     # ------------------------------------------------------------------
 
     def load_tool_signals(self, db: Optional[Any] = None) -> Tuple[ToolBudgetSignals, ...]:
-        """Load per-tool Q-value signals from ``rl_tool_q``.
+        """Load per-tool Q-value signals from the LIVE unified RL tables.
 
-        Returns an empty tuple when the table is absent/empty (cold-start safe).
+        The tool_selector learner writes ``rl_q_value``/``rl_task_stat`` since the
+        v0.7.0 table migration; the legacy ``rl_tool_q`` froze at that migration
+        (2026-05-15) and is consulted only as a cold-start fallback when the
+        unified query returns no rows. The ``rl_task_stat.task_type = tool name``
+        join is a real learner quirk (see ToolSelectorLearner._save_to_db).
+
+        Returns an empty tuple when both are absent/empty (cold-start safe).
         Q-values are clamped into [0, 1] to defend against legacy/default rows.
         """
         try:
             handle = self._resolve_db(db)
             cursor = handle.cursor()
             cursor.execute(
-                f"SELECT tool_name, q_value, selection_count, success_count "
-                f"FROM {Tables.RL_TOOL_Q}"
+                "SELECT q.state_key AS tool_name, q.q_value, "
+                "q.visit_count AS selection_count, "
+                "CAST(COALESCE(s.stat_value, 0) AS INTEGER) AS success_count "
+                "FROM rl_q_value q "
+                "LEFT JOIN rl_task_stat s "
+                "ON s.learner_id = q.learner_id "
+                "AND s.task_type = q.state_key "
+                "AND s.stat_key = 'success_count' "
+                "WHERE q.learner_id = 'tool_selector' AND q.action_key = 'select'"
             )
             rows = [dict(r) for r in cursor.fetchall()]
         except Exception as exc:  # noqa: BLE001 - degrade gracefully
-            logger.debug(f"budget_calibration: rl_tool_q load failed: {exc}")
-            return ()
+            logger.debug(f"budget_calibration: rl_q_value load failed: {exc}")
+            rows = []
+
+        if not rows:
+            # Cold-start fallback: pre-migration installs only have legacy rows.
+            try:
+                handle = self._resolve_db(db)
+                cursor = handle.cursor()
+                cursor.execute(
+                    f"SELECT tool_name, q_value, selection_count, success_count "
+                    f"FROM {Tables.RL_TOOL_Q}"
+                )
+                rows = [dict(r) for r in cursor.fetchall()]
+            except Exception as exc:  # noqa: BLE001 - degrade gracefully
+                logger.debug(f"budget_calibration: rl_tool_q load failed: {exc}")
+                return ()
 
         signals: list[ToolBudgetSignals] = []
         for row in rows:

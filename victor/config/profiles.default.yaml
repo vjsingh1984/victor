@@ -1,0 +1,65 @@
+# Victor default profiles — bundled with the victor-ai package.
+# victor-profiles-version: bundled
+#
+# On first run this file is copied to ~/.victor/profiles.yaml, which is YOURS:
+# edit it freely, add profiles, change models. Bundled defaults act as a base
+# layer — a profile you define with the same name always wins, and new bundled
+# profiles from package upgrades appear automatically without touching your
+# edits.
+#
+# Select a profile:            victor chat -p <name>
+# Quick per-run overrides:     VICTOR_PROVIDER / VICTOR_MODEL environment vars
+# API keys are NEVER stored here — provide them via environment variables
+# (ANTHROPIC_API_KEY, OPENAI_API_KEY, MOONSHOT_API_KEY, ...).
+
+profiles:
+  # Local-first default: works with no API key. Requires Ollama running
+  # (`ollama serve`) and the model pulled (`ollama pull qwen2.5-coder:7b`).
+  default:
+    provider: ollama
+    model: qwen2.5-coder:7b
+    temperature: 0.6
+    max_tokens: 4096
+    description: Local Ollama default (no API key required)
+
+  # Alias kept separate so `-p local` keeps working when `default` is
+  # repointed at a cloud provider.
+  local:
+    provider: ollama
+    model: qwen2.5-coder:7b
+    temperature: 0.6
+    max_tokens: 4096
+    description: Local Ollama profile
+
+  # --- Cloud profiles (commented examples; uncomment + set env key to use) ---
+  #
+  # claude:
+  #   provider: anthropic
+  #   model: claude-sonnet-4-5
+  #   temperature: 0.6
+  #   max_tokens: 8192
+  #   description: Anthropic Claude (ANTHROPIC_API_KEY)
+  #
+  # gpt:
+  #   provider: openai
+  #   model: gpt-4o
+  #   temperature: 0.6
+  #   max_tokens: 8192
+  #   description: OpenAI GPT (OPENAI_API_KEY)
+  #
+  # Kimi K3 is active out of the box for discovery. It requires a top-up to
+  # unlock (see https://platform.kimi.ai) and the MOONSHOT_API_KEY env var.
+  # Set the key, then:  victor chat -p kimi
+  kimi:
+    provider: moonshot
+    model: kimi-k3
+    temperature: 0.6
+    max_tokens: 8192
+    description: Moonshot Kimi K3 — 1M context, always-on thinking (MOONSHOT_API_KEY)
+  #
+  # zai-coding:
+  #   provider: zai
+  #   model: glm-5.2
+  #   temperature: 0.6
+  #   max_tokens: 8192
+  #   description: Z.AI coding-plan profile (ZAI_API_KEY)

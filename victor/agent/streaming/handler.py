@@ -319,7 +319,11 @@ class StreamingChatHandler:
         return chunks
 
     def generate_tool_start_chunk(
-        self, tool_name: str, tool_args: Dict[str, Any], status_msg: str
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        status_msg: str,
+        tool_call_id: Optional[str] = None,
     ) -> StreamChunk:
         """Generate a chunk indicating tool execution start.
 
@@ -327,20 +331,20 @@ class StreamingChatHandler:
             tool_name: Name of the tool
             tool_args: Tool arguments
             status_msg: Status message to display
+            tool_call_id: Provider tool_calls[].id — lets renderers track N
+                concurrent tools independently instead of clobbering one slot
 
         Returns:
             StreamChunk with tool start metadata
         """
-        return StreamChunk(
-            content="",
-            metadata={
-                "tool_start": {
-                    "name": tool_name,
-                    "arguments": tool_args,
-                    "status_msg": status_msg,
-                }
-            },
-        )
+        tool_start: Dict[str, Any] = {
+            "name": tool_name,
+            "arguments": tool_args,
+            "status_msg": status_msg,
+        }
+        if tool_call_id:
+            tool_start["tool_call_id"] = tool_call_id
+        return StreamChunk(content="", metadata={"tool_start": tool_start})
 
     def should_continue_loop(self, result: IterationResult, ctx: StreamingChatContext) -> bool:
         """Determine if the streaming loop should continue.
@@ -1099,6 +1103,7 @@ class StreamingChatHandler:
         was_pruned: bool = False,
         result: Any = None,  # Tool output for preview
         original_result: Any = None,  # Full tool output for expansion/debug
+        tool_call_id: Optional[str] = None,
     ) -> StreamChunk:
         """Generate a StreamChunk for a tool result.
 
@@ -1122,6 +1127,8 @@ class StreamingChatHandler:
                 "arguments": tool_args,
             }
         }
+        if tool_call_id:
+            metadata["tool_result"]["tool_call_id"] = tool_call_id
         if not success and error:
             metadata["tool_result"]["error"] = error
         if follow_up_suggestions:
@@ -1129,11 +1136,10 @@ class StreamingChatHandler:
         if was_pruned:
             metadata["tool_result"]["was_pruned"] = True
         if result is not None:
-            # Show brief metadata-only message instead of full content
-            # User can expand with /expand or Ctrl+O to see full output
-            metadata["tool_result"][
-                "result"
-            ] = "Tool completed successfully. Use /expand or Ctrl+O at prompt to see full output."
+            # Pass the real (already pruned) output through — how much of it
+            # to show, and the /expand affordance, are presentation decisions
+            # owned by the rendering layer.
+            metadata["tool_result"]["result"] = str(result)
         if original_result is not None:
             metadata["tool_result"]["original_result"] = str(original_result)
         return StreamChunk(content="", metadata=metadata)
@@ -1275,6 +1281,7 @@ class StreamingChatHandler:
                 # the real result instead of the CLI "/expand" placeholder. The Rich
                 # CLI still shows the placeholder inline and uses this only for /expand.
                 original_result=full_tool_output,
+                tool_call_id=result.get("tool_call_id"),
             )
         )
 

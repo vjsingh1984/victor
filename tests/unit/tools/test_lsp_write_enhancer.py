@@ -83,6 +83,25 @@ class TestDiagnostic:
         assert diagnostic.code is None
         assert diagnostic.source is None
 
+    def test_severity_is_enum_not_string(self):
+        """Regression: severity is a DiagnosticSeverity Enum, so ``== "error"`` is False.
+
+        write()'s simple-mode lsp_suffix previously compared ``d.severity == "error"``
+        (a string), which was always False and silently reported "validation passed" even
+        for error-level diagnostics. Counting MUST compare against the enum members.
+        """
+        error = Diagnostic(line=1, column=0, severity=DiagnosticSeverity.ERROR, message="x")
+        warning = Diagnostic(line=1, column=0, severity=DiagnosticSeverity.WARNING, message="y")
+        # The buggy comparison (string) must be False for both...
+        assert error.severity != "error"
+        assert warning.severity != "warning"
+        # ...while the enum comparison correctly classifies them.
+        diagnostics = [error, warning]
+        errors = sum(1 for d in diagnostics if d.severity == DiagnosticSeverity.ERROR)
+        warnings = sum(1 for d in diagnostics if d.severity == DiagnosticSeverity.WARNING)
+        assert errors == 1
+        assert warnings == 1
+
 
 class TestWriteResult:
     """Tests for WriteResult dataclass."""

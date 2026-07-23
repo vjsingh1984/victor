@@ -45,8 +45,20 @@ class StreamRenderer(Protocol):
         """Resume streaming after pause."""
         ...
 
-    def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
-        """Handle tool execution start event."""
+    def on_tool_start(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        tool_call_id: str | None = None,
+        batch_index: int | None = None,
+        batch_total: int | None = None,
+        execution_mode: str | None = None,
+    ) -> None:
+        """Handle tool execution start event.
+
+        ``tool_call_id`` and the batch fields let renderers track N concurrent
+        tools independently (parallel batches); renderers may ignore them.
+        """
         ...
 
     def on_tool_progress(
@@ -76,6 +88,7 @@ class StreamRenderer(Protocol):
         was_pruned: bool = False,
         original_result: Any = None,
         result: Any = None,
+        tool_call_id: str | None = None,
     ) -> None:
         """Handle tool execution result event."""
         ...

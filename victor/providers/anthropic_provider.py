@@ -14,20 +14,14 @@
 
 """Anthropic Claude provider implementation."""
 
-from victor.core.json_utils import json_dumps, json_loads
+import logging
 from typing import Any, AsyncIterator, Dict, List, Optional
-
-from anthropic import AsyncAnthropic
-from anthropic.types import Message as AnthropicMessage
 
 from victor.providers.base import (
     BaseProvider,
     CacheCostModel,
     CompletionResponse,
     Message,
-    ProviderAuthError,
-    ProviderError,
-    ProviderRateLimitError,
     StreamChunk,
     ToolDefinition,
 )
@@ -35,10 +29,54 @@ from victor.providers.openai_compat import convert_tools_to_anthropic_format
 from victor.providers.resolution import (
     UnifiedApiKeyResolver,
     APIKeyNotFoundError,
-    get_api_key_with_resolution,
 )
 from victor.providers.logging import ProviderLogger
 from victor.providers.oauth_manager import OAuthTokenManager
+
+logger = logging.getLogger(__name__)
+
+# Curated fallback used when live ``/v1/models`` discovery is unavailable
+# (offline, auth failure, or the anthropic SDK absent). Context-window facts
+# are otherwise resolved via ``context_windows.lookup``; this only enumerates
+# the known model ids and human-readable names. Sourced from Anthropic's
+# Models overview (platform.claude.com), current as of 2026-07.
+_ANTHROPIC_STATIC_MODELS: List[Dict[str, Any]] = [
+    {
+        "id": "claude-fable-5",
+        "name": "Claude Fable 5",
+        "description": "Frontier flagship (Mythos-class) for the hardest long-horizon agentic work",
+        "context_window": 1_000_000,
+        "max_output_tokens": 131_072,
+    },
+    {
+        "id": "claude-opus-4-8",
+        "name": "Claude Opus 4.8",
+        "description": "Most capable model for complex reasoning and agentic coding",
+        "context_window": 1_000_000,
+        "max_output_tokens": 131_072,
+    },
+    {
+        "id": "claude-sonnet-5",
+        "name": "Claude Sonnet 5",
+        "description": "Default model; best combination of speed and intelligence",
+        "context_window": 1_000_000,
+        "max_output_tokens": 131_072,
+    },
+    {
+        "id": "claude-sonnet-4-6",
+        "name": "Claude Sonnet 4.6",
+        "description": "Previous-generation balanced model",
+        "context_window": 1_000_000,
+        "max_output_tokens": 65_536,
+    },
+    {
+        "id": "claude-haiku-4-5-20251001",
+        "name": "Claude Haiku 4.5",
+        "description": "Fastest model with near-frontier intelligence",
+        "context_window": 200_000,
+        "max_output_tokens": 65_536,
+    },
+]
 
 
 class AnthropicProvider(BaseProvider):
@@ -73,6 +111,8 @@ class AnthropicProvider(BaseProvider):
         # Initialize structured logger
         self._provider_logger = ProviderLogger("anthropic", __name__)
         self._oauth_manager: Optional[OAuthTokenManager] = None
+        self._auth_mode = auth_mode
+        self._sandhi_auth_scheme = "bearer" if auth_mode == "oauth" else "api_key"
 
         if auth_mode == "oauth":
             self._oauth_manager = OAuthTokenManager("anthropic", token_source=oauth_source)
@@ -132,23 +172,20 @@ class AnthropicProvider(BaseProvider):
             max_retries=max_retries,
             **kwargs,
         )
-        self.client = AsyncAnthropic(
-            api_key=None if auth_mode == "oauth" else self._api_key,
-            auth_token=self._api_key if auth_mode == "oauth" else None,
-            base_url=base_url,
-            timeout=timeout,
-            max_retries=max_retries,
-        )
 
     async def _ensure_valid_token(self) -> None:
-        """Refresh OAuth token if needed. No-op for api_key mode."""
+        """Refresh OAuth token if needed. No-op for api_key mode.
+
+        The refreshed token lands on ``self._api_key``, which the Sandhi typed
+        handle reads when it is (re)constructed. The policy shell owns no
+        provider generation client (TD-0002 deletion gate), so there is no SDK
+        client to mutate here.
+        """
         if self._oauth_manager is None:
             return
         token = await self._oauth_manager.get_valid_token()
         if token != self._api_key:
             self._api_key = token
-            self.client.api_key = None
-            self.client.auth_token = token
 
     @property
     def name(self) -> str:
@@ -229,338 +266,63 @@ class AnthropicProvider(BaseProvider):
         target = model or getattr(self, "_current_model", None)
         return lookup(ANTHROPIC, target, ANTHROPIC_DEFAULT)
 
-    async def chat(
+    def _build_request_params(
         self,
         messages: List[Message],
         *,
         model: str,
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
+        temperature: float,
+        max_tokens: int,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> CompletionResponse:
-        """Send chat completion request to Anthropic.
+    ) -> Dict[str, Any]:
+        """Build the Messages API request params shared by ``chat()`` and ``stream()``.
 
-        Args:
-            messages: Conversation messages
-            model: Model name (e.g., "claude-sonnet-4-5", "claude-3-opus")
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            tools: Available tools
-            **kwargs: Additional Anthropic parameters
-
-        Returns:
-            CompletionResponse with generated content
-
-        Raises:
-            ProviderAuthError: If authentication fails
-            ProviderRateLimitError: If rate limit is exceeded
-            ProviderError: For other errors
+        Single source of truth for prompt assembly (deduped from the former inline
+        blocks in both call sites): system message extraction with ``cache_control``,
+        message serialization (including image content blocks), and tool conversion
+        with the cache boundary placed at the stable/dynamic tier edge — tools are
+        sorted FULL -> COMPACT -> STUB; caching the FULL+COMPACT prefix means STUB
+        tools can change per-turn without invalidating the cached prefix.
         """
-        await self._ensure_valid_token()
-        # Use structured logging context manager
-        with self._provider_logger.log_api_call(
-            endpoint="/messages/create",
-            model=model,
-            operation="chat",
-            num_messages=len(messages),
-            has_tools=tools is not None,
-        ) as log_success:
-            try:
-                # Separate system messages from conversation
-                system_message = None
-                conversation_messages = []
+        system_message = None
+        conversation_messages = []
 
-                for msg in messages:
-                    if msg.role == "system":
-                        system_message = msg.content
-                    else:
-                        conversation_messages.append(self._serialize_message(msg))
+        for msg in messages:
+            if msg.role == "system":
+                system_message = msg.content
+            else:
+                conversation_messages.append(self._serialize_message(msg))
 
-                # Build request parameters
-                request_params = {
-                    "model": model,
-                    "messages": conversation_messages,
-                    "max_tokens": max_tokens,
-                    "temperature": temperature,
-                    **kwargs,
+        request_params: Dict[str, Any] = {
+            "model": model,
+            "messages": conversation_messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            **kwargs,
+        }
+
+        if system_message:
+            # Content block format with cache_control for prefix caching. Anthropic
+            # caches the prefix (tools -> system -> messages) at 90% discount; the
+            # ephemeral TTL (5 min) refreshes on each use.
+            request_params["system"] = [
+                {
+                    "type": "text",
+                    "text": system_message,
+                    "cache_control": {"type": "ephemeral"},
                 }
+            ]
 
-                if system_message:
-                    request_params["system"] = [
-                        {
-                            "type": "text",
-                            "text": system_message,
-                            "cache_control": {"type": "ephemeral"},
-                        }
-                    ]
+        if tools:
+            converted = self._convert_tools(tools)
+            if converted:
+                cache_idx = self._find_cache_boundary(tools, converted)
+                if 0 <= cache_idx < len(converted):
+                    converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
+            request_params["tools"] = converted
 
-                if tools:
-                    converted = self._convert_tools(tools)
-                    if converted:
-                        # Place cache_control at the stable/dynamic tier boundary.
-                        # Tools are sorted FULL -> COMPACT -> STUB; caching the
-                        # FULL+COMPACT prefix means STUB tools can change per-turn
-                        # without invalidating the cached prefix.
-                        cache_idx = self._find_cache_boundary(tools, converted)
-                        if 0 <= cache_idx < len(converted):
-                            converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
-                    request_params["tools"] = converted
-                response: AnthropicMessage = await self._execute_with_circuit_breaker(
-                    self.client.messages.create, **request_params
-                )
-
-                parsed = self._parse_response(response, model)
-
-                # Log success with usage info via context manager callback
-                tokens = parsed.usage.get("total_tokens") if parsed.usage else None
-                log_success(tokens=tokens)
-
-                return parsed
-
-            except Exception as e:
-                # Convert to specific provider error types based on error message
-                # Skip if already a ProviderError to avoid double-wrapping
-                if isinstance(e, ProviderError):
-                    raise
-
-                error_str = str(e).lower()
-                if any(
-                    term in error_str for term in ["auth", "unauthorized", "invalid key", "401"]
-                ):
-                    raise ProviderAuthError(
-                        message=f"Authentication failed: {str(e)}",
-                        provider=self.name,
-                    ) from e
-                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
-                    raise ProviderRateLimitError(
-                        message=f"Rate limit exceeded: {str(e)}",
-                        provider=self.name,
-                        status_code=429,
-                    ) from e
-                else:
-                    # Wrap generic errors in ProviderError
-                    raise ProviderError(
-                        message=f"Anthropic API error: {str(e)}",
-                        provider=self.name,
-                        raw_error=e,
-                    ) from e
-
-    async def stream(
-        self,
-        messages: List[Message],
-        *,
-        model: str,
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
-        **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
-        """Stream chat completion from Anthropic with tool-use support."""
-        import time as _time
-
-        await self._ensure_valid_token()
-        stream_start_time = _time.time()
-        call_id = f"stream_{model}_{int(stream_start_time * 1000)}"
-        self._provider_logger.logger.info(
-            f"API_CALL_START provider=anthropic model={model} operation=stream",
-            extra={
-                "event": "API_CALL_START",
-                "call_id": call_id,
-                "provider": "anthropic",
-                "model": model,
-                "operation": "stream",
-                "endpoint": "/messages/create",
-                "num_messages": len(messages),
-                "has_tools": tools is not None,
-            },
-        )
-
-        try:
-            # Separate system messages
-            system_message = None
-            conversation_messages = []
-
-            for msg in messages:
-                if msg.role == "system":
-                    system_message = msg.content
-                else:
-                    conversation_messages.append(
-                        {
-                            "role": msg.role,
-                            "content": msg.content,
-                        }
-                    )
-
-            # Build request parameters
-            request_params = {
-                "model": model,
-                "messages": conversation_messages,
-                "max_tokens": max_tokens,
-                "temperature": temperature,
-                **kwargs,
-            }
-
-            if system_message:
-                # Use content block format with cache_control for prefix caching.
-                # Anthropic caches the prefix (tools → system → messages) at 90%
-                # discount. The ephemeral TTL (5 min) refreshes on each use.
-                request_params["system"] = [
-                    {
-                        "type": "text",
-                        "text": system_message,
-                        "cache_control": {"type": "ephemeral"},
-                    }
-                ]
-
-            if tools:
-                converted = self._convert_tools(tools)
-                if converted:
-                    cache_idx = self._find_cache_boundary(tools, converted)
-                    if 0 <= cache_idx < len(converted):
-                        converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
-                request_params["tools"] = converted
-
-            tool_calls: Dict[str, Dict[str, Any]] = {}
-            block_index_to_id: Dict[int, str] = {}
-            usage: Optional[Dict[str, int]] = None
-
-            async with self.client.messages.stream(**request_params) as stream:
-                async for event in stream:
-                    event_type = getattr(event, "type", "")
-
-                    if event_type == "message_start":
-                        # Capture initial usage from message_start (input tokens)
-                        message = getattr(event, "message", None)
-                        if message:
-                            msg_usage = getattr(message, "usage", None)
-                            if msg_usage:
-                                usage = {
-                                    "prompt_tokens": getattr(msg_usage, "input_tokens", 0),
-                                    "completion_tokens": 0,
-                                    "total_tokens": getattr(msg_usage, "input_tokens", 0),
-                                }
-                                # Capture cache tokens if present
-                                cache_creation = getattr(
-                                    msg_usage, "cache_creation_input_tokens", None
-                                )
-                                cache_read = getattr(msg_usage, "cache_read_input_tokens", None)
-                                if cache_creation is not None:
-                                    usage["cache_creation_input_tokens"] = cache_creation
-                                if cache_read is not None:
-                                    usage["cache_read_input_tokens"] = cache_read
-
-                    elif event_type == "content_block_start":
-                        block = getattr(event, "content_block", None)
-                        block_type = getattr(block, "type", "") if block else ""
-                        if block_type == "tool_use":
-                            tc_id = getattr(block, "id", None) or f"tool_{len(tool_calls) + 1}"
-                            tool_calls[tc_id] = {
-                                "id": tc_id,
-                                "name": getattr(block, "name", ""),
-                                "arguments": getattr(block, "input", {}) or {},
-                            }
-                            block_index = getattr(
-                                event,
-                                "index",
-                                getattr(block, "index", len(block_index_to_id)),
-                            )
-                            block_index_to_id[block_index] = tc_id
-                        elif block_type == "thinking":
-                            # Claude extended thinking block — track index
-                            block_index = getattr(
-                                event,
-                                "index",
-                                getattr(block, "index", -1),
-                            )
-                            block_index_to_id[block_index] = "__thinking__"
-
-                    elif event_type == "content_block_delta":
-                        delta = getattr(event, "delta", None)
-                        delta_type = getattr(delta, "type", "")
-                        block_index = getattr(
-                            event, "index", getattr(event, "content_block_index", None)
-                        )
-                        if delta_type == "thinking_delta":
-                            # Claude extended thinking — stream as metadata
-                            thinking_text = getattr(delta, "thinking", "")
-                            if thinking_text:
-                                yield StreamChunk(
-                                    content="",
-                                    is_final=False,
-                                    metadata={"reasoning_content": thinking_text},
-                                )
-                        elif delta_type == "text_delta" and hasattr(delta, "text"):
-                            yield StreamChunk(content=delta.text or "", is_final=False)
-                        elif delta_type in {"input_json_delta", "input_delta"}:
-                            tc_id = block_index_to_id.get(block_index)
-                            if tc_id:
-                                partial = (
-                                    getattr(delta, "partial_json", None)
-                                    or getattr(delta, "text", "")
-                                    or ""
-                                )
-                                existing_args = tool_calls[tc_id].get("arguments", "")
-                                if existing_args in ({}, None):
-                                    tool_calls[tc_id]["arguments"] = partial
-                                elif isinstance(existing_args, str):
-                                    tool_calls[tc_id]["arguments"] = existing_args + partial
-                                else:
-                                    tool_calls[tc_id]["arguments"] = (
-                                        json_dumps(existing_args) + partial
-                                    )
-
-                    elif event_type == "content_block_stop":
-                        block_index = getattr(
-                            event, "index", getattr(event, "content_block_index", None)
-                        )
-                        tc_id = block_index_to_id.get(block_index)
-                        if tc_id and "arguments" in tool_calls.get(tc_id, {}):
-                            tool_calls[tc_id]["arguments"] = self._parse_json_arguments(
-                                tool_calls[tc_id].get("arguments")
-                            )
-
-                    elif event_type == "message_delta":
-                        # Capture output tokens from message_delta
-                        msg_usage = getattr(event, "usage", None)
-                        if msg_usage:
-                            output_tokens = getattr(msg_usage, "output_tokens", 0)
-                            if usage:
-                                usage["completion_tokens"] = output_tokens
-                                usage["total_tokens"] = (
-                                    usage.get("prompt_tokens", 0) + output_tokens
-                                )
-                            else:
-                                usage = {
-                                    "prompt_tokens": 0,
-                                    "completion_tokens": output_tokens,
-                                    "total_tokens": output_tokens,
-                                }
-
-                    elif event_type == "message_stop":
-                        for tc in tool_calls.values():
-                            tc["arguments"] = self._parse_json_arguments(tc.get("arguments"))
-
-                        # Log streaming success
-                        total_tokens = usage.get("total_tokens") if usage else None
-                        self._provider_logger._log_api_call_success(
-                            call_id=call_id,
-                            endpoint="/messages/create",
-                            model=model,
-                            start_time=stream_start_time,
-                            tokens=total_tokens,
-                        )
-
-                        yield StreamChunk(
-                            content="",
-                            tool_calls=list(tool_calls.values()) or None,
-                            stop_reason="stop",
-                            is_final=True,
-                            usage=usage,
-                        )
-
-        except Exception as e:
-            raise self._handle_error(e)
+        return request_params
 
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
         """Convert standard tools to Anthropic format."""
@@ -585,159 +347,113 @@ class AnthropicProvider(BaseProvider):
                 break
         return last_stable
 
-    def _parse_response(self, response: AnthropicMessage, model: str) -> CompletionResponse:
-        """Parse Anthropic API response.
-
-        Args:
-            response: Raw Anthropic response
-            model: Model name
-
-        Returns:
-            Normalized CompletionResponse
-        """
-        # Extract text content, tool calls, and thinking blocks
-        content = ""
-        tool_calls = []
-        thinking_content = ""
-
-        for block in response.content:
-            if block.type == "text":
-                content += block.text
-            elif block.type == "thinking":
-                # Claude extended thinking block — extract reasoning content
-                thinking_content += getattr(block, "thinking", "")
-            elif block.type == "tool_use":
-                tool_calls.append(
-                    {
-                        "id": block.id,
-                        "name": block.name,
-                        "arguments": block.input,
-                    }
-                )
-
-        # Parse usage
-        usage = None
-        if response.usage:
-            usage = {
-                "prompt_tokens": response.usage.input_tokens,
-                "completion_tokens": response.usage.output_tokens,
-                "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
-            }
-
-        # Include thinking content in metadata for downstream rendering
-        metadata = None
-        if thinking_content:
-            metadata = {"reasoning_content": thinking_content}
-
-        return CompletionResponse(
-            content=content,
-            role="assistant",
-            tool_calls=tool_calls if tool_calls else None,
-            stop_reason=response.stop_reason,
-            usage=usage,
-            model=model,
-            metadata=metadata,
-            raw_response=(response.model_dump() if hasattr(response, "model_dump") else None),
-        )
-
-    @staticmethod
-    def _parse_json_arguments(raw_args: Any) -> Any:
-        """Best-effort parse of tool-use arguments."""
-        if raw_args is None:
-            return {}
-        if isinstance(raw_args, dict):
-            return raw_args
-        if isinstance(raw_args, str):
-            try:
-                return json_loads(raw_args)
-            except Exception:
-                return raw_args
-        return raw_args
-
-    def _handle_error(self, error: Exception) -> ProviderError:
-        """Handle and convert API errors.
-
-        Args:
-            error: Original exception
-
-        Returns:
-            ProviderError with details
-
-        Raises:
-            ProviderError: Always raises after converting
-        """
-        error_msg = str(error)
-
-        if "authentication" in error_msg.lower() or "api_key" in error_msg.lower():
-            raise ProviderAuthError(
-                message=f"Authentication failed: {error_msg}",
-                provider=self.name,
-                raw_error=error,
-            )
-        elif "rate_limit" in error_msg.lower() or "429" in error_msg:
-            raise ProviderRateLimitError(
-                message=f"Rate limit exceeded: {error_msg}",
-                provider=self.name,
-                status_code=429,
-                raw_error=error,
-            )
-        else:
-            raise ProviderError(
-                message=f"Anthropic API error: {error_msg}",
-                provider=self.name,
-                raw_error=error,
-            )
-
     async def list_models(self) -> List[Dict[str, Any]]:
         """List available Anthropic Claude models.
 
-        Returns a curated list of currently available Claude models.
-        Note: Anthropic doesn't have a public models endpoint, so this returns
-        a static list of known available models.
+        Resolution order -- Sandhi owns the catalog **data** (TD-0004 Phase A); Victor
+        owns the catalog **policy** (shaping the facts for its consumers):
+
+        1. **Sandhi catalog** -- curated, versioned model data from
+           ``sandhi_gateway.provider_models_json``, when the installed binding exposes it.
+        2. **Live SDK discovery** -- the Anthropic SDK's ``/v1/models`` endpoint
+           (enrichment/fallback when the Sandhi catalog is absent).
+        3. **Curated static list** (``_ANTHROPIC_STATIC_MODELS``) -- offline fallback.
+
+        Transport (``chat``/``stream``) stays Sandhi-owned; any SDK client here is
+        discovery-only (transient), so the provider owns no generation client (TD-0002
+        deletion gate holds).
 
         Returns:
             List of available models with metadata
         """
-        # Anthropic doesn't provide a public API for listing models
-        # Return the known Claude models with their metadata
-        return [
-            {
-                "id": "claude-opus-4-5-20251101",
-                "name": "Claude Opus 4.5",
-                "description": "Most capable model for complex tasks",
-                "context_window": 200000,
-                "max_output_tokens": 32768,
-            },
-            {
-                "id": "claude-sonnet-4-20250514",
-                "name": "Claude Sonnet 4",
-                "description": "Balanced performance and cost",
-                "context_window": 200000,
-                "max_output_tokens": 64000,
-            },
-            {
-                "id": "claude-3-5-sonnet-20241022",
-                "name": "Claude 3.5 Sonnet",
-                "description": "Fast and efficient for everyday tasks",
-                "context_window": 200000,
-                "max_output_tokens": 8192,
-            },
-            {
-                "id": "claude-3-5-haiku-20241022",
-                "name": "Claude 3.5 Haiku",
-                "description": "Fastest model for quick responses",
-                "context_window": 200000,
-                "max_output_tokens": 8192,
-            },
-            {
-                "id": "claude-3-opus-20240229",
-                "name": "Claude 3 Opus",
-                "description": "Previous generation flagship model",
-                "context_window": 200000,
-                "max_output_tokens": 4096,
-            },
-        ]
+        catalog = self._models_from_sandhi()
+        if catalog is not None:
+            return catalog
+        try:
+            await self._ensure_valid_token()
+            # Lazy import: keeps `import victor` (and CLI cold-start) off the
+            # anthropic SDK; it is only needed for the fallback discovery path.
+            from anthropic import AsyncAnthropic
+
+            async with AsyncAnthropic(
+                api_key=None if self._auth_mode == "oauth" else self._api_key,
+                auth_token=self._api_key if self._auth_mode == "oauth" else None,
+                base_url=getattr(self, "base_url", None),
+                timeout=getattr(self, "timeout", self.DEFAULT_TIMEOUT),
+            ) as client:
+                page = await client.models.list()
+                return [self._model_from_sdk(m) for m in (getattr(page, "data", None) or [])]
+        except Exception as exc:  # offline, auth failure, missing SDK, or bad response
+            logger.debug("anthropic live model discovery unavailable; using static list: %s", exc)
+            return [dict(model) for model in _ANTHROPIC_STATIC_MODELS]
+
+    def _models_from_sandhi(self) -> Optional[List[Dict[str, Any]]]:
+        """Victor-shaped models from the Sandhi catalog, or ``None`` to fall back.
+
+        The Sandhi catalog (TD-0004) carries curated model *facts* (id, context window,
+        max output, capabilities). Victor applies catalog *policy* (shared shaping in
+        ``victor.providers.sandhi_catalog``). Returns ``None`` when the installed Sandhi
+        binding predates the catalog surface, so ``list_models`` falls through to live
+        SDK discovery / the static list.
+        """
+        from victor.providers.sandhi_catalog import models_from_sandhi
+
+        return models_from_sandhi(self.name)
+
+    @staticmethod
+    def _model_from_sdk(model: Any) -> Dict[str, Any]:
+        """Map an Anthropic SDK ``ModelInfo`` to Victor's model-dict shape.
+
+        ``getattr`` fallbacks keep this robust to SDK version drift; ``id`` is
+        the only required field on the live ``/v1/models`` response.
+        """
+        return {
+            "id": model.id,
+            "name": getattr(model, "display_name", None) or model.id,
+            "type": getattr(model, "type", "model"),
+            "context_window": getattr(model, "max_input_tokens", None),
+            "max_output_tokens": getattr(model, "max_tokens", None),
+        }
+
+    async def chat(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> CompletionResponse:
+        """Chat transport is owned by the Sandhi typed variant.
+
+        This policy shell stays concrete for auth/capability use; completion
+        transport is delegated to the Sandhi runtime. Obtain the typed provider
+        via ``resolve_transport_class()`` (e.g. ``SandhiAnthropicProvider``).
+        """
+        raise NotImplementedError(
+            f"{self.name} chat() is owned by the Sandhi typed variant; "
+            "use resolve_transport_class() to obtain the typed provider."
+        )
+
+    async def stream(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]:
+        """Stream transport is owned by the Sandhi typed variant (see ``chat``)."""
+        if False:  # pragma: no cover - async-generator marker for typing
+            yield StreamChunk()
+        raise NotImplementedError(
+            f"{self.name} stream() is owned by the Sandhi typed variant; "
+            "use resolve_transport_class() to obtain the typed provider."
+        )
 
     async def close(self) -> None:
-        """Close HTTP client."""
-        await self.client.close()
+        """No provider client to close; transport is owned by the Sandhi handle."""
+        pass
