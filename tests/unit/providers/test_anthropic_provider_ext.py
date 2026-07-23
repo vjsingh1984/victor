@@ -17,6 +17,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 from victor.providers.anthropic_provider import AnthropicProvider
 from victor.providers.base import (
@@ -142,3 +143,55 @@ async def test_close_is_safe_without_generation_client(anthropic_provider):
     # so close() is a safe no-op rather than a client.teardown.
     assert not hasattr(anthropic_provider, "client")
     await anthropic_provider.close()  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_list_models_uses_live_sdk_discovery():
+    """list_models() queries the anthropic SDK /v1/models when reachable.
+
+    The SDK client is discovery-only (transient); transport stays Sandhi-owned.
+    """
+    provider = AnthropicProvider(api_key="test-key")
+    fake_model = SimpleNamespace(
+        id="claude-future-9",
+        display_name="Claude Future 9",
+        type="model",
+        max_input_tokens=2_000_000,
+        max_tokens=200_000,
+    )
+    fake_client = MagicMock()
+    fake_client.__aenter__ = AsyncMock(return_value=fake_client)
+    fake_client.__aexit__ = AsyncMock(return_value=False)
+    fake_client.models.list = AsyncMock(return_value=SimpleNamespace(data=[fake_model]))
+
+    with patch("anthropic.AsyncAnthropic", return_value=fake_client) as mock_ctor:
+        models = await provider.list_models()
+
+    mock_ctor.assert_called_once()
+    assert models == [
+        {
+            "id": "claude-future-9",
+            "name": "Claude Future 9",
+            "type": "model",
+            "context_window": 2_000_000,
+            "max_output_tokens": 200_000,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_list_models_falls_back_to_current_static_list():
+    """On discovery failure, list_models() returns the curated static fallback."""
+    provider = AnthropicProvider(api_key="test-key")
+    with patch("anthropic.AsyncAnthropic", side_effect=RuntimeError("offline")):
+        models = await provider.list_models()
+
+    ids = [m["id"] for m in models]
+    # Current Claude lineup (web-sourced 2026-07): live discovery down -> static.
+    assert "claude-fable-5" in ids
+    assert "claude-opus-4-8" in ids
+    assert "claude-sonnet-5" in ids
+    assert "claude-haiku-4-5-20251001" in ids
+    # Retired/ancient models must not be advertised in the fallback.
+    assert "claude-sonnet-4-20250514" not in ids
+    assert "claude-3-5-sonnet-20241022" not in ids

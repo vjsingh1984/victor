@@ -14,6 +14,7 @@
 
 """Anthropic Claude provider implementation."""
 
+import logging
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from victor.providers.base import (
@@ -31,6 +32,51 @@ from victor.providers.resolution import (
 )
 from victor.providers.logging import ProviderLogger
 from victor.providers.oauth_manager import OAuthTokenManager
+
+logger = logging.getLogger(__name__)
+
+# Curated fallback used when live ``/v1/models`` discovery is unavailable
+# (offline, auth failure, or the anthropic SDK absent). Context-window facts
+# are otherwise resolved via ``context_windows.lookup``; this only enumerates
+# the known model ids and human-readable names. Sourced from Anthropic's
+# Models overview (platform.claude.com), current as of 2026-07.
+_ANTHROPIC_STATIC_MODELS: List[Dict[str, Any]] = [
+    {
+        "id": "claude-fable-5",
+        "name": "Claude Fable 5",
+        "description": "Frontier flagship (Mythos-class) for the hardest long-horizon agentic work",
+        "context_window": 1_000_000,
+        "max_output_tokens": 131_072,
+    },
+    {
+        "id": "claude-opus-4-8",
+        "name": "Claude Opus 4.8",
+        "description": "Most capable model for complex reasoning and agentic coding",
+        "context_window": 1_000_000,
+        "max_output_tokens": 131_072,
+    },
+    {
+        "id": "claude-sonnet-5",
+        "name": "Claude Sonnet 5",
+        "description": "Default model; best combination of speed and intelligence",
+        "context_window": 1_000_000,
+        "max_output_tokens": 131_072,
+    },
+    {
+        "id": "claude-sonnet-4-6",
+        "name": "Claude Sonnet 4.6",
+        "description": "Previous-generation balanced model",
+        "context_window": 1_000_000,
+        "max_output_tokens": 65_536,
+    },
+    {
+        "id": "claude-haiku-4-5-20251001",
+        "name": "Claude Haiku 4.5",
+        "description": "Fastest model with near-frontier intelligence",
+        "context_window": 200_000,
+        "max_output_tokens": 65_536,
+    },
+]
 
 
 class AnthropicProvider(BaseProvider):
@@ -301,56 +347,53 @@ class AnthropicProvider(BaseProvider):
                 break
         return last_stable
 
-    @staticmethod
     async def list_models(self) -> List[Dict[str, Any]]:
         """List available Anthropic Claude models.
 
-        Returns a curated list of currently available Claude models.
-        Note: Anthropic doesn't have a public models endpoint, so this returns
-        a static list of known available models.
+        Uses the Anthropic SDK's live ``/v1/models`` endpoint when reachable,
+        falling back to a curated static list (``_ANTHROPIC_STATIC_MODELS``) on
+        any failure -- network error, auth failure, or the SDK being absent.
+        Transport (``chat``/``stream``) stays Sandhi-owned; the SDK client here
+        is **discovery-only** (transient), so the provider owns no generation
+        client (the TD-0002 deletion gate still holds -- parity with how
+        ``OpenAIProvider`` keeps an SDK client for ``models.list()`` while
+        completion transport is delegated to Sandhi).
 
         Returns:
             List of available models with metadata
         """
-        # Anthropic doesn't provide a public API for listing models
-        # Return the known Claude models with their metadata
-        return [
-            {
-                "id": "claude-opus-4-5-20251101",
-                "name": "Claude Opus 4.5",
-                "description": "Most capable model for complex tasks",
-                "context_window": 200000,
-                "max_output_tokens": 32768,
-            },
-            {
-                "id": "claude-sonnet-4-20250514",
-                "name": "Claude Sonnet 4",
-                "description": "Balanced performance and cost",
-                "context_window": 200000,
-                "max_output_tokens": 64000,
-            },
-            {
-                "id": "claude-3-5-sonnet-20241022",
-                "name": "Claude 3.5 Sonnet",
-                "description": "Fast and efficient for everyday tasks",
-                "context_window": 200000,
-                "max_output_tokens": 8192,
-            },
-            {
-                "id": "claude-3-5-haiku-20241022",
-                "name": "Claude 3.5 Haiku",
-                "description": "Fastest model for quick responses",
-                "context_window": 200000,
-                "max_output_tokens": 8192,
-            },
-            {
-                "id": "claude-3-opus-20240229",
-                "name": "Claude 3 Opus",
-                "description": "Previous generation flagship model",
-                "context_window": 200000,
-                "max_output_tokens": 4096,
-            },
-        ]
+        try:
+            await self._ensure_valid_token()
+            # Lazy import: keeps `import victor` (and CLI cold-start) off the
+            # anthropic SDK; it is only needed for discovery.
+            from anthropic import AsyncAnthropic
+
+            async with AsyncAnthropic(
+                api_key=None if self._auth_mode == "oauth" else self._api_key,
+                auth_token=self._api_key if self._auth_mode == "oauth" else None,
+                base_url=getattr(self, "base_url", None),
+                timeout=getattr(self, "timeout", self.DEFAULT_TIMEOUT),
+            ) as client:
+                page = await client.models.list()
+                return [self._model_from_sdk(m) for m in (getattr(page, "data", None) or [])]
+        except Exception as exc:  # offline, auth failure, missing SDK, or bad response
+            logger.debug("anthropic live model discovery unavailable; using static list: %s", exc)
+            return [dict(model) for model in _ANTHROPIC_STATIC_MODELS]
+
+    @staticmethod
+    def _model_from_sdk(model: Any) -> Dict[str, Any]:
+        """Map an Anthropic SDK ``ModelInfo`` to Victor's model-dict shape.
+
+        ``getattr`` fallbacks keep this robust to SDK version drift; ``id`` is
+        the only required field on the live ``/v1/models`` response.
+        """
+        return {
+            "id": model.id,
+            "name": getattr(model, "display_name", None) or model.id,
+            "type": getattr(model, "type", "model"),
+            "context_window": getattr(model, "max_input_tokens", None),
+            "max_output_tokens": getattr(model, "max_tokens", None),
+        }
 
     async def chat(
         self,
