@@ -31,8 +31,12 @@ from typing import Optional
 # (longer/more-specific prefixes first).
 
 ANTHROPIC: list[tuple[str, int]] = [
-    ("claude-opus-4-7", 200_000),
-    ("claude-sonnet-4-6", 200_000),
+    # Claude 5 family / 4.8: 1M-token context (current as of 2026-07).
+    ("claude-fable-5", 1_000_000),
+    ("claude-opus-4-8", 1_000_000),
+    ("claude-opus-4-7", 1_000_000),
+    ("claude-sonnet-5", 1_000_000),
+    ("claude-sonnet-4-6", 1_000_000),
     ("claude-sonnet-4-5", 200_000),
     ("claude-haiku-4-5", 200_000),
     ("claude-3-5-sonnet", 200_000),
