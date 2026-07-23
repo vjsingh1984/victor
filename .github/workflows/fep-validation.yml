@@ -31,7 +31,6 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install Victor with dependencies
         run: |

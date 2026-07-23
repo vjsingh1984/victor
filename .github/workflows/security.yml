@@ -119,7 +119,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install package for audit
         run: |

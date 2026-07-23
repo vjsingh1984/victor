@@ -95,7 +95,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pytest-
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies
         run: |
@@ -247,7 +246,6 @@ jobs:
             ${{ runner.os }}-pip-smoke-
             ${{ runner.os }}-pip-
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install Victor
         run: |
