@@ -312,6 +312,31 @@ class SandhiTypedProviderMixin:
         except (TypeError, ValueError):
             return 120.0
 
+    def _gateway_overrides(self) -> Optional[Tuple[str, str]]:
+        """Return ``(proxy_url, virtual_key)`` when gateway mode is configured.
+
+        Gateway mode (TD-0003 P3) points the Sandhi FFI handle at the Sandhi proxy:
+        the proxy URL becomes the handle ``base_url`` and the virtual key becomes
+        both the presented credential and a ``bearer`` auth_scheme, so traffic is
+        centrally attributed and budget-enforced. The provider slug is preserved so
+        the proxy still speaks the right dialect and routes to the vault-resolved
+        upstream. Returns ``None`` in direct mode (the default).
+        """
+        raw = getattr(self, "extra_config", None)
+        if not isinstance(raw, dict):
+            return None
+        gateway = raw.get("gateway")
+        if not isinstance(gateway, dict):
+            return None
+        url = str(gateway.get("url") or "").strip()
+        if not url:
+            return None
+        virtual_key = gateway.get("virtual_key")
+        # Duck-type SecretStr without importing pydantic into the transport layer.
+        if hasattr(virtual_key, "get_secret_value"):
+            virtual_key = virtual_key.get_secret_value()
+        return (url, str(virtual_key or ""))
+
     def _typed_provider(self, model: str) -> Any:
         if not sandhi_transport_available():
             raise ProviderConnectionError(
@@ -323,20 +348,38 @@ class SandhiTypedProviderMixin:
         if self._sandhi_typed_providers is None:
             self._sandhi_typed_providers = {}
         slug = self._sandhi_slug()
-        base_url = str(getattr(self, "base_url", "") or "")
-        # A catalog default is not an override. Omitting it lets Sandhi apply authoritative
-        # model-specific routing (notably Moonshot K3's .ai endpoint). Only a genuinely custom
-        # endpoint crosses the FFI.
-        try:
-            catalog_base = str(_sg.provider_spec(slug).get("base_url") or "")
-        except Exception:
-            catalog_base = ""
-        explicit_base_url = (
-            base_url if base_url and base_url.rstrip("/") != catalog_base.rstrip("/") else ""
-        )
-        api_key = str(getattr(self, "_api_key", None) or getattr(self, "api_key", "") or "")
-        auth_scheme = str(getattr(self, "_sandhi_auth_scheme", "") or "")
         protocol = str(getattr(self, "_sandhi_protocol", "") or "")
+        gateway = self._gateway_overrides()
+        if gateway is not None:
+            # Gateway mode (TD-0003 P3): the FFI handle targets the Sandhi proxy with
+            # the virtual key presented as a bearer token. The slug is preserved so the
+            # proxy still speaks the right dialect; no raw HTTP/SSE transport is used.
+            proxy_url, virtual_key = gateway
+            if not virtual_key:
+                raise ProviderConnectionError(
+                    f"sandhi gateway mode for provider {slug!r} requires a non-empty "
+                    "virtual_key (set providers.<name>.gateway.virtual_key or the "
+                    "SANDHI_GATEWAY_VIRTUAL_KEY env var)",
+                    provider=slug,
+                )
+            base_url = proxy_url
+            api_key = virtual_key
+            auth_scheme = "bearer"
+            explicit_base_url = proxy_url
+        else:
+            base_url = str(getattr(self, "base_url", "") or "")
+            # A catalog default is not an override. Omitting it lets Sandhi apply authoritative
+            # model-specific routing (notably Moonshot K3's .ai endpoint). Only a genuinely custom
+            # endpoint crosses the FFI.
+            try:
+                catalog_base = str(_sg.provider_spec(slug).get("base_url") or "")
+            except Exception:
+                catalog_base = ""
+            explicit_base_url = (
+                base_url if base_url and base_url.rstrip("/") != catalog_base.rstrip("/") else ""
+            )
+            api_key = str(getattr(self, "_api_key", None) or getattr(self, "api_key", "") or "")
+            auth_scheme = str(getattr(self, "_sandhi_auth_scheme", "") or "")
         cache_key = (slug, model, explicit_base_url, api_key, auth_scheme, protocol)
         if cache_key not in self._sandhi_typed_providers:
             kwargs: Dict[str, Any] = {
