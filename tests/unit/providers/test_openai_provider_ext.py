@@ -111,3 +111,70 @@ async def test_supports_reasoning_effort(openai_provider):
     assert openai_provider.supports_reasoning_effort("gpt-5.1") is True
     assert openai_provider.supports_reasoning_effort("gpt-4o") is False
     assert openai_provider.supports_reasoning_effort(None) is False
+
+
+@pytest.mark.asyncio
+async def test_list_models_uses_sandhi_catalog(monkeypatch, openai_provider):
+    """When the Sandhi catalog is available, list_models() uses it (Victor shapes the facts)."""
+    monkeypatch.setattr(
+        openai_provider,
+        "_models_from_sandhi",
+        lambda: [
+            {
+                "id": "gpt-5",
+                "name": "GPT-5",
+                "context_window": 400_000,
+                "max_output_tokens": 128_000,
+            }
+        ],
+    )
+    # The SDK must NOT be consulted when the catalog is present.
+    openai_provider.client.models.list = AsyncMock(
+        side_effect=AssertionError("SDK unused when catalog present")
+    )
+
+    models = await openai_provider.list_models()
+
+    assert models == [
+        {
+            "id": "gpt-5",
+            "name": "GPT-5",
+            "context_window": 400_000,
+            "max_output_tokens": 128_000,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_list_models_falls_back_to_sdk_when_catalog_absent(monkeypatch, openai_provider):
+    """When the Sandhi catalog is unavailable, list_models() falls back to the live API list."""
+    monkeypatch.setattr(openai_provider, "_models_from_sandhi", lambda: None)
+    fake_models = [
+        MagicMock(id="gpt-4o", owned_by="openai", created=1),
+        MagicMock(id="whisper-1", owned_by="openai", created=2),  # filtered: not chat-capable
+    ]
+    openai_provider.client.models.list = AsyncMock(return_value=MagicMock(data=fake_models))
+
+    models = await openai_provider.list_models()
+
+    assert [m["id"] for m in models] == ["gpt-4o"]
+
+
+@pytest.mark.asyncio
+async def test_models_from_sandhi_reads_real_catalog_when_available(openai_provider):
+    """Integration: the shared catalog reader returns the curated OpenAI lineup.
+
+    Skips cleanly when the installed Sandhi predates the catalog surface (TD-0004
+    Phase A), so it is not CI-flaky.
+    """
+    try:
+        import sandhi_gateway as sg
+    except Exception:  # pragma: no cover - sandhi absent
+        pytest.skip("sandhi-gateway not installed")
+    if not hasattr(sg, "provider_models_json"):
+        pytest.skip("installed sandhi predates the catalog surface (TD-0004 Phase A)")
+
+    models = openai_provider._models_from_sandhi()
+    assert models is not None
+    ids = [m["id"] for m in models]
+    assert "gpt-5" in ids

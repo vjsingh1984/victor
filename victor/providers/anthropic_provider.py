@@ -391,38 +391,14 @@ class AnthropicProvider(BaseProvider):
         """Victor-shaped models from the Sandhi catalog, or ``None`` to fall back.
 
         The Sandhi catalog (TD-0004) carries curated model *facts* (id, context window,
-        max output, capabilities). Victor applies catalog *policy* here -- shaping the
-        neutral descriptor into Victor's model-dict surface. Returns ``None`` when the
-        installed Sandhi binding predates the catalog surface, so ``list_models`` falls
-        through to live SDK discovery / the static list.
+        max output, capabilities). Victor applies catalog *policy* (shared shaping in
+        ``victor.providers.sandhi_catalog``). Returns ``None`` when the installed Sandhi
+        binding predates the catalog surface, so ``list_models`` falls through to live
+        SDK discovery / the static list.
         """
-        try:
-            import json
+        from victor.providers.sandhi_catalog import models_from_sandhi
 
-            import sandhi_gateway as sg  # lazy: only needed for discovery
-        except Exception:
-            return None
-        if not hasattr(sg, "provider_models_json"):
-            return None
-        try:
-            raw = json.loads(sg.provider_models_json(self.name))
-        except Exception as exc:  # unknown provider, deserialize error, FFI failure
-            logger.debug("sandhi catalog lookup failed for %s: %s", self.name, exc)
-            return None
-        models: List[Dict[str, Any]] = []
-        for entry in raw:
-            if not isinstance(entry, dict) or not entry.get("id"):
-                continue
-            extensions = entry.get("extensions") or {}
-            models.append(
-                {
-                    "id": entry["id"],
-                    "name": extensions.get("display_name") or entry["id"],
-                    "context_window": entry.get("max_input_tokens"),
-                    "max_output_tokens": entry.get("max_output_tokens"),
-                }
-            )
-        return models or None
+        return models_from_sandhi(self.name)
 
     @staticmethod
     def _model_from_sdk(model: Any) -> Dict[str, Any]:
