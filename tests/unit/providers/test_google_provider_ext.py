@@ -69,6 +69,27 @@ def test_initialization_resolves_api_key():
     assert provider._api_key == "test-key"
 
 
+def test_api_key_mode_keeps_x_goog_api_key_scheme(google_provider):
+    """API-key mode stays on the x-goog-api-key scheme (default)."""
+    assert google_provider._sandhi_auth_scheme == "api_key"
+
+
+def test_oauth_mode_routes_access_token_as_bearer_to_sandhi():
+    """OAuth/ADC: the access token (not an api_key placeholder) flows to Sandhi as bearer."""
+    pytest.importorskip("google.oauth2.credentials", reason="google-auth not installed")
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock, patch
+
+    tokens = SimpleNamespace(access_token="adc-token-123", refresh_token="rt", is_expired=False)
+    with patch("victor.providers.oauth_manager.OAuthTokenManager") as MockMgr:
+        MockMgr.return_value = MagicMock(_load_cached=MagicMock(return_value=None))
+        provider = GoogleProvider(auth_mode="oauth", oauth_tokens=tokens)
+
+    assert provider._sandhi_auth_scheme == "bearer"
+    # The real access token is what the typed Gemini handle sends as Authorization: Bearer.
+    assert provider._api_key == "adc-token-123"
+
+
 @pytest.mark.asyncio
 async def test_close_is_noop(google_provider):
     # Gemini client needs no explicit closing; close() must not raise.
