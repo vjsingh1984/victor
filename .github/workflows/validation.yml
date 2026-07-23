@@ -49,7 +49,6 @@ jobs:
             ${{ runner.os }}-pip-validation-
             ${{ runner.os }}-pip-
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install Victor
         run: |
@@ -118,7 +117,6 @@ jobs:
             ${{ runner.os }}-pip-validation-
             ${{ runner.os }}-pip-
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install Victor
         run: |

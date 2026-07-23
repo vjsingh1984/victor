@@ -154,7 +154,6 @@ jobs:
   imports:
     name: Import Check
     runs-on: ubuntu-latest
-    # Was 3; the install-sandhi source build (maturin/cargo) adds ~2m, which
     # pushed this job over the cap and got it cancelled mid-check.
     timeout-minutes: 8
     steps:
@@ -165,7 +164,6 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies
         run: |
@@ -185,7 +183,6 @@ jobs:
   imports-with-verticals:
     name: Import Check with Verticals
     runs-on: ubuntu-latest
-    # Was 5; bumped for the install-sandhi source-build overhead (~2m).
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
@@ -195,7 +192,6 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies with verticals
         run: |
@@ -294,7 +290,6 @@ jobs:
   strict-fallback-guards:
     name: Strict Fallback Guards
     runs-on: ubuntu-latest
-    # Was 4; bumped for the install-sandhi source-build overhead (~2m).
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
@@ -304,7 +299,6 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies
         run: |
@@ -329,7 +323,6 @@ jobs:
   definition-import-boundaries:
     name: Definition Import Boundaries
     runs-on: ubuntu-latest
-    # Was 4; the install-sandhi source build (~2m) pushed this past the cap
     # (observed 4m16s -> cancelled). Bumped to absorb the overhead.
     timeout-minutes: 8
     steps:
@@ -340,7 +333,6 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies
         run: |
@@ -485,7 +477,6 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies
         run: |
@@ -545,7 +536,6 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies
         run: |
@@ -579,7 +569,6 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies
         run: |

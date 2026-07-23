@@ -95,7 +95,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pytest-
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install dependencies
         run: |
@@ -226,7 +225,6 @@ jobs:
   smoke-test:
     name: CLI Smoke Test
     runs-on: ubuntu-latest
-    # Was 5; bumped for the install-sandhi source-build overhead (~2m).
     timeout-minutes: 10
     env:
       PYTHONPATH: ${{ github.workspace }}
@@ -247,7 +245,6 @@ jobs:
             ${{ runner.os }}-pip-smoke-
             ${{ runner.os }}-pip-
 
-      - uses: ./.github/actions/install-sandhi
 
       - name: Install Victor
         run: |
