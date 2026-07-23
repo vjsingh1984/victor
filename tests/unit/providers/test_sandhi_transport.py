@@ -326,3 +326,123 @@ def test_non_routine_usage_state_survives_victor_compatibility_mapping():
         st._usage_diagnostics({"attempts": 1, "completeness": "final", "outcome": "success"})
         is None
     )
+
+
+# =============================================================================
+# Gateway mode (TD-0003 P3) — point the FFI handle at the Sandhi proxy with a vk.
+# =============================================================================
+
+
+def make_gateway_provider() -> DeepSeekProvider:
+    return DeepSeekProvider(
+        api_key="real-upstream-key",
+        base_url="https://api.deepseek.com/v1",
+        gateway={"url": "http://localhost:8600", "virtual_key": "vk_test_123"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_gateway_mode_points_ffi_handle_at_proxy_with_virtual_key(monkeypatch):
+    runtime = install_runtime(monkeypatch)
+    provider = make_gateway_provider()
+
+    await provider.chat([Message(role="user", content="hi")], model="deepseek-chat")
+
+    args, kwargs = runtime.calls[0]
+    # The slug is preserved so the proxy still speaks the openai-compat dialect;
+    # the virtual key replaces the credential; the proxy URL replaces the endpoint.
+    assert args[:3] == ("deepseek", "deepseek-chat", "vk_test_123")
+    assert kwargs["base_url"] == "http://localhost:8600"
+    assert kwargs["auth_scheme"] == "bearer"
+
+
+@pytest.mark.asyncio
+async def test_gateway_mode_preserves_protocol_alongside_overrides(monkeypatch):
+    """A gateway-mode provider still selects its wire protocol (e.g. responses)."""
+    runtime = install_runtime(monkeypatch)
+    provider = make_gateway_provider()
+    # An OAuth/responses provider carries _sandhi_protocol; gateway mode must not drop it.
+    provider._sandhi_protocol = "chatgpt_responses"
+
+    await provider.chat([Message(role="user", content="hi")], model="deepseek-chat")
+
+    _, kwargs = runtime.calls[0]
+    assert kwargs["protocol"] == "chatgpt_responses"
+    assert kwargs["base_url"] == "http://localhost:8600"
+    assert kwargs["auth_scheme"] == "bearer"
+
+
+@pytest.mark.asyncio
+async def test_gateway_mode_reuses_handle_across_calls(monkeypatch):
+    runtime = install_runtime(monkeypatch)
+    provider = make_gateway_provider()
+
+    await provider.chat([Message(role="user", content="hi")], model="deepseek-chat")
+    await provider.chat([Message(role="user", content="again")], model="deepseek-chat")
+
+    # The gateway handle is cached just like a direct-mode handle (one FFI build).
+    assert len(runtime.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_gateway_mode_missing_virtual_key_fails_closed(monkeypatch):
+    install_runtime(monkeypatch)
+    monkeypatch.delenv("SANDHI_GATEWAY_VIRTUAL_KEY_DEEPSEEK", raising=False)
+    monkeypatch.delenv("SANDHI_GATEWAY_VIRTUAL_KEY", raising=False)
+    provider = DeepSeekProvider(
+        api_key="real-upstream-key",
+        base_url="https://api.deepseek.com/v1",
+        gateway={"url": "http://localhost:8600"},
+    )
+
+    with pytest.raises(ProviderConnectionError, match="virtual_key"):
+        await provider.chat([Message(role="user", content="hi")], model="deepseek-chat")
+
+
+@pytest.mark.asyncio
+async def test_direct_mode_is_unchanged_when_gateway_not_configured(monkeypatch):
+    """Regression: absent gateway leaves the provider in direct FFI mode."""
+    runtime = install_runtime(monkeypatch)
+    provider = DeepSeekProvider(api_key="k", base_url="https://api.deepseek.com/v1")
+
+    await provider.chat([Message(role="user", content="hi")], model="deepseek-chat")
+
+    args, kwargs = runtime.calls[0]
+    assert args[:3] == ("deepseek", "deepseek-chat", "k")
+    # No gateway override: auth_scheme is not forced to bearer.
+    assert kwargs.get("auth_scheme") in (None, "api_key", "")
+    assert kwargs["base_url"] == "https://api.deepseek.com/v1"
+
+
+def test_resolve_provider_gateway_normalizes_block_and_unwraps_secret():
+    from pydantic import SecretStr
+
+    from victor.config.provider_config_registry import resolve_provider_gateway
+
+    base: dict = {"gateway": {"url": "http://localhost:8600", "virtual_key": SecretStr("vk_s")}}
+    resolve_provider_gateway(base, "deepseek")
+    assert base["gateway"] == {"url": "http://localhost:8600", "virtual_key": "vk_s"}
+
+
+def test_resolve_provider_gateway_env_fallback_per_provider_then_global(monkeypatch):
+    from victor.config.provider_config_registry import resolve_provider_gateway
+
+    base: dict = {"gateway": {"url": "http://localhost:8600"}}
+    monkeypatch.setenv("SANDHI_GATEWAY_VIRTUAL_KEY_DEEPSEEK", "vk_per_provider")
+    monkeypatch.setenv("SANDHI_GATEWAY_VIRTUAL_KEY", "vk_global")
+    resolve_provider_gateway(base, "deepseek")
+    assert base["gateway"]["virtual_key"] == "vk_per_provider"
+
+    base = {"gateway": {"url": "http://localhost:8600"}}
+    monkeypatch.delenv("SANDHI_GATEWAY_VIRTUAL_KEY_DEEPSEEK", raising=False)
+    resolve_provider_gateway(base, "deepseek")
+    assert base["gateway"]["virtual_key"] == "vk_global"
+
+
+def test_resolve_provider_gateway_drops_block_without_url():
+    from victor.config.provider_config_registry import resolve_provider_gateway
+
+    base: dict = {"gateway": {"virtual_key": "vk_orphan"}, "api_key": "k"}
+    resolve_provider_gateway(base, "deepseek")
+    assert "gateway" not in base
+    assert base["api_key"] == "k"
