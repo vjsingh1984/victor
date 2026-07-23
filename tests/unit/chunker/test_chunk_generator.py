@@ -95,7 +95,7 @@ class TestToolRelatedChunks:
 
         # Verify delegation to streaming handler
         mock_streaming_handler.generate_tool_start_chunk.assert_called_once_with(
-            tool_name, tool_args, status_msg
+            tool_name, tool_args, status_msg, tool_call_id=None
         )
 
         # Verify chunk returned
