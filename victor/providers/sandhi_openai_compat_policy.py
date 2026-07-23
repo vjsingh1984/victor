@@ -195,11 +195,33 @@ class SandhiOpenAICompatPolicy(SandhiHttpxTransportMixin, HttpxOpenAICompatProvi
         return chunk
 
     async def list_models(self) -> List[Dict[str, Any]]:
-        """Return Victor's admitted model policy without bypassing Sandhi for I/O."""
+        """List models -- Sandhi catalog data first, Victor's admitted policy as fallback.
+
+        Resolution order (TD-0004 Phase A): the Sandhi catalog carries curated model
+        facts for first-party vendors (deepseek/xai/mistral/zai/qwen/...); aggregators
+        (openrouter/together/fireworks) deliberately have no catalog there, so they --
+        and any sandhi version predating the surface -- fall back to Victor's admitted
+        model policy. Neither tier performs I/O.
+        """
+        catalog = self._models_from_sandhi()
+        if catalog is not None:
+            return catalog
         return [
             {"id": model_id, **dict(model_info)}
             for model_id, model_info in self._spec.models.items()
         ]
+
+    def _models_from_sandhi(self) -> Optional[List[Dict[str, Any]]]:
+        """Victor-shaped models from the Sandhi catalog, or ``None`` to fall back.
+
+        Shared catalog policy lives in ``victor.providers.sandhi_catalog``; ``None``
+        means the installed Sandhi binding predates the catalog surface or carries no
+        curated lineup for this slug (e.g. aggregators), so ``list_models`` falls
+        through to the spec-admitted policy list.
+        """
+        from victor.providers.sandhi_catalog import models_from_sandhi
+
+        return models_from_sandhi(self.name)
 
 
 __all__ = ["SandhiOpenAICompatPolicy"]

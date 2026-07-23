@@ -244,3 +244,66 @@ def test_invalid_config_fails_closed(tmp_path: Path, yaml_text: str, error: str)
     path.write_text(yaml_text, encoding="utf-8")
     with pytest.raises(provider_config.OpenAICompatConfigError, match=error):
         provider_config._load_specs(path)
+
+
+@pytest.mark.asyncio
+async def test_list_models_uses_sandhi_catalog(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When the Sandhi catalog carries a curated lineup, list_models() serves it."""
+    provider = DeepSeekProvider(api_key="test-key", max_retries=0)
+    monkeypatch.setattr(
+        provider,
+        "_models_from_sandhi",
+        lambda: [
+            {
+                "id": "deepseek-chat",
+                "name": "DeepSeek Chat",
+                "context_window": 131_072,
+                "max_output_tokens": 8_192,
+            }
+        ],
+    )
+
+    models = await provider.list_models()
+
+    assert models == [
+        {
+            "id": "deepseek-chat",
+            "name": "DeepSeek Chat",
+            "context_window": 131_072,
+            "max_output_tokens": 8_192,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_list_models_falls_back_to_admitted_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without catalog data (aggregators, old sandhi), list_models() serves the spec policy."""
+    provider = OpenRouterProvider(api_key="test-key", max_retries=0)
+    monkeypatch.setattr(provider, "_models_from_sandhi", lambda: None)
+
+    models = await provider.list_models()
+
+    assert models == [
+        {"id": model_id, **dict(model_info)}
+        for model_id, model_info in provider.provider_spec().models.items()
+    ]
+
+
+def test_models_from_sandhi_reads_real_catalog_when_available() -> None:
+    """Integration: seeded compat vendors resolve through the real Sandhi catalog.
+
+    Skips cleanly when the installed Sandhi predates the catalog surface or the
+    compat seeding (sandhi#49), so it is not CI-flaky.
+    """
+    try:
+        import sandhi_gateway as sg
+    except Exception:  # pragma: no cover - sandhi absent
+        pytest.skip("sandhi-gateway not installed")
+    if not hasattr(sg, "provider_models_json"):
+        pytest.skip("installed sandhi predates the catalog surface (TD-0004 Phase A)")
+
+    provider = DeepSeekProvider(api_key="test-key", max_retries=0)
+    models = provider._models_from_sandhi()
+    if models is None:
+        pytest.skip("installed sandhi predates compat vendor seeding (sandhi#49)")
+    assert any(m["id"] == "deepseek-chat" for m in models)
