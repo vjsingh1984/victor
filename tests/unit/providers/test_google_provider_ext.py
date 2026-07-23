@@ -76,6 +76,7 @@ def test_api_key_mode_keeps_x_goog_api_key_scheme(google_provider):
 
 def test_oauth_mode_routes_access_token_as_bearer_to_sandhi():
     """OAuth/ADC: the access token (not an api_key placeholder) flows to Sandhi as bearer."""
+    pytest.importorskip("google.oauth2.credentials", reason="google-auth not installed")
     from types import SimpleNamespace
     from unittest.mock import MagicMock, patch
 
