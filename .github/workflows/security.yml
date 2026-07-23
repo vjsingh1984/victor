@@ -109,7 +109,6 @@ jobs:
   dependency-audit:
     name: Dependency Audit (High+Critical Blocking)
     runs-on: ubuntu-latest
-    # Was 5; bumped for the install-sandhi source-build overhead (~2m).
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
