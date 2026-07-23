@@ -49,8 +49,11 @@ typed-runtime migration ships once as 0.1.2 because there are no external compat
 For provider transport, the ownership boundary is explicit: Victor owns agent/model
 policy and normalized framework objects; Sandhi owns endpoint routing, headers, HTTP/SSE,
 wire errors, resilience, and neutral usage extraction. The active transport is the sole
-retry/timeout/circuit owner. Sandhi's catalog contains stable wire facts only, while Victor
-retains volatile model metadata and capability/discovery policy. An admitted provider has one
+retry/timeout/circuit owner. Per TD-0004, Sandhi's catalog contains stable wire facts **and
+curated model data** (id, context window, max output, wire capabilities; no pricing) exposed via
+`provider_models_json`, while Victor retains model **policy** — which models to expose/select and
+the discovery UX. (Revised 2026-07-23 by TD-0004; previously the catalog held wire facts only and
+Victor retained all model metadata.) An admitted provider has one
 Sandhi execution path with no replay, demotion, or native Python wire fallback.
 
 For OpenAI-compatible Chat Completions, Victor owns normalized history and provider/model
@@ -135,3 +138,4 @@ they are agent/UX policy, not provider transport.
 | 2026-07-18 | 1.0 | Initial ADR | Vijaykumar Singh |
 | 2026-07-21 | 1.1 | Accepted; pinned Victor/Sandhi provider ownership and migration gates | Vijaykumar Singh |
 | 2026-07-22 | 1.2 | Added explicit public Responses and ChatGPT subscription/Codex profiles | Vijaykumar Singh |
+| 2026-07-23 | 1.3 | Revised catalog boundary per TD-0004: Sandhi owns model catalog data; Victor owns policy | Vijaykumar Singh |

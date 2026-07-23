@@ -350,22 +350,29 @@ class AnthropicProvider(BaseProvider):
     async def list_models(self) -> List[Dict[str, Any]]:
         """List available Anthropic Claude models.
 
-        Uses the Anthropic SDK's live ``/v1/models`` endpoint when reachable,
-        falling back to a curated static list (``_ANTHROPIC_STATIC_MODELS``) on
-        any failure -- network error, auth failure, or the SDK being absent.
-        Transport (``chat``/``stream``) stays Sandhi-owned; the SDK client here
-        is **discovery-only** (transient), so the provider owns no generation
-        client (the TD-0002 deletion gate still holds -- parity with how
-        ``OpenAIProvider`` keeps an SDK client for ``models.list()`` while
-        completion transport is delegated to Sandhi).
+        Resolution order -- Sandhi owns the catalog **data** (TD-0004 Phase A); Victor
+        owns the catalog **policy** (shaping the facts for its consumers):
+
+        1. **Sandhi catalog** -- curated, versioned model data from
+           ``sandhi_gateway.provider_models_json``, when the installed binding exposes it.
+        2. **Live SDK discovery** -- the Anthropic SDK's ``/v1/models`` endpoint
+           (enrichment/fallback when the Sandhi catalog is absent).
+        3. **Curated static list** (``_ANTHROPIC_STATIC_MODELS``) -- offline fallback.
+
+        Transport (``chat``/``stream``) stays Sandhi-owned; any SDK client here is
+        discovery-only (transient), so the provider owns no generation client (TD-0002
+        deletion gate holds).
 
         Returns:
             List of available models with metadata
         """
+        catalog = self._models_from_sandhi()
+        if catalog is not None:
+            return catalog
         try:
             await self._ensure_valid_token()
             # Lazy import: keeps `import victor` (and CLI cold-start) off the
-            # anthropic SDK; it is only needed for discovery.
+            # anthropic SDK; it is only needed for the fallback discovery path.
             from anthropic import AsyncAnthropic
 
             async with AsyncAnthropic(
@@ -379,6 +386,43 @@ class AnthropicProvider(BaseProvider):
         except Exception as exc:  # offline, auth failure, missing SDK, or bad response
             logger.debug("anthropic live model discovery unavailable; using static list: %s", exc)
             return [dict(model) for model in _ANTHROPIC_STATIC_MODELS]
+
+    def _models_from_sandhi(self) -> Optional[List[Dict[str, Any]]]:
+        """Victor-shaped models from the Sandhi catalog, or ``None`` to fall back.
+
+        The Sandhi catalog (TD-0004) carries curated model *facts* (id, context window,
+        max output, capabilities). Victor applies catalog *policy* here -- shaping the
+        neutral descriptor into Victor's model-dict surface. Returns ``None`` when the
+        installed Sandhi binding predates the catalog surface, so ``list_models`` falls
+        through to live SDK discovery / the static list.
+        """
+        try:
+            import json
+
+            import sandhi_gateway as sg  # lazy: only needed for discovery
+        except Exception:
+            return None
+        if not hasattr(sg, "provider_models_json"):
+            return None
+        try:
+            raw = json.loads(sg.provider_models_json(self.name))
+        except Exception as exc:  # unknown provider, deserialize error, FFI failure
+            logger.debug("sandhi catalog lookup failed for %s: %s", self.name, exc)
+            return None
+        models: List[Dict[str, Any]] = []
+        for entry in raw:
+            if not isinstance(entry, dict) or not entry.get("id"):
+                continue
+            extensions = entry.get("extensions") or {}
+            models.append(
+                {
+                    "id": entry["id"],
+                    "name": extensions.get("display_name") or entry["id"],
+                    "context_window": entry.get("max_input_tokens"),
+                    "max_output_tokens": entry.get("max_output_tokens"),
+                }
+            )
+        return models or None
 
     @staticmethod
     def _model_from_sdk(model: Any) -> Dict[str, Any]:
