@@ -2073,45 +2073,7 @@ class ToolService:
             from victor.agent.argument_normalizer import ArgumentNormalizer
 
             for tc in tool_calls:
-                args = tc.get("arguments")
-                if isinstance(args, str):
-                    tc["arguments"] = ArgumentNormalizer.coerce_arg_string(args)
-                elif args is None:
-                    tc["arguments"] = {}
-
-                parsed_args = tc.get("arguments")
-                if (
-                    isinstance(parsed_args, list)
-                    and len(parsed_args) == 1
-                    and isinstance(parsed_args[0], dict)
-                ):
-                    # Forgiveness: some models wrap the arguments object in a
-                    # one-element array.
-                    self._logger.warning(
-                        "Unwrapped single-element list arguments for tool '%s'",
-                        tc.get("name"),
-                    )
-                    tc["arguments"] = parsed_args[0]
-                elif not isinstance(parsed_args, dict):
-                    # Any other non-object shape (list, int, bool, ...) would crash
-                    # downstream dict access before execution-time validation runs.
-                    # Mark the call invalid so the model receives a corrective
-                    # tool_error and can re-issue the call.
-                    type_name = type(parsed_args).__name__
-                    self._logger.warning(
-                        "Tool '%s' arguments have non-object shape (%s); "
-                        "marking invalid for corrective feedback",
-                        tc.get("name"),
-                        type_name,
-                    )
-                    tc["_invalid"] = True
-                    tc["_error"] = (
-                        f"Tool '{tc.get('name')}' arguments must be a single JSON "
-                        f"object of parameters, got {type_name}. Re-issue the call "
-                        'with an object, e.g. {"param": value}.'
-                    )
-                    tc["arguments"] = {}
-
+                ArgumentNormalizer.normalize_arguments_shape(tc)
                 parsed_args = tc.get("arguments")
                 if isinstance(parsed_args, dict):
                     tc["arguments"] = parser.normalize_args(tc.get("name", ""), parsed_args)
